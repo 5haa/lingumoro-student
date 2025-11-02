@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/widgets/carousel_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -90,6 +91,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
+                    ),
+
+                    // Carousel
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: CarouselWidget(),
                     ),
 
                     // Dashboard cards
