@@ -50,7 +50,7 @@ class StudentService {
           .select('''
             student_id,
             language_id,
-            student:students(id, full_name, email, avatar_url),
+            student:students(id, full_name, email, avatar_url, bio, province:provinces(id, name, name_ar, code)),
             language:language_courses(id, name, code, flag_url)
           ''')
           .inFilter('language_id', studentLanguages)
@@ -73,6 +73,8 @@ class StudentService {
               'full_name': studentData['full_name'],
               'email': studentData['email'],
               'avatar_url': studentData['avatar_url'],
+              'bio': studentData['bio'],
+              'province': studentData['province'],
               'languages': <Map<String, dynamic>>[],
             };
           }
@@ -114,7 +116,7 @@ class StudentService {
       final response = await _supabase
           .from('student_subscriptions')
           .select('''
-            student:students(id, full_name, email, avatar_url)
+            student:students(id, full_name, email, avatar_url, bio, province:provinces(id, name, name_ar, code))
           ''')
           .eq('language_id', languageId)
           .eq('status', 'active')
@@ -133,6 +135,8 @@ class StudentService {
               'full_name': studentData['full_name'],
               'email': studentData['email'],
               'avatar_url': studentData['avatar_url'],
+              'bio': studentData['bio'],
+              'province': studentData['province'],
             };
           }
         }

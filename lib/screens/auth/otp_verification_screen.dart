@@ -7,12 +7,14 @@ class OTPVerificationScreen extends StatefulWidget {
   final String email;
   final String fullName;
   final String? phone;
+  final String? provinceId;
 
   const OTPVerificationScreen({
     super.key,
     required this.email,
     required this.fullName,
     this.phone,
+    this.provinceId,
   });
 
   @override
@@ -89,6 +91,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         token: otp,
         fullName: widget.fullName,
         phone: widget.phone,
+        provinceId: widget.provinceId,
       );
 
       if (mounted) {

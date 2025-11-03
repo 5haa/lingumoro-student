@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/student_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:student/screens/students/student_public_profile_screen.dart';
 
 class StudentsListScreen extends StatefulWidget {
   const StudentsListScreen({super.key});
@@ -196,6 +197,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
 
   Widget _buildStudentCard(Map<String, dynamic> student) {
     final languages = student['languages'] as List<Map<String, dynamic>>? ?? [];
+    final province = student['province'] as Map<String, dynamic>?;
 
     return Card(
       elevation: 3,
@@ -203,9 +205,22 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StudentPublicProfileScreen(
+                studentId: student['id'],
+                studentData: student,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
           children: [
             // Avatar
             Container(
@@ -265,6 +280,26 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                       color: Colors.grey[600],
                     ),
                   ),
+                  if (province != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: Colors.grey[500],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${province['name']} (${province['name_ar']})',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (languages.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
@@ -319,21 +354,15 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
               ),
             ),
 
-            // Connect Icon
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.teal.shade50,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.person,
-                color: Colors.teal.shade700,
-                size: 24,
-              ),
+            // Arrow Icon
+            Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.grey[400],
+              size: 20,
             ),
           ],
         ),
+      ),
       ),
     );
   }

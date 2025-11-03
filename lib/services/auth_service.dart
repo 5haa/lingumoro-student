@@ -13,6 +13,7 @@ class AuthService {
     required String password,
     required String fullName,
     String? phone,
+    String? provinceId,
   }) async {
     // Sign up user - this will send OTP email
     final response = await _supabase.auth.signUp(
@@ -33,6 +34,7 @@ class AuthService {
     required String token,
     required String fullName,
     String? phone,
+    String? provinceId,
   }) async {
     // Verify the OTP - this will create an authenticated session
     final response = await _supabase.auth.verifyOTP(
@@ -56,6 +58,7 @@ class AuthService {
           'email': response.user!.email,
           'full_name': fullName,
           'phone': phone,
+          if (provinceId != null) 'province_id': provinceId,
         });
       }
     }

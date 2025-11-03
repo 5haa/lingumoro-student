@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/province_service.dart';
 import 'package:student/screens/auth/otp_verification_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -17,9 +18,31 @@ class _SignupScreenState extends State<SignupScreen> {
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _authService = AuthService();
+  final _provinceService = ProvinceService();
   bool _isLoading = false;
+  bool _isLoadingProvinces = true;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  List<Map<String, dynamic>> _provinces = [];
+  String? _selectedProvinceId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProvinces();
+  }
+
+  Future<void> _loadProvinces() async {
+    try {
+      final provinces = await _provinceService.getActiveProvinces();
+      setState(() {
+        _provinces = provinces;
+        _isLoadingProvinces = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingProvinces = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -44,6 +67,7 @@ class _SignupScreenState extends State<SignupScreen> {
         phone: _phoneController.text.trim().isEmpty 
             ? null 
             : _phoneController.text.trim(),
+        provinceId: _selectedProvinceId,
       );
 
       if (mounted) {
@@ -56,6 +80,7 @@ class _SignupScreenState extends State<SignupScreen> {
               phone: _phoneController.text.trim().isEmpty 
                   ? null 
                   : _phoneController.text.trim(),
+              provinceId: _selectedProvinceId,
             ),
           ),
         );
@@ -194,6 +219,50 @@ class _SignupScreenState extends State<SignupScreen> {
                             fillColor: Colors.grey.shade50,
                           ),
                         ),
+                        const SizedBox(height: 16),
+
+                        // Province dropdown
+                        _isLoadingProvinces
+                            ? Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.grey.shade50,
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : DropdownButtonFormField<String>(
+                                value: _selectedProvinceId,
+                                decoration: InputDecoration(
+                                  labelText: 'Province',
+                                  prefixIcon: const Icon(Icons.location_on),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey.shade50,
+                                ),
+                                items: _provinces.map((province) {
+                                  return DropdownMenuItem<String>(
+                                    value: province['id'],
+                                    child: Text('${province['name']} (${province['name_ar']})'),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedProvinceId = value;
+                                  });
+                                },
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please select your province';
+                                  }
+                                  return null;
+                                },
+                              ),
                         const SizedBox(height: 16),
 
                         // Password field
