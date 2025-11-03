@@ -22,14 +22,23 @@ class LanguageService {
   /// Fetch teachers for a specific language
   Future<List<Map<String, dynamic>>> getTeachersForLanguage(String languageId) async {
     try {
+      print('Fetching teachers for language ID: $languageId');
+      
       final response = await _supabase
           .from('teacher_languages')
           .select('*, teachers(*)')
           .eq('language_id', languageId);
 
-      return List<Map<String, dynamic>>.from(response);
+      print('Raw response from Supabase: $response');
+      print('Response type: ${response.runtimeType}');
+      
+      final result = List<Map<String, dynamic>>.from(response);
+      print('Converted to list, count: ${result.length}');
+      
+      return result;
     } catch (e) {
       print('Error fetching teachers for language: $e');
+      print('Stack trace: ${StackTrace.current}');
       return [];
     }
   }

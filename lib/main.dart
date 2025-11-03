@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/config/supabase_config.dart';
 import 'package:student/screens/splash_screen.dart';
+import 'package:student/screens/teachers/teachers_list_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +35,15 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: const SplashScreen(),
+      routes: {
+        '/teachers': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return TeachersListScreen(
+            languageId: args['languageId'],
+            languageName: args['languageName'],
+          );
+        },
+      },
     );
   }
 }
