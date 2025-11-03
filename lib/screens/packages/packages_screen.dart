@@ -21,15 +21,20 @@ class _PackagesScreenState extends State<PackagesScreen> {
   }
 
   Future<void> _loadPackages() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final packages = await _packageService.getActivePackages();
-      setState(() {
-        _packages = packages;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _packages = packages;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

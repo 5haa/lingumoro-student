@@ -50,97 +50,21 @@ class _PackageSelectionScreenState extends State<PackageSelectionScreen> {
     }
   }
 
-  Future<void> _handlePackageSelection(Map<String, dynamic> package) async {
-    final currentUser = _authService.currentUser;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please login to subscribe'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    // Show confirmation dialog
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Subscription'),
-        content: Text(
-          'Subscribe to ${widget.teacherName} for ${widget.languageName} with ${package['name']}?\n\n'
-          '${package['duration_minutes']} minutes per session\n'
-          '${package['sessions_per_week']} sessions per week\n'
-          '${package['total_weeks']} weeks total\n\n'
-          'Price: \$${package['price_monthly']?.toStringAsFixed(2) ?? 'N/A'}/month',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
-            ),
-            child: const Text('Confirm', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+  void _handlePackageSelection(Map<String, dynamic> package) {
+    // Navigate to payment submission screen
+    Navigator.pushNamed(
+      context,
+      '/payment-submission',
+      arguments: {
+        'teacherId': widget.teacherId,
+        'teacherName': widget.teacherName,
+        'packageId': package['id'],
+        'packageName': package['name'],
+        'languageId': widget.languageId,
+        'languageName': widget.languageName,
+        'amount': package['price_monthly'],
+      },
     );
-
-    if (confirm != true) return;
-
-    setState(() => _isSubscribing = true);
-
-    try {
-      final success = await _teacherService.createSubscription(
-        studentId: currentUser.id,
-        teacherId: widget.teacherId,
-        languageId: widget.languageId,
-        packageId: package['id'],
-      );
-
-      setState(() => _isSubscribing = false);
-
-      if (success) {
-        if (mounted) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Subscription successful!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
-          
-          // Navigate back to home or appropriate screen
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Subscription failed. Please try again.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      setState(() => _isSubscribing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
   }
 
   @override
