@@ -4,6 +4,7 @@ import 'package:student/config/supabase_config.dart';
 import 'package:student/screens/splash_screen.dart';
 import 'package:student/screens/teachers/teachers_list_screen.dart';
 import 'package:student/screens/payment/payment_submission_screen.dart';
+import 'package:student/screens/students/students_list_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,7 @@ class MyApp extends StatelessWidget {
             languageName: args['languageName'],
           );
         },
+        '/students': (context) => const StudentsListScreen(),
         '/payment-submission': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return PaymentSubmissionScreen(
