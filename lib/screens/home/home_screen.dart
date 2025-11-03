@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/language_service.dart';
 import 'package:student/widgets/carousel_widget.dart';
+import 'package:student/widgets/language_slider_widget.dart';
+import 'package:student/widgets/teacher_card_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,8 +14,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _authService = AuthService();
+  final _languageService = LanguageService();
   Map<String, dynamic>? _profile;
+  List<Map<String, dynamic>> _teachers = [];
+  String? _selectedLanguageId;
+  String? _selectedLanguageName;
   bool _isLoading = true;
+  bool _isLoadingTeachers = false;
 
   @override
   void initState() {
@@ -27,8 +35,41 @@ class _HomeScreenState extends State<HomeScreen> {
         _profile = profile;
         _isLoading = false;
       });
+      // Load all teachers with languages initially
+      _loadAllTeachers();
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadAllTeachers() async {
+    setState(() => _isLoadingTeachers = true);
+    try {
+      final teachers = await _languageService.getAllTeachersWithLanguages();
+      setState(() {
+        _teachers = teachers;
+        _isLoadingTeachers = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingTeachers = false);
+    }
+  }
+
+  Future<void> _loadTeachersForLanguage(String languageId, String languageName) async {
+    setState(() {
+      _selectedLanguageId = languageId;
+      _selectedLanguageName = languageName;
+      _isLoadingTeachers = true;
+    });
+    
+    try {
+      final teacherLanguages = await _languageService.getTeachersForLanguage(languageId);
+      setState(() {
+        _teachers = teacherLanguages;
+        _isLoadingTeachers = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingTeachers = false);
     }
   }
 
@@ -97,6 +138,153 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 16),
                       child: CarouselWidget(),
+                    ),
+
+                    // Language Slider
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: LanguageSliderWidget(
+                        onLanguageSelected: _loadTeachersForLanguage,
+                      ),
+                    ),
+
+                    // Teachers and Students Cards
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedLanguageName != null
+                                ? 'Teachers for $_selectedLanguageName'
+                                : 'Available Teachers',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          
+                          // Teachers Card
+                          Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.person_outline,
+                                        color: Colors.deepPurple.shade700,
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Teachers',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _isLoadingTeachers
+                                      ? const Center(
+                                          child: Padding(
+                                            padding: EdgeInsets.all(16.0),
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                        )
+                                      : _teachers.isEmpty
+                                          ? Padding(
+                                              padding: const EdgeInsets.all(16.0),
+                                              child: Center(
+                                                child: Text(
+                                                  _selectedLanguageName != null
+                                                      ? 'No teachers available for $_selectedLanguageName'
+                                                      : 'No teachers available',
+                                                  style: TextStyle(
+                                                    color: Colors.grey[600],
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : ListView.separated(
+                                              shrinkWrap: true,
+                                              physics: const NeverScrollableScrollPhysics(),
+                                              itemCount: _teachers.length,
+                                              separatorBuilder: (context, index) =>
+                                                  const SizedBox(height: 12),
+                                              itemBuilder: (context, index) {
+                                                return TeacherCardWidget(
+                                                  teacher: _teachers[index],
+                                                  onTap: () {
+                                                    // TODO: Navigate to teacher details
+                                                  },
+                                                );
+                                              },
+                                            ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 16),
+                          
+                          // Students Card (placeholder)
+                          Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.school_outlined,
+                                        color: Colors.deepPurple.shade700,
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Students',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Text(
+                                        'Coming soon...',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
                     // Dashboard cards
