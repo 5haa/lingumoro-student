@@ -11,6 +11,9 @@ class PaymentSubmissionScreen extends StatefulWidget {
   final String languageId;
   final String languageName;
   final double amount;
+  final List<int>? selectedDays;
+  final String? selectedStartTime;
+  final String? selectedEndTime;
 
   const PaymentSubmissionScreen({
     Key? key,
@@ -21,6 +24,9 @@ class PaymentSubmissionScreen extends StatefulWidget {
     required this.languageId,
     required this.languageName,
     required this.amount,
+    this.selectedDays,
+    this.selectedStartTime,
+    this.selectedEndTime,
   }) : super(key: key);
 
   @override
@@ -129,6 +135,9 @@ class _PaymentSubmissionScreenState extends State<PaymentSubmissionScreen> {
         amount: widget.amount,
         paymentProofUrl: imageUrl,
         studentNotes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        selectedDays: widget.selectedDays,
+        selectedStartTime: widget.selectedStartTime,
+        selectedEndTime: widget.selectedEndTime,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -191,6 +200,17 @@ class _PaymentSubmissionScreenState extends State<PaymentSubmissionScreen> {
                       _buildDetailRow('Teacher', widget.teacherName),
                       _buildDetailRow('Language', widget.languageName),
                       _buildDetailRow('Package', widget.packageName),
+                      if (widget.selectedDays != null && widget.selectedDays!.isNotEmpty) ...[
+                        _buildDetailRow(
+                          'Selected Days',
+                          _formatDays(widget.selectedDays!),
+                        ),
+                        if (widget.selectedStartTime != null && widget.selectedEndTime != null)
+                          _buildDetailRow(
+                            'Time Slot',
+                            '${_formatTime(widget.selectedStartTime!)} - ${_formatTime(widget.selectedEndTime!)}',
+                          ),
+                      ],
                       _buildDetailRow(
                         'Amount',
                         '\$${widget.amount.toStringAsFixed(2)}',
@@ -437,6 +457,23 @@ class _PaymentSubmissionScreenState extends State<PaymentSubmissionScreen> {
       default:
         return Icons.payment;
     }
+  }
+
+  String _formatDays(List<int> days) {
+    final dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    final sortedDays = List<int>.from(days)..sort();
+    return sortedDays.map((d) => dayNames[d]).join(', ');
+  }
+
+  String _formatTime(String time) {
+    final parts = time.split(':');
+    final hour = int.parse(parts[0]);
+    final minute = parts[1];
+    
+    if (hour == 0) return '12:$minute AM';
+    if (hour < 12) return '$hour:$minute AM';
+    if (hour == 12) return '12:$minute PM';
+    return '${hour - 12}:$minute PM';
   }
 
   @override

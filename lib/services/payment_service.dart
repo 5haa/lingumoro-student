@@ -53,6 +53,9 @@ class PaymentService {
     required double amount,
     required String paymentProofUrl,
     String? studentNotes,
+    List<int>? selectedDays,
+    String? selectedStartTime,
+    String? selectedEndTime,
   }) async {
     try {
       final user = _supabase.auth.currentUser;
@@ -68,6 +71,9 @@ class PaymentService {
         'payment_proof_url': paymentProofUrl,
         'student_notes': studentNotes,
         'status': 'pending',
+        if (selectedDays != null) 'selected_days': selectedDays,
+        if (selectedStartTime != null) 'selected_start_time': selectedStartTime,
+        if (selectedEndTime != null) 'selected_end_time': selectedEndTime,
       }).select().single();
 
       return response;

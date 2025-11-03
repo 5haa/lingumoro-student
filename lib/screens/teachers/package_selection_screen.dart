@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:student/services/package_service.dart';
 import 'package:student/services/teacher_service.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/screens/teachers/day_time_selection_screen.dart';
 import 'dart:convert';
 
 class PackageSelectionScreen extends StatefulWidget {
@@ -51,19 +52,22 @@ class _PackageSelectionScreenState extends State<PackageSelectionScreen> {
   }
 
   void _handlePackageSelection(Map<String, dynamic> package) {
-    // Navigate to payment submission screen
-    Navigator.pushNamed(
+    // Navigate to day/time selection screen
+    Navigator.push(
       context,
-      '/payment-submission',
-      arguments: {
-        'teacherId': widget.teacherId,
-        'teacherName': widget.teacherName,
-        'packageId': package['id'],
-        'packageName': package['name'],
-        'languageId': widget.languageId,
-        'languageName': widget.languageName,
-        'amount': package['price_monthly'],
-      },
+      MaterialPageRoute(
+        builder: (context) => DayTimeSelectionScreen(
+          teacherId: widget.teacherId,
+          teacherName: widget.teacherName,
+          languageId: widget.languageId,
+          languageName: widget.languageName,
+          packageId: package['id'],
+          packageName: package['name'],
+          amount: (package['price_monthly'] ?? 0).toDouble(),
+          sessionsPerWeek: package['sessions_per_week'] ?? 5,
+          durationMinutes: package['duration_minutes'] ?? 60,
+        ),
+      ),
     );
   }
 
