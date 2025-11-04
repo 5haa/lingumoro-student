@@ -262,7 +262,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   }
                                   return null;
                                 },
-                              ),
+                        ),
                         const SizedBox(height: 16),
 
                         // Password field

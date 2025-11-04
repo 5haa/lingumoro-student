@@ -3,6 +3,7 @@ import 'package:student/services/teacher_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/screens/teachers/package_selection_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class TeacherDetailScreen extends StatefulWidget {
   final String teacherId;
@@ -28,6 +29,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   bool _isLoading = true;
   bool _hasSubscription = false;
   bool _isCheckingSubscription = true;
+  YoutubePlayerController? _youtubeController;
 
   final List<String> _dayNames = [
     'Sunday',
@@ -60,6 +62,9 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
           _isLoading = false;
         });
         
+        // Initialize YouTube player if intro video exists
+        _initializeYouTubePlayer();
+        
         // Check if student has subscription
         _checkSubscription();
       } else {
@@ -68,6 +73,30 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _initializeYouTubePlayer() {
+    final videoUrl = _teacher?['intro_video_url'] as String?;
+    if (videoUrl != null && videoUrl.isNotEmpty) {
+      final videoId = YoutubePlayer.convertUrlToId(videoUrl);
+      if (videoId != null) {
+        _youtubeController = YoutubePlayerController(
+          initialVideoId: videoId,
+          flags: const YoutubePlayerFlags(
+            autoPlay: false,
+            mute: false,
+            enableCaption: true,
+            controlsVisibleAtStart: true,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _youtubeController?.dispose();
+    super.dispose();
   }
 
   Future<void> _checkSubscription() async {
@@ -259,6 +288,39 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             ),
 
             const SizedBox(height: 24),
+
+            // Intro Video Section
+            if (_youtubeController != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Introduction Video',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: YoutubePlayer(
+                        controller: _youtubeController!,
+                        showVideoProgressIndicator: true,
+                        progressIndicatorColor: Colors.deepPurple,
+                        progressColors: ProgressBarColors(
+                          playedColor: Colors.deepPurple,
+                          handleColor: Colors.deepPurpleAccent,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
 
             // About Section
             if (_teacher!['bio'] != null)

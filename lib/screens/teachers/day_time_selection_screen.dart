@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:student/services/teacher_service.dart';
+import 'package:student/services/timeslot_service.dart';
+import 'package:student/screens/payment/payment_submission_screen.dart';
 
 class DayTimeSelectionScreen extends StatefulWidget {
   final String teacherId;
@@ -30,19 +31,13 @@ class DayTimeSelectionScreen extends StatefulWidget {
 }
 
 class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
-  final _teacherService = TeacherService();
+  final _timeslotService = TimeslotService();
   
-  Map<String, dynamic>? _teacher;
-  List<Map<String, dynamic>> _schedules = [];
+  Map<int, List<Map<String, dynamic>>> _availableTimeslots = {};
   bool _isLoading = true;
+  String? _errorMessage;
   
-  // Selected days (0 = Sunday, 6 = Saturday)
   Set<int> _selectedDays = {};
-  
-  // Available time slots grouped by day
-  Map<int, List<Map<String, String>>> _availableTimeSlots = {};
-  
-  // Selected time slot
   String? _selectedStartTime;
   String? _selectedEndTime;
   
@@ -61,95 +56,30 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _loadTeacherSchedule();
+    _loadAvailableTimeslots();
   }
 
-  Future<void> _loadTeacherSchedule() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadAvailableTimeslots() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     
     try {
-      final teacherData = await _teacherService.getTeacherWithSchedule(widget.teacherId);
+      final slots = await _timeslotService.getAvailableTimeslots(
+        teacherId: widget.teacherId,
+      );
       
-      if (teacherData != null) {
-        final schedules = teacherData['schedules'] as List<Map<String, dynamic>>? ?? [];
-        
-        // Process schedules and group by day
-        _processSchedules(schedules);
-        
-        setState(() {
-          _teacher = teacherData;
-          _schedules = schedules;
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading schedule: $e')),
-        );
-      }
-    }
-  }
-
-  void _processSchedules(List<Map<String, dynamic>> schedules) {
-    _availableTimeSlots.clear();
-    
-    for (var schedule in schedules) {
-      if (schedule['is_available'] == true) {
-        final dayOfWeek = schedule['day_of_week'] as int;
-        final startTime = schedule['start_time'] as String;
-        final endTime = schedule['end_time'] as String;
-        
-        // Generate time slots based on package duration
-        final slots = _generateTimeSlotsFromRange(startTime, endTime, widget.durationMinutes);
-        
-        if (!_availableTimeSlots.containsKey(dayOfWeek)) {
-          _availableTimeSlots[dayOfWeek] = [];
-        }
-        
-        _availableTimeSlots[dayOfWeek]!.addAll(slots);
-      }
-    }
-  }
-
-  List<Map<String, String>> _generateTimeSlotsFromRange(String startTime, String endTime, int durationMinutes) {
-    final slots = <Map<String, String>>[];
-    
-    // Parse start and end times
-    final startParts = startTime.split(':');
-    final endParts = endTime.split(':');
-    
-    final startHour = int.parse(startParts[0]);
-    final startMinute = int.parse(startParts[1]);
-    final endHour = int.parse(endParts[0]);
-    final endMinute = int.parse(endParts[1]);
-    
-    // Convert to minutes since midnight
-    var currentMinutes = startHour * 60 + startMinute;
-    final endMinutes = endHour * 60 + endMinute;
-    
-    // Generate slots
-    while (currentMinutes + durationMinutes <= endMinutes) {
-      final slotStartHour = currentMinutes ~/ 60;
-      final slotStartMinute = currentMinutes % 60;
-      
-      final slotEndMinutes = currentMinutes + durationMinutes;
-      final slotEndHour = slotEndMinutes ~/ 60;
-      final slotEndMinute = slotEndMinutes % 60;
-      
-      slots.add({
-        'start_time': '${slotStartHour.toString().padLeft(2, '0')}:${slotStartMinute.toString().padLeft(2, '0')}:00',
-        'end_time': '${slotEndHour.toString().padLeft(2, '0')}:${slotEndMinute.toString().padLeft(2, '0')}:00',
+      setState(() {
+        _availableTimeslots = slots;
+        _isLoading = false;
       });
-      
-      // Move to next slot (30 min intervals for flexibility)
-      currentMinutes += 30;
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading available timeslots: ${e.toString()}';
+        _isLoading = false;
+      });
     }
-    
-    return slots;
   }
 
   void _toggleDay(int day) {
@@ -199,23 +129,23 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
       );
       return;
     }
-    
-    // Navigate to payment submission with selected days and time
-    Navigator.pushNamed(
+
+    Navigator.push(
       context,
-      '/payment-submission',
-      arguments: {
-        'teacherId': widget.teacherId,
-        'teacherName': widget.teacherName,
-        'packageId': widget.packageId,
-        'packageName': widget.packageName,
-        'languageId': widget.languageId,
-        'languageName': widget.languageName,
-        'amount': widget.amount,
-        'selectedDays': _selectedDays.toList(),
-        'selectedStartTime': _selectedStartTime,
-        'selectedEndTime': _selectedEndTime,
-      },
+      MaterialPageRoute(
+        builder: (context) => PaymentSubmissionScreen(
+          teacherId: widget.teacherId,
+          teacherName: widget.teacherName,
+          packageId: widget.packageId,
+          packageName: widget.packageName,
+          languageId: widget.languageId,
+          languageName: widget.languageName,
+          amount: widget.amount,
+          selectedDays: _selectedDays.toList(),
+          selectedStartTime: _selectedStartTime,
+          selectedEndTime: _selectedEndTime,
+        ),
+      ),
     );
   }
 
@@ -223,76 +153,97 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Schedule'),
+        title: const Text('Select Days & Time'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Progress indicator
-                _buildProgressIndicator(),
-                
-                // Content
-                Expanded(
-                  child: _currentStep == 0
-                      ? _buildDaySelection()
-                      : _buildTimeSelection(),
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
+                        const SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: _loadAvailableTimeslots,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    // Progress indicator
+                    _buildProgressIndicator(),
+                    
+                    // Content
+                    Expanded(
+                      child: _currentStep == 0
+                          ? _buildDaySelection()
+                          : _buildTimeSelection(),
+                    ),
+                  ],
                 ),
-                
-                // Bottom button
-                _buildBottomButton(),
-              ],
-            ),
     );
   }
 
   Widget _buildProgressIndicator() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.deepPurple.shade50,
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.deepPurple.shade100,
-            width: 1,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 2),
           ),
-        ),
+        ],
       ),
       child: Row(
         children: [
-          _buildProgressStep(1, 'Select Days', _currentStep >= 0),
+          _buildStepIndicator(0, 'Select Days', Icons.calendar_today),
           Expanded(
             child: Container(
               height: 2,
               color: _currentStep >= 1 ? Colors.deepPurple : Colors.grey.shade300,
             ),
           ),
-          _buildProgressStep(2, 'Select Time', _currentStep >= 1),
+          _buildStepIndicator(1, 'Select Time', Icons.access_time),
         ],
       ),
     );
   }
 
-  Widget _buildProgressStep(int step, String label, bool isActive) {
+  Widget _buildStepIndicator(int step, String label, IconData icon) {
+    final isActive = _currentStep == step;
+    final isCompleted = _currentStep > step;
+    
     return Row(
       children: [
         Container(
-          width: 32,
-          height: 32,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
-            color: isActive ? Colors.deepPurple : Colors.grey.shade300,
             shape: BoxShape.circle,
+            color: isActive || isCompleted ? Colors.deepPurple : Colors.grey.shade300,
           ),
-          child: Center(
-            child: Text(
-              '$step',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          child: Icon(
+            isCompleted ? Icons.check : icon,
+            color: Colors.white,
+            size: 20,
           ),
         ),
         const SizedBox(width: 8),
@@ -301,7 +252,7 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? Colors.deepPurple : Colors.grey.shade600,
+            color: isActive || isCompleted ? Colors.deepPurple : Colors.grey,
           ),
         ),
       ],
@@ -309,8 +260,7 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
   }
 
   Widget _buildDaySelection() {
-    // Get available days from teacher's schedule
-    final availableDays = _availableTimeSlots.keys.toList()..sort();
+    final availableDays = _availableTimeslots.keys.toList()..sort();
     
     if (availableDays.length < widget.sessionsPerWeek) {
       return Center(
@@ -393,10 +343,10 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
           
           ...availableDays.map((day) {
             final isSelected = _selectedDays.contains(day);
-            final timeSlots = _availableTimeSlots[day]!;
+            final timeSlots = _availableTimeslots[day]!;
             
             return Card(
-              elevation: isSelected ? 4 : 2,
+              elevation: isSelected ? 4 : 1,
               margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -418,17 +368,13 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
+                            color: isSelected ? Colors.deepPurple : Colors.grey,
                             width: 2,
                           ),
                           color: isSelected ? Colors.deepPurple : Colors.transparent,
                         ),
                         child: isSelected
-                            ? const Icon(
-                                Icons.check,
-                                size: 16,
-                                color: Colors.white,
-                              )
+                            ? const Icon(Icons.check, size: 16, color: Colors.white)
                             : null,
                       ),
                       const SizedBox(width: 16),
@@ -446,92 +392,150 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${timeSlots.length} time slot${timeSlots.length > 1 ? 's' : ''} available',
+                              '${timeSlots.length} available 30-min slots',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: Colors.grey[600],
                               ),
                             ),
                           ],
                         ),
                       ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: isSelected ? Colors.deepPurple : Colors.grey,
+                        size: 16,
+                      ),
                     ],
                   ),
                 ),
               ),
             );
-          }),
+          }).toList(),
+          
+          const SizedBox(height: 24),
+          
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _canProceedToTimeSelection() ? _proceedToTimeSelection : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 4,
+              ),
+              child: const Text(
+                'Continue to Time Selection',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildTimeSelection() {
-    // Get common time slots available for all selected days
-    List<Map<String, String>> commonTimeSlots = [];
-    
-    if (_selectedDays.isNotEmpty) {
-      // Start with first selected day's slots
-      final firstDay = _selectedDays.first;
-      commonTimeSlots = List.from(_availableTimeSlots[firstDay] ?? []);
-      
-      // Find intersection with other days
-      for (var day in _selectedDays.skip(1)) {
-        final daySlots = _availableTimeSlots[day] ?? [];
-        commonTimeSlots.retainWhere((slot) {
-          return daySlots.any((daySlot) =>
-              daySlot['start_time'] == slot['start_time'] &&
-              daySlot['end_time'] == slot['end_time']);
-        });
-      }
-    }
+    return FutureBuilder<List<Map<String, String>>>(
+      future: _timeslotService.getCommonTimeslots(
+        teacherId: widget.teacherId,
+        days: _selectedDays.toList(),
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading timeslots',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    snapshot.error.toString(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        final commonSlots = snapshot.data ?? [];
+        
+        if (commonSlots.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.orange.shade400),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No common time slots available',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'The selected days don\'t have any matching available time slots. Please select different days.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() => _currentStep = 0);
+                    },
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Change Days'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        return _buildTimeSelectionContent(commonSlots);
+      },
+    );
+  }
 
-    if (commonTimeSlots.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.orange.shade400),
-              const SizedBox(height: 16),
-              const Text(
-                'No common time slots',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'The selected days don\'t have any overlapping time slots. Please go back and select different days.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _currentStep = 0;
-                  });
-                },
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Back to Day Selection'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+  Widget _buildTimeSelectionContent(List<Map<String, String>> commonSlots) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -539,14 +543,14 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
         children: [
           const Text(
             'Select your preferred time slot',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'This ${widget.durationMinutes}-minute slot will be used for all selected days',
+            'This 30-minute slot will be used for all selected days',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
@@ -566,7 +570,7 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Selected days: ${_selectedDays.map((d) => _dayNames[d]).join(', ')}',
+                    'Selected days: ${_selectedDays.map((d) => _dayNames[d]).join(", ")}',
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.blue.shade900,
@@ -578,13 +582,13 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
           ),
           const SizedBox(height: 20),
           
-          ...commonTimeSlots.map((slot) {
+          ...commonSlots.map((slot) {
             final startTime = slot['start_time']!;
             final endTime = slot['end_time']!;
             final isSelected = _selectedStartTime == startTime && _selectedEndTime == endTime;
             
             return Card(
-              elevation: isSelected ? 4 : 2,
+              elevation: isSelected ? 4 : 1,
               margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -601,122 +605,98 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
                   child: Row(
                     children: [
                       Container(
-                        width: 24,
-                        height: 24,
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
-                            width: 2,
-                          ),
-                          color: isSelected ? Colors.deepPurple : Colors.transparent,
+                          color: isSelected ? Colors.deepPurple.shade50 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: isSelected
-                            ? const Icon(
-                                Icons.check,
-                                size: 16,
-                                color: Colors.white,
-                              )
-                            : null,
+                        child: Icon(
+                          Icons.access_time,
+                          color: isSelected ? Colors.deepPurple : Colors.grey[600],
+                          size: 28,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 20,
-                              color: isSelected ? Colors.deepPurple : Colors.grey[600],
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatTime(startTime),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.deepPurple : Colors.black87,
-                              ),
-                            ),
-                            Text(
-                              ' - ',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            Text(
-                              _formatTime(endTime),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.deepPurple : Colors.black87,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          '${_formatTime(startTime)} - ${_formatTime(endTime)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.deepPurple : Colors.black87,
+                          ),
                         ),
                       ),
+                      if (isSelected)
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.deepPurple,
+                          ),
+                          child: const Icon(Icons.check, size: 16, color: Colors.white),
+                        ),
                     ],
                   ),
                 ),
               ),
             );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomButton() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          if (_currentStep == 1)
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () {
-                  setState(() {
-                    _currentStep = 0;
-                  });
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: const BorderSide(color: Colors.deepPurple),
-                ),
-                child: const Text('Back'),
-              ),
-            ),
-          if (_currentStep == 1) const SizedBox(width: 12),
-          Expanded(
-            flex: _currentStep == 0 ? 1 : 2,
-            child: ElevatedButton(
-              onPressed: _currentStep == 0
-                  ? (_canProceedToTimeSelection() ? _proceedToTimeSelection : null)
-                  : (_selectedStartTime != null ? _proceedToPayment : null),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                disabledBackgroundColor: Colors.grey.shade300,
-              ),
-              child: Text(
-                _currentStep == 0 ? 'Continue' : 'Proceed to Payment',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+          }).toList(),
+          
+          const SizedBox(height: 24),
+          
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      _currentStep = 0;
+                      _selectedStartTime = null;
+                      _selectedEndTime = null;
+                    });
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.deepPurple),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Back to Days',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.deepPurple,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _selectedStartTime != null ? _proceedToPayment : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 4,
+                  ),
+                  child: const Text(
+                    'Proceed to Payment',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -724,7 +704,6 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
   }
 
   String _formatTime(String time) {
-    // Format time from "HH:MM:SS" to "HH:MM AM/PM"
     final parts = time.split(':');
     final hour = int.parse(parts[0]);
     final minute = parts[1];
@@ -735,4 +714,5 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
     return '${hour - 12}:$minute PM';
   }
 }
+
 

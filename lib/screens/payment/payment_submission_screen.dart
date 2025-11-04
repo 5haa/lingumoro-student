@@ -43,11 +43,52 @@ class _PaymentSubmissionScreenState extends State<PaymentSubmissionScreen> {
   File? _paymentProofImage;
   bool _isLoading = false;
   bool _isSubmitting = false;
+  bool _hasPendingPayment = false;
 
   @override
   void initState() {
     super.initState();
+    _checkPendingPayment();
     _loadPaymentMethods();
+  }
+
+  Future<void> _checkPendingPayment() async {
+    try {
+      final pendingPayment = await _paymentService.getPendingPayment(
+        teacherId: widget.teacherId,
+        packageId: widget.packageId,
+      );
+      
+      if (pendingPayment != null && mounted) {
+        setState(() => _hasPendingPayment = true);
+        
+        // Show dialog and go back
+        Future.delayed(Duration.zero, () {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Payment Pending'),
+              content: const Text(
+                'You already have a pending payment for this course. '
+                'Please wait for admin approval or rejection before submitting again.',
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      print('Error checking pending payment: $e');
+    }
   }
 
   Future<void> _loadPaymentMethods() async {

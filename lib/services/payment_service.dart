@@ -61,6 +61,7 @@ class PaymentService {
       final user = _supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
+      // Insert payment submission
       final response = await _supabase.from('payment_submissions').insert({
         'student_id': user.id,
         'teacher_id': teacherId,
@@ -75,6 +76,24 @@ class PaymentService {
         if (selectedStartTime != null) 'selected_start_time': selectedStartTime,
         if (selectedEndTime != null) 'selected_end_time': selectedEndTime,
       }).select().single();
+
+      // Reserve timeslots temporarily (48 hours) if schedule was provided
+      if (selectedDays != null && selectedDays.isNotEmpty && 
+          selectedStartTime != null && selectedEndTime != null) {
+        try {
+          await _supabase.rpc('reserve_timeslots_temporarily', params: {
+            'p_teacher_id': teacherId,
+            'p_payment_id': response['id'],
+            'p_days': selectedDays,
+            'p_start_time': selectedStartTime,
+            'p_end_time': selectedEndTime,
+            'p_reservation_hours': 48,
+          });
+        } catch (e) {
+          print('Warning: Could not reserve timeslots: $e');
+          // Continue even if reservation fails - payment is submitted
+        }
+      }
 
       return response;
     } catch (e) {

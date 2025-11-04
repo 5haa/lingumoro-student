@@ -61,6 +61,9 @@ dependencies:
   
   # Image picker for payment proof upload
   image_picker: ^1.0.7
+  
+  # YouTube player for intro videos
+  youtube_player_flutter: ^9.0.3
 
 dev_dependencies:
   flutter_test:
