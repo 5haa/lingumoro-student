@@ -198,7 +198,6 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   Widget _buildStudentCard(Map<String, dynamic> student) {
     final languages = student['languages'] as List<Map<String, dynamic>>? ?? [];
     final province = student['province'] as Map<String, dynamic>?;
-    final level = student['level'] as String? ?? 'Beginner';
 
     return Card(
       elevation: 3,
@@ -280,45 +279,6 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                       fontSize: 14,
                       color: Colors.grey[600],
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Level Badge
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.amber.shade300,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star,
-                              size: 14,
-                              color: Colors.amber.shade700,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              level,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.amber.shade900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
                   if (province != null) ...[
                     const SizedBox(height: 4),

@@ -26,12 +26,16 @@ class _CarouselWidgetState extends State<CarouselWidget> {
   Future<void> _loadSlides() async {
     try {
       final slides = await _carouselService.getActiveSlides();
-      setState(() {
-        _slides = slides;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _slides = slides;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -97,9 +101,11 @@ class _CarouselWidgetState extends State<CarouselWidget> {
             autoPlayAnimationDuration: const Duration(milliseconds: 800),
             autoPlayCurve: Curves.fastOutSlowIn,
             onPageChanged: (index, reason) {
-              setState(() {
-                _currentIndex = index;
-              });
+              if (mounted) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              }
             },
           ),
           items: _slides.map((slide) {

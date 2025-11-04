@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:student/services/practice_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
+import 'package:student/screens/practice/reading_screen.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class PracticeScreen extends StatefulWidget {
@@ -11,9 +12,10 @@ class PracticeScreen extends StatefulWidget {
   State<PracticeScreen> createState() => _PracticeScreenState();
 }
 
-class _PracticeScreenState extends State<PracticeScreen> {
+class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProviderStateMixin {
   final _practiceService = PracticeService();
   final _authService = AuthService();
+  late TabController _tabController;
   
   List<Map<String, dynamic>> _videos = [];
   Map<String, bool> _watchedVideos = {};
@@ -24,7 +26,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadPracticeVideos();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPracticeVideos() async {
@@ -91,14 +100,38 @@ class _PracticeScreenState extends State<PracticeScreen> {
         title: const Text('Practice'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.video_library),
+              text: 'Videos',
+            ),
+            Tab(
+              icon: Icon(Icons.auto_stories),
+              text: 'Reading',
+            ),
+          ],
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? _buildErrorState()
-              : _videos.isEmpty
-                  ? _buildEmptyState()
-                  : _buildVideoList(),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Videos Tab
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _errorMessage != null
+                  ? _buildErrorState()
+                  : _videos.isEmpty
+                      ? _buildEmptyState()
+                      : _buildVideoList(),
+          // Reading Tab
+          const ReadingScreen(),
+        ],
+      ),
     );
   }
 
