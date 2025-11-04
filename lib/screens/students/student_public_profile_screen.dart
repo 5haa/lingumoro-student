@@ -16,6 +16,7 @@ class StudentPublicProfileScreen extends StatelessWidget {
     final languages = studentData['languages'] as List<Map<String, dynamic>>? ?? [];
     final province = studentData['province'] as Map<String, dynamic>?;
     final bio = studentData['bio'] as String?;
+    final level = studentData['level'] as String? ?? 'Beginner';
 
     return Scaffold(
       body: CustomScrollView(
@@ -90,6 +91,41 @@ class StudentPublicProfileScreen extends StatelessWidget {
                           color: Colors.white,
                         ),
                         textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      // Level Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.5),
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              level,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       // Province

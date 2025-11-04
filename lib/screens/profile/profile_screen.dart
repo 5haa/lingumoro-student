@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/level_service.dart';
 import 'package:student/screens/auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -11,7 +12,9 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
+  final _levelService = LevelService();
   Map<String, dynamic>? _profile;
+  Map<String, dynamic>? _levelProgress;
   bool _isLoading = true;
 
   @override
@@ -23,8 +26,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     try {
       final profile = await _authService.getStudentProfile();
+      final studentId = _authService.currentUser?.id;
+      
+      Map<String, dynamic>? progress;
+      if (studentId != null) {
+        progress = await _levelService.getStudentProgress(studentId);
+      }
+      
       setState(() {
         _profile = profile;
+        _levelProgress = progress;
         _isLoading = false;
       });
     } catch (e) {
@@ -132,6 +143,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ],
+                          const SizedBox(height: 24),
+                          // Level and Points Display
+                          if (_levelProgress != null) _buildLevelProgressWidget(),
                         ],
                       ),
                     ),
@@ -302,6 +316,159 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       return dateString;
     }
+  }
+
+  Widget _buildLevelProgressWidget() {
+    final points = _levelProgress!['points'] as int;
+    final level = _levelProgress!['level'] as String;
+    final isMaxLevel = _levelProgress!['isMaxLevel'] as bool;
+    final progressPercent = _levelProgress!['progressPercent'] as double;
+    final nextLevel = _levelProgress!['nextLevel'] as String?;
+    final pointsToNext = _levelProgress!['pointsToNext'] as int;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Current level
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.stars,
+                    color: Colors.amber.shade300,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Current Level',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      Text(
+                        level,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade300,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.star,
+                      size: 18,
+                      color: Colors.amber.shade900,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$points',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          if (!isMaxLevel) ...[
+            const SizedBox(height: 16),
+            // Progress bar
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Progress to $nextLevel',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    Text(
+                      '$pointsToNext points to go',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: progressPercent / 100,
+                    minHeight: 8,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.amber.shade300,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.emoji_events,
+                  color: Colors.amber.shade300,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Max Level Reached!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
