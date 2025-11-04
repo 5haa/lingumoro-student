@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/teacher_service.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/rating_service.dart';
 import 'package:student/screens/teachers/package_selection_screen.dart';
+import 'package:student/widgets/rating_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
@@ -24,8 +26,13 @@ class TeacherDetailScreen extends StatefulWidget {
 class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   final _teacherService = TeacherService();
   final _authService = AuthService();
+  final _ratingService = RatingService();
   Map<String, dynamic>? _teacher;
   List<Map<String, dynamic>> _schedules = [];
+  Map<String, dynamic>? _ratingStats;
+  List<Map<String, dynamic>> _reviews = [];
+  Map<String, dynamic>? _myRating;
+  bool _canRate = false;
   bool _isLoading = true;
   bool _hasSubscription = false;
   bool _isCheckingSubscription = true;
@@ -56,22 +63,55 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       if (teacherData != null) {
         final schedules = teacherData['schedules'] as List<Map<String, dynamic>>? ?? [];
         
+        // Load rating data
+        final ratingStats = await _ratingService.getTeacherRatingStats(widget.teacherId);
+        final reviews = await _ratingService.getTeacherRatings(widget.teacherId);
+        
         setState(() {
           _teacher = teacherData;
           _schedules = schedules;
+          _ratingStats = ratingStats;
+          _reviews = reviews;
           _isLoading = false;
         });
         
         // Initialize YouTube player if intro video exists
         _initializeYouTubePlayer();
         
-        // Check if student has subscription
+        // Check if student has subscription and can rate
         _checkSubscription();
+        _checkCanRate();
       } else {
         setState(() => _isLoading = false);
       }
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _checkCanRate() async {
+    final currentUser = _authService.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      final canRate = await _ratingService.canRateTeacher(
+        currentUser.id,
+        widget.teacherId,
+      );
+      
+      if (canRate) {
+        final myRating = await _ratingService.getStudentRating(
+          currentUser.id,
+          widget.teacherId,
+        );
+        
+        setState(() {
+          _canRate = canRate;
+          _myRating = myRating;
+        });
+      }
+    } catch (e) {
+      print('Error checking if can rate: $e');
     }
   }
 
@@ -141,6 +181,71 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
           teacherName: _teacher?['full_name'] ?? 'Teacher',
           languageId: widget.languageId,
           languageName: widget.languageName,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleRatingSubmit(int rating, String? comment) async {
+    final currentUser = _authService.currentUser;
+    if (currentUser == null) return;
+
+    final success = await _ratingService.submitRating(
+      studentId: currentUser.id,
+      teacherId: widget.teacherId,
+      rating: rating,
+      comment: comment,
+    );
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Rating submitted successfully!'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Reload teacher data to show updated rating
+        _loadTeacherData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to submit rating. Please try again.'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showRatingDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: RatingInput(
+            initialRating: _myRating?['rating'] as int?,
+            initialComment: _myRating?['comment'] as String?,
+            onSubmit: (rating, comment) async {
+              Navigator.pop(context);
+              await _handleRatingSubmit(rating, comment);
+            },
+          ),
         ),
       ),
     );
@@ -283,6 +388,26 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                         ),
                       ),
                     ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Rating Display
+                  if (_ratingStats != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: RatingDisplay(
+                        averageRating: (_ratingStats!['average_rating'] as num?)?.toDouble() ?? 0.0,
+                        totalRatings: (_ratingStats!['total_ratings'] as int?) ?? 0,
+                        compact: true,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -401,6 +526,80 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             ),
 
             const SizedBox(height: 32),
+
+            // Rating Stats Section
+            if (_ratingStats != null && ((_ratingStats!['total_ratings'] as int?) ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: RatingDisplay(
+                  averageRating: (_ratingStats!['average_rating'] as num?)?.toDouble() ?? 0.0,
+                  totalRatings: (_ratingStats!['total_ratings'] as int?) ?? 0,
+                  starCounts: {
+                    5: (_ratingStats!['five_star_count'] as int?) ?? 0,
+                    4: (_ratingStats!['four_star_count'] as int?) ?? 0,
+                    3: (_ratingStats!['three_star_count'] as int?) ?? 0,
+                    2: (_ratingStats!['two_star_count'] as int?) ?? 0,
+                    1: (_ratingStats!['one_star_count'] as int?) ?? 0,
+                  },
+                ),
+              ),
+
+            if (_ratingStats != null && ((_ratingStats!['total_ratings'] as int?) ?? 0) > 0)
+              const SizedBox(height: 24),
+
+            // Rate Teacher Button (if eligible)
+            if (_canRate)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: OutlinedButton.icon(
+                  onPressed: _showRatingDialog,
+                  icon: Icon(
+                    _myRating != null ? Icons.edit : Icons.star_outline,
+                    color: Colors.deepPurple,
+                  ),
+                  label: Text(
+                    _myRating != null ? 'Update Your Rating' : 'Rate This Teacher',
+                    style: const TextStyle(
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.deepPurple, width: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+
+            if (_canRate)
+              const SizedBox(height: 24),
+
+            // Reviews Section
+            if (_reviews.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Student Reviews',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ..._reviews.map((review) => RatingReviewCard(review: review)),
+                  ],
+                ),
+              ),
+
+            if (_reviews.isNotEmpty)
+              const SizedBox(height: 32),
 
             // Subscribe Button
             Padding(
