@@ -64,6 +64,15 @@ dependencies:
   
   # YouTube player for intro videos
   youtube_player_flutter: ^9.0.3
+  
+  # File picker for chat attachments
+  file_picker: ^8.1.2
+  
+  # Intl for date formatting
+  intl: ^0.20.0
+  
+  # Path provider for file handling
+  path_provider: ^2.1.1
 
 dev_dependencies:
   flutter_test:
