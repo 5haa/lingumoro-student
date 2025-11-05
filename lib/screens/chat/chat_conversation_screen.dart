@@ -59,11 +59,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     _chatService.subscribeToMessages(widget.conversationId);
     _chatService.onMessage.listen((message) {
       if (mounted) {
-        setState(() {
-          _messages.add(message);
-        });
-        _scrollToBottom();
-        _markMessagesAsRead();
+        // Check if message already exists to prevent duplicates
+        final messageId = message['id'];
+        final exists = _messages.any((m) => m['id'] == messageId);
+        
+        if (!exists) {
+          setState(() {
+            _messages.add(message);
+          });
+          _scrollToBottom();
+          _markMessagesAsRead();
+        }
       }
     });
 
@@ -146,9 +152,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       }
 
       if (message != null) {
-        setState(() {
-          _messages.add(message!);
-        });
+        // Don't add to local state - let realtime subscription handle it
+        // to avoid duplicates
         _scrollToBottom();
       } else {
         _showError('Failed to send message');

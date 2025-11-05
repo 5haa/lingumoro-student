@@ -14,15 +14,18 @@ class ChatService {
   RealtimeChannel? _messagesChannel;
   RealtimeChannel? _conversationsChannel;
   RealtimeChannel? _typingChannel;
+  RealtimeChannel? _chatRequestsChannel;
   
   // Stream controllers
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
   final _conversationUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   final _typingController = StreamController<Map<String, dynamic>>.broadcast();
+  final _chatRequestController = StreamController<Map<String, dynamic>>.broadcast();
   
   Stream<Map<String, dynamic>> get onMessage => _messageController.stream;
   Stream<Map<String, dynamic>> get onConversationUpdate => _conversationUpdateController.stream;
   Stream<Map<String, dynamic>> get onTyping => _typingController.stream;
+  Stream<Map<String, dynamic>> get onChatRequest => _chatRequestController.stream;
 
   /// Get or create conversation with a teacher
   Future<Map<String, dynamic>?> getOrCreateConversation(String teacherId) async {
@@ -88,7 +91,7 @@ class ChatService {
     }
   }
 
-  /// Get all conversations for current student with their subscribed teachers
+  /// Get all conversations for current student (both teacher and peer chats)
   Future<List<Map<String, dynamic>>> getConversations() async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -103,9 +106,21 @@ class ChatService {
               full_name,
               avatar_url,
               email
+            ),
+            student:student_id (
+              id,
+              full_name,
+              avatar_url,
+              email
+            ),
+            peer:participant2_id (
+              id,
+              full_name,
+              avatar_url,
+              email
             )
           ''')
-          .eq('student_id', userId)
+          .or('student_id.eq.$userId,participant2_id.eq.$userId')
           .order('last_message_at', ascending: false);
 
       return List<Map<String, dynamic>>.from(conversations);
@@ -424,11 +439,276 @@ class ChatService {
         .subscribe();
   }
 
+  /// Get students who have taken the same course
+  Future<List<Map<String, dynamic>>> getStudentsInSameCourse() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return [];
+
+      // Get students who have subscriptions to the same languages
+      final students = await _supabase
+          .from('student_subscriptions')
+          .select('''
+            student:student_id (
+              id,
+              full_name,
+              avatar_url,
+              email,
+              level
+            )
+          ''')
+          .eq('status', 'active')
+          .neq('student_id', userId);
+
+      // Get my languages
+      final myLanguages = await _supabase
+          .from('student_subscriptions')
+          .select('language_id')
+          .eq('student_id', userId)
+          .eq('status', 'active');
+
+      final myLanguageIds = myLanguages.map((l) => l['language_id']).toSet();
+
+      // Filter students who share at least one language
+      final filteredStudents = <Map<String, dynamic>>[];
+      final seenStudents = <String>{};
+
+      for (var record in students) {
+        if (record['student'] == null) continue;
+        
+        final student = record['student'] as Map<String, dynamic>;
+        final studentId = student['id'] as String;
+        
+        if (seenStudents.contains(studentId)) continue;
+        
+        // Check if this student shares a language
+        final studentLanguages = await _supabase
+            .from('student_subscriptions')
+            .select('language_id')
+            .eq('student_id', studentId)
+            .eq('status', 'active');
+        
+        final hasSharedLanguage = studentLanguages.any(
+          (l) => myLanguageIds.contains(l['language_id'])
+        );
+        
+        if (hasSharedLanguage) {
+          seenStudents.add(studentId);
+          filteredStudents.add(student);
+        }
+      }
+
+      return filteredStudents;
+    } catch (e) {
+      print('Error fetching students in same course: $e');
+      return [];
+    }
+  }
+
+  /// Send chat request to another student
+  Future<Map<String, dynamic>?> sendChatRequest(String recipientId, {String? message}) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      final request = await _supabase
+          .from('chat_requests')
+          .insert({
+            'requester_id': userId,
+            'recipient_id': recipientId,
+            if (message != null) 'message': message,
+            'status': 'pending',
+          })
+          .select()
+          .single();
+
+      return request;
+    } catch (e) {
+      print('Error sending chat request: $e');
+      return null;
+    }
+  }
+
+  /// Get pending chat requests (received)
+  Future<List<Map<String, dynamic>>> getPendingChatRequests() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return [];
+
+      final requests = await _supabase
+          .from('chat_requests')
+          .select('''
+            *,
+            requester:requester_id (
+              id,
+              full_name,
+              avatar_url,
+              email
+            )
+          ''')
+          .eq('recipient_id', userId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(requests);
+    } catch (e) {
+      print('Error fetching pending chat requests: $e');
+      return [];
+    }
+  }
+
+  /// Get sent chat requests
+  Future<List<Map<String, dynamic>>> getSentChatRequests() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return [];
+
+      final requests = await _supabase
+          .from('chat_requests')
+          .select('''
+            *,
+            recipient:recipient_id (
+              id,
+              full_name,
+              avatar_url,
+              email
+            )
+          ''')
+          .eq('requester_id', userId)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(requests);
+    } catch (e) {
+      print('Error fetching sent chat requests: $e');
+      return [];
+    }
+  }
+
+  /// Accept chat request
+  Future<bool> acceptChatRequest(String requestId) async {
+    try {
+      await _supabase
+          .from('chat_requests')
+          .update({'status': 'accepted'})
+          .eq('id', requestId);
+      return true;
+    } catch (e) {
+      print('Error accepting chat request: $e');
+      return false;
+    }
+  }
+
+  /// Reject chat request
+  Future<bool> rejectChatRequest(String requestId) async {
+    try {
+      await _supabase
+          .from('chat_requests')
+          .delete()
+          .eq('id', requestId);
+      return true;
+    } catch (e) {
+      print('Error rejecting chat request: $e');
+      return false;
+    }
+  }
+
+  /// Get or create conversation with another student
+  Future<Map<String, dynamic>?> getOrCreateStudentConversation(String otherStudentId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Check if accepted chat request exists
+      final request = await _supabase
+          .from('chat_requests')
+          .select()
+          .or('requester_id.eq.$userId,recipient_id.eq.$userId')
+          .or('requester_id.eq.$otherStudentId,recipient_id.eq.$otherStudentId')
+          .eq('status', 'accepted')
+          .maybeSingle();
+
+      if (request == null) {
+        throw Exception('No accepted chat request found');
+      }
+
+      // Check if conversation exists
+      var conversation = await _supabase
+          .from('chat_conversations')
+          .select('''
+            *,
+            peer:participant2_id (
+              id,
+              full_name,
+              avatar_url,
+              email
+            )
+          ''')
+          .eq('conversation_type', 'student_student')
+          .or('student_id.eq.$userId,participant2_id.eq.$userId')
+          .or('student_id.eq.$otherStudentId,participant2_id.eq.$otherStudentId')
+          .maybeSingle();
+
+      if (conversation == null) {
+        // Create conversation
+        final newConversation = await _supabase
+            .from('chat_conversations')
+            .insert({
+              'student_id': userId,
+              'participant2_id': otherStudentId,
+              'conversation_type': 'student_student',
+            })
+            .select('''
+              *,
+              peer:participant2_id (
+                id,
+                full_name,
+                avatar_url,
+                email
+              )
+            ''')
+            .single();
+
+        conversation = newConversation;
+      }
+
+      return conversation;
+    } catch (e) {
+      print('Error getting/creating student conversation: $e');
+      return null;
+    }
+  }
+
+  /// Subscribe to chat requests
+  void subscribeToChatRequests() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _chatRequestsChannel?.unsubscribe();
+    
+    _chatRequestsChannel = _supabase
+        .channel('chat_requests:$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'chat_requests',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'recipient_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            _chatRequestController.add(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
+
   /// Unsubscribe from all realtime channels
   void unsubscribeAll() {
     _messagesChannel?.unsubscribe();
     _conversationsChannel?.unsubscribe();
     _typingChannel?.unsubscribe();
+    _chatRequestsChannel?.unsubscribe();
   }
 
   /// Dispose
@@ -437,6 +717,7 @@ class ChatService {
     _messageController.close();
     _conversationUpdateController.close();
     _typingController.close();
+    _chatRequestController.close();
   }
 }
 

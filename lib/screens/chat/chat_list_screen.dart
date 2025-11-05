@@ -126,7 +126,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Start chatting with your teachers',
+              'Start chatting with teachers or students',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[500],
@@ -156,41 +156,92 @@ class _ChatListScreenState extends State<ChatListScreen> {
       itemCount: _conversations.length,
       itemBuilder: (context, index) {
         final conversation = _conversations[index];
-        final teacherData = conversation['teacher'];
+        final conversationType = conversation['conversation_type'] ?? 'teacher_student';
         
-        // Skip if teacher data is null
-        if (teacherData == null) {
+        // Determine who is the other party
+        Map<String, dynamic>? otherParty;
+        String? otherPartyId;
+        String otherPartyType;
+        
+        if (conversationType == 'teacher_student') {
+          otherParty = conversation['teacher'] as Map<String, dynamic>?;
+          otherPartyId = conversation['teacher_id'];
+          otherPartyType = 'teacher';
+        } else {
+          // Student-to-student conversation
+          final currentUserId = _chatService.supabase.auth.currentUser?.id;
+          if (conversation['student_id'] == currentUserId) {
+            // I'm student_id, other is participant2
+            otherParty = conversation['peer'] as Map<String, dynamic>?;
+            otherPartyId = conversation['participant2_id'];
+          } else {
+            // I'm participant2, other is student
+            final studentData = conversation['student'];
+            if (studentData != null) {
+              otherParty = {'id': conversation['student_id'], ...studentData};
+            }
+            otherPartyId = conversation['student_id'];
+          }
+          otherPartyType = 'student';
+        }
+        
+        // Skip if other party data is null
+        if (otherParty == null || otherPartyId == null) {
           return const SizedBox.shrink();
         }
         
-        final teacher = teacherData as Map<String, dynamic>;
         final unreadCount = conversation['student_unread_count'] ?? 0;
         final lastMessage = conversation['last_message'] ?? '';
         final lastMessageAt = conversation['last_message_at'];
 
         return ListTile(
-          leading: CircleAvatar(
-            radius: 28,
-            backgroundImage: teacher['avatar_url'] != null
-                ? NetworkImage(teacher['avatar_url'])
-                : null,
-            backgroundColor: Colors.deepPurple[100],
-            child: teacher['avatar_url'] == null
-                ? Text(
-                    teacher['full_name']?[0]?.toUpperCase() ?? 'T',
-                    style: TextStyle(
-                      color: Colors.deepPurple[700],
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-                  )
-                : null,
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: otherParty['avatar_url'] != null
+                    ? NetworkImage(otherParty['avatar_url'])
+                    : null,
+                backgroundColor: otherPartyType == 'teacher' 
+                    ? Colors.deepPurple[100] 
+                    : Colors.teal[100],
+                child: otherParty['avatar_url'] == null
+                    ? Text(
+                        otherParty['full_name']?[0]?.toUpperCase() ?? 'U',
+                        style: TextStyle(
+                          color: otherPartyType == 'teacher' 
+                              ? Colors.deepPurple[700] 
+                              : Colors.teal[700],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      )
+                    : null,
+              ),
+              // Badge to indicate type
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: otherPartyType == 'teacher' ? Colors.deepPurple : Colors.teal,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    otherPartyType == 'teacher' ? Icons.school : Icons.person,
+                    size: 12,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
           title: Row(
             children: [
               Expanded(
                 child: Text(
-                  teacher['full_name'] ?? 'Teacher',
+                  otherParty['full_name'] ?? 'User',
                   style: TextStyle(
                     fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w500,
                   ),
@@ -242,9 +293,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
               MaterialPageRoute(
                 builder: (context) => ChatConversationScreen(
                   conversationId: conversation['id'],
-                  recipientId: teacher['id'],
-                  recipientName: teacher['full_name'] ?? 'Teacher',
-                  recipientAvatar: teacher['avatar_url'],
+                  recipientId: otherPartyId!,
+                  recipientName: otherParty!['full_name'] ?? 'User',
+                  recipientAvatar: otherParty['avatar_url'],
                 ),
               ),
             );

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/student_service.dart';
+import 'package:student/services/chat_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/screens/students/student_public_profile_screen.dart';
+import 'package:student/screens/chat/chat_requests_screen.dart';
+import 'package:student/screens/chat/chat_conversation_screen.dart';
 
 class StudentsListScreen extends StatefulWidget {
   const StudentsListScreen({super.key});
@@ -12,8 +15,11 @@ class StudentsListScreen extends StatefulWidget {
 
 class _StudentsListScreenState extends State<StudentsListScreen> {
   final _studentService = StudentService();
+  final _chatService = ChatService();
   List<Map<String, dynamic>> _students = [];
   List<String> _myLanguages = [];
+  List<Map<String, dynamic>> _sentRequests = [];
+  Map<String, String> _chatRequestStatus = {}; // studentId -> status
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -24,38 +30,145 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   }
 
   Future<void> _loadStudents() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       // Get languages the current student is learning
       final languages = await _studentService.getStudentLanguages();
       
       if (languages.isEmpty) {
-        setState(() {
-          _myLanguages = [];
-          _students = [];
-          _isLoading = false;
-          _errorMessage = 'You need to enroll in a course to see other students';
-        });
+        if (mounted) {
+          setState(() {
+            _myLanguages = [];
+            _students = [];
+            _isLoading = false;
+            _errorMessage = 'You need to enroll in a course to see other students';
+          });
+        }
         return;
       }
 
       // Get students learning the same languages
       final students = await _studentService.getStudentsInSameLanguages();
+      
+      // Get sent chat requests to check status
+      final sentRequests = await _chatService.getSentChatRequests();
+      
+      // Build status map
+      final statusMap = <String, String>{};
+      for (var request in sentRequests) {
+        final recipientData = request['recipient'];
+        if (recipientData != null) {
+          final recipientId = recipientData['id'] as String;
+          statusMap[recipientId] = request['status'] as String;
+        }
+      }
 
-      setState(() {
-        _myLanguages = languages;
-        _students = students;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _myLanguages = languages;
+          _students = students;
+          _sentRequests = sentRequests;
+          _chatRequestStatus = statusMap;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load students: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load students: ${e.toString()}';
+        });
+      }
+    }
+  }
+  
+  Future<void> _sendChatRequest(String recipientId, String recipientName) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Send chat request to $recipientName?'),
+        content: TextField(
+          decoration: const InputDecoration(
+            hintText: 'Optional message...',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+          onChanged: (value) {},
+          controller: TextEditingController(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final controller = (context as Element).findAncestorStateOfType<State>();
+              Navigator.pop(context, '');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return;
+
+    final success = await _chatService.sendChatRequest(recipientId, message: result.isEmpty ? null : result);
+
+    if (mounted) {
+      if (success != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chat request sent!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadStudents();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to send request'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _openChat(String studentId, String studentName) async {
+    // Try to get/create conversation
+    final conversation = await _chatService.getOrCreateStudentConversation(studentId);
+    
+    if (conversation != null && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatConversationScreen(
+            conversationId: conversation['id'],
+            recipientId: studentId,
+            recipientName: studentName,
+            recipientAvatar: null,
+          ),
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to start chat. Make sure request is accepted.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -66,6 +179,21 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
         title: const Text('Fellow Students'),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.mail),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ChatRequestsScreen(),
+                ),
+              );
+              _loadStudents();
+            },
+            tooltip: 'Chat Requests',
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -354,17 +482,44 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
               ),
             ),
 
-            // Arrow Icon
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey[400],
-              size: 20,
-            ),
+            // Chat Button
+            const SizedBox(width: 8),
+            _buildChatButton(student),
           ],
         ),
       ),
       ),
     );
+  }
+  
+  Widget _buildChatButton(Map<String, dynamic> student) {
+    final studentId = student['id'] as String;
+    final studentName = student['full_name'] as String?  ?? 'Student';
+    final status = _chatRequestStatus[studentId];
+    
+    if (status == 'accepted') {
+      // Can chat
+      return IconButton(
+        icon: const Icon(Icons.chat, color: Colors.green),
+        onPressed: () => _openChat(studentId, studentName),
+        tooltip: 'Chat',
+      );
+    } else if (status == 'pending') {
+      // Request sent, waiting
+      return const Chip(
+        label: Text('Pending', style: TextStyle(fontSize: 11)),
+        backgroundColor: Colors.orange,
+        labelStyle: TextStyle(color: Colors.white),
+        padding: EdgeInsets.symmetric(horizontal: 8),
+      );
+    } else {
+      // Can send request
+      return IconButton(
+        icon: const Icon(Icons.person_add, color: Colors.deepPurple),
+        onPressed: () => _sendChatRequest(studentId, studentName),
+        tooltip: 'Send Chat Request',
+      );
+    }
   }
 
   Widget _buildDefaultAvatar(String? fullName) {
