@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:student/services/practice_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
+import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/screens/practice/reading_screen.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
@@ -15,11 +16,13 @@ class PracticeScreen extends StatefulWidget {
 class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProviderStateMixin {
   final _practiceService = PracticeService();
   final _authService = AuthService();
+  final _proService = ProSubscriptionService();
   late TabController _tabController;
   
   List<Map<String, dynamic>> _videos = [];
   Map<String, bool> _watchedVideos = {};
   bool _isLoading = true;
+  bool _hasProSubscription = false;
   String? _errorMessage;
   String? _studentId;
 
@@ -54,6 +57,21 @@ class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProvid
       }
 
       _studentId = user.id;
+
+      // Check PRO subscription
+      final hasPro = await _proService.hasActivePro(_studentId!);
+      if (!hasPro) {
+        setState(() {
+          _isLoading = false;
+          _hasProSubscription = false;
+          _errorMessage = 'PRO subscription required';
+        });
+        return;
+      }
+
+      setState(() {
+        _hasProSubscription = true;
+      });
 
       // Get all practice videos (not filtering by language for now)
       final videos = await _practiceService.getPracticeVideos(null);
@@ -136,6 +154,119 @@ class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProvid
   }
 
   Widget _buildErrorState() {
+    // Check if it's a PRO subscription error
+    if (_errorMessage == 'PRO subscription required') {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.amber.shade300,
+                      Colors.amber.shade600,
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.workspace_premium,
+                  size: 64,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'PRO Subscription Required',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Unlock practice videos with a PRO subscription',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    _buildFeatureItem('Access all practice videos'),
+                    const SizedBox(height: 8),
+                    _buildFeatureItem('Chat with other students'),
+                    const SizedBox(height: 8),
+                    _buildFeatureItem('Unlock reading exercises'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Show dialog with instructions
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Row(
+                        children: [
+                          Icon(Icons.workspace_premium, color: Colors.amber),
+                          SizedBox(width: 12),
+                          Text('Activate PRO'),
+                        ],
+                      ),
+                      content: const Text(
+                        'To activate PRO subscription:\n\n'
+                        '1. Go to your Profile tab\n'
+                        '2. Tap "Activate PRO" button\n'
+                        '3. Enter your voucher code\n\n'
+                        'Get your voucher code from your teacher or admin.',
+                        style: TextStyle(fontSize: 15),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.workspace_premium),
+                label: const Text('How to Activate PRO'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Regular error state
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -173,6 +304,26 @@ class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProvid
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFeatureItem(String text) {
+    return Row(
+      children: [
+        Icon(
+          Icons.check_circle,
+          color: Colors.deepPurple,
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 

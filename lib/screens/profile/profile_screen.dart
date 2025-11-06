@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
+import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/screens/auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -13,8 +14,10 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
   final _levelService = LevelService();
+  final _proService = ProSubscriptionService();
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _levelProgress;
+  Map<String, dynamic>? _proSubscription;
   bool _isLoading = true;
 
   @override
@@ -29,14 +32,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final studentId = _authService.currentUser?.id;
       
       Map<String, dynamic>? progress;
+      Map<String, dynamic>? proSub;
       if (studentId != null) {
         progress = await _levelService.getStudentProgress(studentId);
+        proSub = await _proService.getProStatus(studentId);
       }
       
       if (mounted) {
         setState(() {
           _profile = profile;
           _levelProgress = progress;
+          _proSubscription = proSub;
           _isLoading = false;
         });
       }
@@ -119,13 +125,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          Text(
-                            _profile?['full_name'] ?? 'Student',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _profile?['full_name'] ?? 'Student',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              if (_proSubscription != null) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.amber.shade300,
+                                        Colors.amber.shade600,
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.workspace_premium,
+                                        size: 16,
+                                        color: Colors.amber.shade900,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'PRO',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.amber.shade900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -146,6 +194,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                           const SizedBox(height: 24),
+                          // PRO Subscription Status
+                          if (_proSubscription != null) _buildProSubscriptionWidget(),
+                          if (_proSubscription != null) const SizedBox(height: 16),
                           // Level and Points Display
                           if (_levelProgress != null) _buildLevelProgressWidget(),
                         ],
@@ -242,6 +293,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               // TODO: Implement help
                             },
                           ),
+                          
+                          const SizedBox(height: 32),
+
+                          // PRO Subscription Section
+                          const Text(
+                            'PRO Subscription',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          _buildActionButton(
+                            _proSubscription != null ? 'Extend PRO Subscription' : 'Activate PRO',
+                            Icons.workspace_premium,
+                            () => _showRedeemVoucherDialog(),
+                          ),
                         ],
                       ),
                     ),
@@ -250,6 +319,291 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
     );
+  }
+
+  Widget _buildProSubscriptionWidget() {
+    final expiresAt = _proSubscription!['expires_at'] as String;
+    final daysRemaining = _proService.getDaysRemaining(expiresAt);
+    final expiryText = _proService.formatExpiryDate(expiresAt);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.amber.shade300,
+            Colors.amber.shade600,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.workspace_premium,
+                color: Colors.amber.shade900,
+                size: 32,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PRO Member',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      expiryText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Expires on:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.amber.shade900,
+                  ),
+                ),
+                Text(
+                  DateTime.parse(expiresAt).toString().split(' ')[0],
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber.shade900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRedeemVoucherDialog() {
+    final voucherController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.card_giftcard, color: Colors.deepPurple),
+            const SizedBox(width: 12),
+            const Text('Redeem Voucher'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter your PRO subscription voucher code:',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: voucherController,
+              decoration: InputDecoration(
+                labelText: 'Voucher Code',
+                hintText: 'XXXXXXXXXXXXXXXX',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                prefixIcon: const Icon(Icons.confirmation_number),
+              ),
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 16,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 20, color: Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'PRO features: Student chat & Practice videos',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final code = voucherController.text.trim();
+              if (code.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a voucher code')),
+                );
+                return;
+              }
+              
+              Navigator.pop(context);
+              await _redeemVoucher(code);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Redeem'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _redeemVoucher(String code) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final studentId = _authService.currentUser?.id;
+      if (studentId == null) {
+        throw Exception('Not logged in');
+      }
+
+      final result = await _proService.redeemVoucher(studentId, code);
+      
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      if (result['success'] == true) {
+        // Show success dialog
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green),
+                  const SizedBox(width: 12),
+                  const Text('Success!'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Your PRO subscription has been activated!',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.workspace_premium,
+                          size: 48,
+                          color: Colors.amber.shade700,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '+${result['days_added']} days',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _loadProfile(); // Refresh profile
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Awesome!'),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        throw Exception(result['error'] ?? 'Failed to redeem voucher');
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildInfoCard(String label, String value, IconData icon) {
