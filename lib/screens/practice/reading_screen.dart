@@ -79,10 +79,13 @@ class _ReadingScreenState extends State<ReadingScreen> {
           _themeController.clear();
         });
 
-        // Reload data
+        // Small delay to ensure database commit
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // Reload data to update remaining stories count
         await _loadData();
 
-        // Show success message
+        // Show success message (no points)
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -90,7 +93,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                 children: [
                   const Icon(Icons.check_circle, color: Colors.white),
                   const SizedBox(width: 12),
-                  Text('Story generated! +${result['points']} points ✨'),
+                  Text('Story generated! ${result['wordCount']} words ✨'),
                 ],
               ),
               backgroundColor: Colors.green,
@@ -200,7 +203,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Generate personalized stories and earn points!',
+            'Generate personalized stories for reading practice!',
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withOpacity(0.9),
@@ -446,31 +449,48 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade300),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.star, size: 16, color: Colors.amber.shade700),
+                      Icon(Icons.edit_note, size: 16, color: Colors.grey.shade700),
                       const SizedBox(width: 6),
                       Text(
-                        '+${_currentStory!['points']} points',
+                        '${_currentStory!['wordCount']} words',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade900,
+                          color: Colors.grey.shade800,
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  '${_currentStory!['wordCount']} words',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 13,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.purple.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.auto_awesome, size: 16, color: Colors.purple.shade700),
+                      const SizedBox(width: 6),
+                      Text(
+                        'AI Generated',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purple.shade800),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -548,7 +568,6 @@ class _ReadingScreenState extends State<ReadingScreen> {
         onTap: () => setState(() => _currentStory = {
               'story': story['story_text'],
               'theme': story['theme'],
-              'points': story['points_awarded'],
               'wordCount': story['word_count'],
             }),
         borderRadius: BorderRadius.circular(12),
@@ -593,31 +612,28 @@ class _ReadingScreenState extends State<ReadingScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '+${story['points_awarded']}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade900,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
                   Text(
                     '${story['word_count']} words',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[500],
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.auto_awesome, size: 12, color: Colors.purple.shade400),
+                      const SizedBox(width: 4),
+                      Text(
+                        'AI Story',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.purple[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

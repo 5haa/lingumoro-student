@@ -2,10 +2,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/level_service.dart';
+import 'package:student/services/ai_speech_service.dart';
 
 class AIStoryService {
   final _supabase = Supabase.instance.client;
   final _levelService = LevelService();
+  
+  // Use AI server URL from AiSpeechService
+  String get _serverUrl => AiSpeechService.serverUrl;
 
   /// Get AI settings from Supabase
   Future<Map<String, String>> getAISettings() async {
@@ -32,9 +36,9 @@ class AIStoryService {
       final settings = await getAISettings();
       final dailyLimit = int.parse(settings['daily_limit_per_student'] ?? '5');
 
-      // Get today's date
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      // Get today's date - use UTC to match database
+      final now = DateTime.now().toUtc();
+      final today = DateTime.utc(now.year, now.month, now.day);
       final tomorrow = today.add(const Duration(days: 1));
 
       // Count stories generated today
@@ -46,9 +50,13 @@ class AIStoryService {
           .lt('generated_at', tomorrow.toIso8601String());
 
       final count = (response as List).length;
-      return count < dailyLimit;
+      final canGenerate = count < dailyLimit;
+      
+      print('🔍 Daily limit check: $count/$dailyLimit - Can generate: $canGenerate');
+      
+      return canGenerate;
     } catch (e) {
-      print('Error checking daily limit: $e');
+      print('❌ Error checking daily limit: $e');
       return false;
     }
   }
@@ -59,21 +67,36 @@ class AIStoryService {
       final settings = await getAISettings();
       final dailyLimit = int.parse(settings['daily_limit_per_student'] ?? '5');
 
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      final now = DateTime.now().toUtc();
+      // Use UTC to match database timestamps
+      final today = DateTime.utc(now.year, now.month, now.day);
       final tomorrow = today.add(const Duration(days: 1));
+
+      print('📊 Checking stories for student: $studentId');
+      print('📅 Today (UTC): ${today.toIso8601String()}');
+      print('📅 Tomorrow (UTC): ${tomorrow.toIso8601String()}');
 
       final response = await _supabase
           .from('story_generations')
-          .select('id')
+          .select('id, generated_at, theme')
           .eq('student_id', studentId)
           .gte('generated_at', today.toIso8601String())
           .lt('generated_at', tomorrow.toIso8601String());
 
-      final count = (response as List).length;
-      return dailyLimit - count;
+      final stories = response as List;
+      print('📚 Stories found today: ${stories.length}');
+      if (stories.isNotEmpty) {
+        print('📖 Stories:');
+        for (var story in stories) {
+          print('   - ${story['theme']} at ${story['generated_at']}');
+        }
+      }
+      print('📊 Daily limit: $dailyLimit');
+      print('✅ Remaining: ${dailyLimit - stories.length}');
+      
+      return dailyLimit - stories.length;
     } catch (e) {
-      print('Error getting remaining stories: $e');
+      print('❌ Error getting remaining stories: $e');
       return 0;
     }
   }
@@ -93,102 +116,32 @@ class AIStoryService {
         };
       }
 
-      // Get AI settings
+      // Get AI settings for prompt customization (optional)
       final settings = await getAISettings();
-      final apiKey = settings['api_key'] ?? '';
-      final basePrompt = settings['story_prompt'] ?? '';
-      final modelName = settings['model_name'] ?? 'gemini-2.0-flash-lite';
+      final basePrompt = settings['story_prompt'];
       final minPoints = int.parse(settings['min_points'] ?? '15');
       final maxPoints = int.parse(settings['max_points'] ?? '50');
 
-      if (apiKey.isEmpty) {
-        return {
-          'success': false,
-          'error': 'AI service is not configured. Please contact admin.',
-        };
-      }
-
-      // Construct the full prompt
-      final fullPrompt = '''
-$basePrompt "$theme"
-
-IMPORTANT: After writing the story, you must evaluate it and assign points based on these criteria:
-
-Scoring Guide (Total: $minPoints-$maxPoints points):
-- Word Count: 
-  * Under 150 words: Low points (towards $minPoints)
-  * 150-250 words: Medium points (middle range)
-  * Over 250 words: Higher points (towards $maxPoints)
-  
-- Vocabulary Complexity:
-  * Simple vocabulary only: Lower points
-  * Mix of simple and intermediate words: Medium points
-  * Rich, varied vocabulary with some advanced words: Higher points
-  
-- Story Structure:
-  * Basic beginning-middle-end: Lower points
-  * Well-developed plot with good flow: Medium points
-  * Excellent narrative with engaging elements: Higher points
-  
-- Educational Value:
-  * Minimal learning value: Lower points
-  * Some useful language patterns: Medium points
-  * Rich learning content with clear lesson: Higher points
-
-Examples:
-- Short simple story (120 words, basic vocab): ${minPoints}-${minPoints + 5} points
-- Medium story (200 words, good vocab, clear plot): ${minPoints + 10}-${minPoints + 20} points
-- Excellent story (280+ words, rich vocab, engaging): ${maxPoints - 10}-$maxPoints points
-
-Vary your scoring! Each story should get different points based on its actual quality.
-
-Format your response EXACTLY as follows:
-[STORY_START]
-(write the story here)
-[STORY_END]
-
-[POINTS]
-(write only the number of points, e.g., "25")
-[POINTS_END]
-
-[WORD_COUNT]
-(write only the word count number, e.g., "250")
-[WORD_COUNT_END]
-''';
-
-      // Call Google Gemini API (using v1beta for Gemini 2.0 models)
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey',
-      );
-
-      print('Calling Gemini API with model: $modelName');
+      print('Calling AI Server for story generation...');
       
+      // Call AI Server instead of Gemini directly
       final response = await http.post(
-        url,
+        Uri.parse('$_serverUrl/api/generate-story'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': fullPrompt}
-              ]
-            }
-          ],
-          'generationConfig': {
-            'temperature': 0.9,
-            'topK': 1,
-            'topP': 1,
-            'maxOutputTokens': 2048,
-          },
+          'theme': theme,
+          'base_prompt': basePrompt,
+          'min_points': minPoints,
+          'max_points': maxPoints,
         }),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 40));
 
-      print('API Response Status: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
+      print('AI Server Response Status: ${response.statusCode}');
+      print('AI Server Response Body: ${response.body}');
 
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
-        final errorMessage = errorData['error']?['message'] ?? 'API request failed';
+        final errorMessage = errorData['error'] ?? 'Story generation failed';
         return {
           'success': false,
           'error': 'Failed to generate story: $errorMessage',
@@ -198,11 +151,7 @@ Format your response EXACTLY as follows:
       final data = jsonDecode(response.body);
       
       // Check if response has expected structure
-      if (data['candidates'] == null || 
-          data['candidates'].isEmpty ||
-          data['candidates'][0]['content'] == null ||
-          data['candidates'][0]['content']['parts'] == null ||
-          data['candidates'][0]['content']['parts'].isEmpty) {
+      if (data['success'] != true || data['story'] == null) {
         print('Unexpected API response structure: $data');
         return {
           'success': false,
@@ -210,36 +159,38 @@ Format your response EXACTLY as follows:
         };
       }
       
-      final generatedText = data['candidates'][0]['content']['parts'][0]['text'] as String;
-      print('Generated text: $generatedText');
+      final story = data['story'] as String;
+      int points = data['points'] ?? minPoints;
+      int wordCount = data['word_count'] ?? story.split(' ').length;
 
-      // Parse the response
-      final story = _extractBetween(generatedText, '[STORY_START]', '[STORY_END]').trim();
-      final pointsStr = _extractBetween(generatedText, '[POINTS]', '[POINTS_END]').trim();
-      final wordCountStr = _extractBetween(generatedText, '[WORD_COUNT]', '[WORD_COUNT_END]').trim();
+      print('Generated story: $wordCount words, $points points');
 
-      int points = int.tryParse(pointsStr) ?? minPoints;
-      int wordCount = int.tryParse(wordCountStr) ?? story.split(' ').length;
+      // Save story to database (no points awarded)
+      final now = DateTime.now().toUtc();
+      print('💾 Saving story with timestamp: ${now.toIso8601String()}');
+      
+      try {
+        final insertResult = await _supabase.from('story_generations').insert({
+          'student_id': studentId,
+          'theme': theme,
+          'story_text': story,
+          'points_awarded': 0,  // No points for story generation
+          'word_count': wordCount,
+          'generated_at': now.toIso8601String(),  // Explicitly set UTC timestamp
+        }).select();  // Add select() to get the inserted row
+        
+        print('✅ Story saved to database: $insertResult');
+      } catch (insertError) {
+        print('❌ Error saving story to database: $insertError');
+        // Continue anyway - the story was generated successfully
+      }
 
-      // Ensure points are within range
-      points = points.clamp(minPoints, maxPoints);
-
-      // Save story to database
-      await _supabase.from('story_generations').insert({
-        'student_id': studentId,
-        'theme': theme,
-        'story_text': story,
-        'points_awarded': points,
-        'word_count': wordCount,
-      });
-
-      // Award points to student
-      await _levelService.awardPoints(studentId, points);
+      // Points removed - students don't get points for story generation anymore
 
       return {
         'success': true,
         'story': story,
-        'points': points,
+        'points': 0,  // No points awarded
         'wordCount': wordCount,
         'theme': theme,
       };
@@ -268,16 +219,5 @@ Format your response EXACTLY as follows:
     }
   }
 
-  /// Helper to extract text between markers
-  String _extractBetween(String text, String start, String end) {
-    final startIndex = text.indexOf(start);
-    final endIndex = text.indexOf(end);
-
-    if (startIndex == -1 || endIndex == -1) {
-      return text; // Return full text if markers not found
-    }
-
-    return text.substring(startIndex + start.length, endIndex);
-  }
 }
 
