@@ -4,6 +4,7 @@ import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/screens/practice/reading_screen.dart';
+import 'package:student/screens/practice/grammar_practice_screen.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class PracticeScreen extends StatefulWidget {
@@ -29,7 +30,7 @@ class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadPracticeVideos();
   }
 
@@ -132,6 +133,10 @@ class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProvid
               icon: Icon(Icons.auto_stories),
               text: 'Reading',
             ),
+            Tab(
+              icon: Icon(Icons.school),
+              text: 'Grammar',
+            ),
           ],
         ),
       ),
@@ -148,6 +153,8 @@ class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProvid
                       : _buildVideoList(),
           // Reading Tab
           const ReadingScreen(),
+          // Grammar Tab
+          const GrammarPracticeScreen(),
         ],
       ),
     );
@@ -580,7 +587,7 @@ class _PracticeScreenState extends State<PracticeScreen> with SingleTickerProvid
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              video['level'],
+                              'Level ${video['level']}',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -977,7 +984,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            widget.video['level'],
+                            'Level ${widget.video['level']}',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,

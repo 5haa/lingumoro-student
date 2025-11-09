@@ -33,27 +33,37 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadProfile() async {
     try {
       final profile = await _authService.getStudentProfile();
-      setState(() {
-        _profile = profile;
-        _isLoading = false;
-      });
-      // Load languages
-      _loadLanguages();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _isLoading = false;
+        });
+        // Load languages
+        _loadLanguages();
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _loadLanguages() async {
-    setState(() => _isLoadingLanguages = true);
+    if (mounted) {
+      setState(() => _isLoadingLanguages = true);
+    }
     try {
       final languages = await _languageService.getActiveLanguages();
-      setState(() {
-        _languages = languages;
-        _isLoadingLanguages = false;
-      });
+      if (mounted) {
+        setState(() {
+          _languages = languages;
+          _isLoadingLanguages = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingLanguages = false);
+      if (mounted) {
+        setState(() => _isLoadingLanguages = false);
+      }
     }
   }
 

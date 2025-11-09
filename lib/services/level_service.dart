@@ -3,60 +3,45 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class LevelService {
   final _supabase = Supabase.instance.client;
 
-  // Define level thresholds (points required to reach each level)
-  static const Map<String, int> levelThresholds = {
-    'Beginner': 0,
-    'Elementary': 100,
-    'Intermediate': 300,
-    'Advanced': 600,
-    'Proficient': 1000,
-  };
+  // Constants
+  static const int maxLevel = 100;
+  static const int minLevel = 1;
+  static const int pointsPerLevel = 100; // Points required per level
 
-  // Get level names in order
-  static const List<String> levelOrder = [
-    'Beginner',
-    'Elementary',
-    'Intermediate',
-    'Advanced',
-    'Proficient',
-  ];
-
-  /// Calculate level based on points
-  String calculateLevel(int points) {
-    if (points >= levelThresholds['Proficient']!) return 'Proficient';
-    if (points >= levelThresholds['Advanced']!) return 'Advanced';
-    if (points >= levelThresholds['Intermediate']!) return 'Intermediate';
-    if (points >= levelThresholds['Elementary']!) return 'Elementary';
-    return 'Beginner';
+  /// Calculate level based on points (1-100)
+  int calculateLevel(int points) {
+    final level = (points ~/ pointsPerLevel) + 1;
+    return level.clamp(minLevel, maxLevel);
   }
 
   /// Get next level info
   Map<String, dynamic> getNextLevelInfo(int currentPoints) {
     final currentLevel = calculateLevel(currentPoints);
-    final currentIndex = levelOrder.indexOf(currentLevel);
     
-    if (currentIndex == levelOrder.length - 1) {
+    if (currentLevel >= maxLevel) {
       // Already at max level
       return {
         'nextLevel': null,
         'pointsToNext': 0,
         'progressPercent': 100.0,
         'isMaxLevel': true,
+        'currentLevel': currentLevel,
       };
     }
 
-    final nextLevel = levelOrder[currentIndex + 1];
-    final pointsToNext = levelThresholds[nextLevel]! - currentPoints;
-    final currentLevelThreshold = levelThresholds[currentLevel]!;
-    final nextLevelThreshold = levelThresholds[nextLevel]!;
-    final progressPercent = ((currentPoints - currentLevelThreshold) / 
-        (nextLevelThreshold - currentLevelThreshold) * 100).clamp(0.0, 100.0);
+    final nextLevel = currentLevel + 1;
+    final pointsForCurrentLevel = (currentLevel - 1) * pointsPerLevel;
+    final pointsForNextLevel = currentLevel * pointsPerLevel;
+    final pointsToNext = pointsForNextLevel - currentPoints;
+    final progressPercent = ((currentPoints - pointsForCurrentLevel) / 
+        pointsPerLevel * 100).clamp(0.0, 100.0);
 
     return {
       'nextLevel': nextLevel,
       'pointsToNext': pointsToNext,
       'progressPercent': progressPercent,
       'isMaxLevel': false,
+      'currentLevel': currentLevel,
     };
   }
 
@@ -71,7 +56,7 @@ class LevelService {
           .single();
 
       final currentPoints = (student['points'] as int?) ?? 0;
-      final currentLevel = student['level'] as String? ?? 'Beginner';
+      final currentLevel = (student['level'] as int?) ?? 1;
       final newPoints = currentPoints + points;
       final newLevel = calculateLevel(newPoints);
       
@@ -113,7 +98,7 @@ class LevelService {
           .single();
 
       final points = (student['points'] as int?) ?? 0;
-      final level = student['level'] as String? ?? 'Beginner';
+      final level = (student['level'] as int?) ?? 1;
       final nextLevelInfo = getNextLevelInfo(points);
 
       return {

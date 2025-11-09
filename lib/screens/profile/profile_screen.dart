@@ -676,10 +676,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildLevelProgressWidget() {
     final points = _levelProgress!['points'] as int;
-    final level = _levelProgress!['level'] as String;
+    final level = _levelProgress!['level'] as int;
     final isMaxLevel = _levelProgress!['isMaxLevel'] as bool;
     final progressPercent = _levelProgress!['progressPercent'] as double;
-    final nextLevel = _levelProgress!['nextLevel'] as String?;
+    final nextLevel = _levelProgress!['nextLevel'] as int?;
     final pointsToNext = _levelProgress!['pointsToNext'] as int;
 
     return Container(
@@ -717,7 +717,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       Text(
-                        level,
+                        'Level $level',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -770,7 +770,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Progress to $nextLevel',
+                      'Progress to Level $nextLevel',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.white70,
