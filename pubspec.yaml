@@ -73,6 +73,11 @@ dependencies:
   
   # Path provider for file handling
   path_provider: ^2.1.1
+  
+  # AI Speech capabilities
+  speech_to_text: ^7.0.0
+  just_audio: ^0.9.40
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:

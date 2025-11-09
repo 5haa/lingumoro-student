@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Permissions for AI Voice Assistant -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to your microphone to enable voice conversations with the AI tutor.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app needs speech recognition to understand your voice and provide interactive learning.</string>
 </dict>
 </plist>
