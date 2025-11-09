@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/widgets/student_avatar_widget.dart';
 import 'package:student/services/photo_service.dart';
+import 'package:student/services/blocking_service.dart';
 
 class StudentPublicProfileScreen extends StatefulWidget {
   final String studentId;
@@ -19,14 +20,18 @@ class StudentPublicProfileScreen extends StatefulWidget {
 
 class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen> {
   final _photoService = PhotoService();
+  final _blockingService = BlockingService();
   List<Map<String, dynamic>> _photos = [];
   bool _isLoadingPhotos = true;
   int _currentPhotoIndex = 0;
+  bool _isBlocked = false;
+  bool _isCheckingBlock = true;
 
   @override
   void initState() {
     super.initState();
     _loadPhotos();
+    _checkIfBlocked();
   }
 
   Future<void> _loadPhotos() async {
@@ -45,6 +50,93 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     }
   }
 
+  Future<void> _checkIfBlocked() async {
+    try {
+      final isBlocked = await _blockingService.isUserBlocked(widget.studentId);
+      if (mounted) {
+        setState(() {
+          _isBlocked = isBlocked;
+          _isCheckingBlock = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCheckingBlock = false);
+      }
+    }
+  }
+
+  Future<void> _toggleBlock() async {
+    final shouldBlock = !_isBlocked;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(shouldBlock ? 'Block User?' : 'Unblock User?'),
+        content: Text(
+          shouldBlock
+              ? 'Blocking this user will hide their profile and prevent them from contacting you.'
+              : 'This user will be able to see your profile and contact you again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: shouldBlock ? Colors.red : Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(shouldBlock ? 'Block' : 'Unblock'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final success = shouldBlock
+          ? await _blockingService.blockUser(widget.studentId)
+          : await _blockingService.unblockUser(widget.studentId);
+
+      if (mounted) {
+        if (success) {
+          setState(() => _isBlocked = shouldBlock);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(shouldBlock ? 'User blocked' : 'User unblocked'),
+              backgroundColor: shouldBlock ? Colors.red : Colors.green,
+            ),
+          );
+          
+          if (shouldBlock) {
+            // Go back after blocking
+            Navigator.pop(context);
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to ${shouldBlock ? 'block' : 'unblock'} user'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final languages = widget.studentData['languages'] as List<Map<String, dynamic>>? ?? [];
@@ -52,6 +144,38 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     final bio = widget.studentData['bio'] as String?;
 
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          if (!_isCheckingBlock)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'block') {
+                  _toggleBlock();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'block',
+                  child: Row(
+                    children: [
+                      Icon(
+                        _isBlocked ? Icons.check_circle : Icons.block,
+                        color: _isBlocked ? Colors.green : Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(_isBlocked ? 'Unblock User' : 'Block User'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+      extendBodyBehindAppBar: true,
       body: CustomScrollView(
         slivers: [
           // App bar with student header

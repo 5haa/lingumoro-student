@@ -1,7 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:student/services/blocking_service.dart';
 
 class StudentService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final _blockingService = BlockingService();
 
   /// Get languages that the current student is learning (has active subscriptions for)
   Future<List<String>> getStudentLanguages() async {
@@ -36,6 +38,11 @@ class StudentService {
       final user = _supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
+      // Get blocked user IDs to filter them out
+      final blockedIds = await _blockingService.getBlockedUserIds();
+      final blockerIds = await _blockingService.getUsersWhoBlockedMe();
+      final allBlockedIds = {...blockedIds, ...blockerIds};
+
       // First, get the languages the current student is learning
       final studentLanguages = await getStudentLanguages();
 
@@ -50,11 +57,12 @@ class StudentService {
           .select('''
             student_id,
             language_id,
-            student:students(id, full_name, email, avatar_url, bio, province:provinces(id, name, name_ar, code)),
+            student:students!inner(id, full_name, email, avatar_url, bio, is_suspended, province:provinces(id, name, name_ar, code)),
             language:language_courses(id, name, code, flag_url)
           ''')
           .inFilter('language_id', studentLanguages)
           .eq('status', 'active')
+          .eq('student.is_suspended', false) // Filter suspended students
           .neq('student_id', user.id); // Exclude current user
 
       // Group students by ID to avoid duplicates and collect their languages
@@ -66,6 +74,11 @@ class StudentService {
         
         if (studentData != null && languageData != null) {
           final studentId = studentData['id'];
+          
+          // Skip blocked users
+          if (allBlockedIds.contains(studentId)) {
+            continue;
+          }
           
           if (!studentsMap.containsKey(studentId)) {
             studentsMap[studentId] = {
