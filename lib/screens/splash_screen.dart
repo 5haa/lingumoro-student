@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/screens/auth/login_screen.dart';
 import 'package:student/screens/main_navigation.dart';
 import 'package:student/screens/onboarding_screen.dart';
+import 'package:student/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -95,11 +96,41 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Check authentication status
     final session = Supabase.instance.client.auth.currentSession;
+    
+    Widget nextScreen;
+    
+    if (session != null) {
+      // Check if user is suspended
+      final authService = AuthService();
+      final isSuspended = await authService.checkIfSuspended();
+      
+      if (isSuspended) {
+        // User is suspended, show login screen with message
+        nextScreen = const LoginScreen();
+        if (mounted) {
+          // Show suspension message after navigation
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Your account has been suspended. Please contact support.'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 5),
+                ),
+              );
+            }
+          });
+        }
+      } else {
+        nextScreen = const MainNavigation();
+      }
+    } else {
+      nextScreen = const LoginScreen();
+    }
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            session != null ? const MainNavigation() : const LoginScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
             opacity: animation,
