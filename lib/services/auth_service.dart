@@ -108,6 +108,7 @@ class AuthService {
     required String fullName,
     String? phone,
     String? avatarUrl,
+    String? bio,
   }) async {
     if (currentUser == null) throw Exception('No user logged in');
 
@@ -115,6 +116,7 @@ class AuthService {
       'full_name': fullName,
       if (phone != null) 'phone': phone,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (bio != null) 'bio': bio,
     }).eq('id', currentUser!.id);
   }
 

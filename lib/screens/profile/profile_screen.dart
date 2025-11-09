@@ -3,6 +3,8 @@ import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/screens/auth/login_screen.dart';
+import 'package:student/screens/profile/edit_profile_screen.dart';
+import 'package:student/widgets/student_avatar_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -112,16 +114,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.all(32),
                       child: Column(
                         children: [
-                          CircleAvatar(
-                            radius: 50,
-                            backgroundColor: Colors.white,
-                            child: Text(
-                              _profile?['full_name']?[0]?.toUpperCase() ?? 'S',
-                              style: TextStyle(
-                                fontSize: 40,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.deepPurple.shade700,
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 3,
                               ),
+                            ),
+                            child: StudentAvatarWidget(
+                              avatarUrl: _profile?['avatar_url'],
+                              fullName: _profile?['full_name'],
+                              size: 100,
+                              backgroundColor: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -262,8 +267,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _buildActionButton(
                             'Edit Profile',
                             Icons.edit,
-                            () {
-                              // TODO: Implement edit profile
+                            () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditProfileScreen(profile: _profile!),
+                                ),
+                              );
+                              if (result == true) {
+                                _loadProfile(); // Refresh profile after edit
+                              }
                             },
                           ),
                           const SizedBox(height: 12),

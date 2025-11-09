@@ -62,6 +62,12 @@ dependencies:
   # Image picker for payment proof upload
   image_picker: ^1.0.7
   
+  # Image compression
+  flutter_image_compress: ^2.3.0
+  
+  # Path utilities
+  path: ^1.9.0
+  
   # YouTube player for intro videos
   youtube_player_flutter: ^9.0.3
   

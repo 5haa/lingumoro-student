@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:student/widgets/student_avatar_widget.dart';
+import 'package:student/services/photo_service.dart';
 
-class StudentPublicProfileScreen extends StatelessWidget {
+class StudentPublicProfileScreen extends StatefulWidget {
   final String studentId;
   final Map<String, dynamic> studentData;
 
@@ -12,10 +14,42 @@ class StudentPublicProfileScreen extends StatelessWidget {
   });
 
   @override
+  State<StudentPublicProfileScreen> createState() => _StudentPublicProfileScreenState();
+}
+
+class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen> {
+  final _photoService = PhotoService();
+  List<Map<String, dynamic>> _photos = [];
+  bool _isLoadingPhotos = true;
+  int _currentPhotoIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPhotos();
+  }
+
+  Future<void> _loadPhotos() async {
+    try {
+      final photos = await _photoService.getStudentPhotos(widget.studentId);
+      if (mounted) {
+        setState(() {
+          _photos = photos;
+          _isLoadingPhotos = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingPhotos = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final languages = studentData['languages'] as List<Map<String, dynamic>>? ?? [];
-    final province = studentData['province'] as Map<String, dynamic>?;
-    final bio = studentData['bio'] as String?;
+    final languages = widget.studentData['languages'] as List<Map<String, dynamic>>? ?? [];
+    final province = widget.studentData['province'] as Map<String, dynamic>?;
+    final bio = widget.studentData['bio'] as String?;
 
     return Scaffold(
       body: CustomScrollView(
@@ -42,48 +76,12 @@ class StudentPublicProfileScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 40),
-                      // Profile picture
-                      Hero(
-                        tag: 'student_${studentData['id']}',
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 4,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 15,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: studentData['avatar_url'] != null
-                                ? CachedNetworkImage(
-                                    imageUrl: studentData['avatar_url'],
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
-                                      color: Colors.white,
-                                      child: const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    ),
-                                    errorWidget: (context, url, error) =>
-                                        _buildDefaultAvatar(),
-                                  )
-                                : _buildDefaultAvatar(),
-                          ),
-                        ),
-                      ),
+                      // Profile picture carousel
+                      _buildPhotoCarousel(),
                       const SizedBox(height: 16),
                       // Name
                       Text(
-                        studentData['full_name'] ?? 'Unknown',
+                        widget.studentData['full_name'] ?? 'Unknown',
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -136,7 +134,7 @@ class StudentPublicProfileScreen extends StatelessWidget {
                         _buildInfoRow(
                           Icons.email_outlined,
                           'Email',
-                          studentData['email'] ?? 'Not provided',
+                          widget.studentData['email'] ?? 'Not provided',
                         ),
                       ],
                     ),
@@ -364,8 +362,8 @@ class StudentPublicProfileScreen extends StatelessWidget {
   }
 
   Widget _buildDefaultAvatar() {
-    final initial = (studentData['full_name']?.isNotEmpty ?? false)
-        ? studentData['full_name']![0].toUpperCase()
+    final initial = (widget.studentData['full_name']?.isNotEmpty ?? false)
+        ? widget.studentData['full_name']![0].toUpperCase()
         : '?';
 
     return Container(
@@ -379,6 +377,278 @@ class StudentPublicProfileScreen extends StatelessWidget {
             color: Colors.white,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoCarousel() {
+    if (_isLoadingPhotos) {
+      return Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(0.2),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+      );
+    }
+
+    if (_photos.isEmpty) {
+      // Show default avatar if no photos
+      return Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white,
+            width: 4,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: _buildDefaultAvatar(),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Photo viewer with gestures
+        GestureDetector(
+          onTap: () => _showFullScreenPhoto(),
+          onHorizontalDragEnd: (details) {
+            if (details.primaryVelocity! > 0) {
+              // Swiped right - previous photo
+              _previousPhoto();
+            } else if (details.primaryVelocity! < 0) {
+              // Swiped left - next photo
+              _nextPhoto();
+            }
+          },
+          child: Hero(
+            tag: 'student_${widget.studentData['id']}_photo_$_currentPhotoIndex',
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white,
+                  width: 4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: _photos[_currentPhotoIndex]['photo_url'],
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.white.withOpacity(0.2),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => _buildDefaultAvatar(),
+                ),
+              ),
+            ),
+          ),
+        ),
+        
+        // Photo counter and navigation
+        if (_photos.length > 1) ...[
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Previous button
+              IconButton(
+                onPressed: _previousPhoto,
+                icon: const Icon(Icons.chevron_left, color: Colors.white),
+                iconSize: 28,
+              ),
+              
+              // Photo indicators
+              ...List.generate(_photos.length, (index) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: _currentPhotoIndex == index ? 10 : 6,
+                  height: _currentPhotoIndex == index ? 10 : 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _currentPhotoIndex == index
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.4),
+                  ),
+                );
+              }),
+              
+              // Next button
+              IconButton(
+                onPressed: _nextPhoto,
+                icon: const Icon(Icons.chevron_right, color: Colors.white),
+                iconSize: 28,
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _previousPhoto() {
+    if (_photos.isEmpty) return;
+    setState(() {
+      _currentPhotoIndex = (_currentPhotoIndex - 1 + _photos.length) % _photos.length;
+    });
+  }
+
+  void _nextPhoto() {
+    if (_photos.isEmpty) return;
+    setState(() {
+      _currentPhotoIndex = (_currentPhotoIndex + 1) % _photos.length;
+    });
+  }
+
+  void _showFullScreenPhoto() {
+    if (_photos.isEmpty) return;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FullScreenPhotoViewer(
+          photos: _photos,
+          initialIndex: _currentPhotoIndex,
+          studentName: widget.studentData['full_name'] ?? 'Student',
+          studentId: widget.studentData['id'],
+        ),
+      ),
+    );
+  }
+}
+
+// Full screen photo viewer
+class _FullScreenPhotoViewer extends StatefulWidget {
+  final List<Map<String, dynamic>> photos;
+  final int initialIndex;
+  final String studentName;
+  final String studentId;
+
+  const _FullScreenPhotoViewer({
+    required this.photos,
+    required this.initialIndex,
+    required this.studentName,
+    required this.studentId,
+  });
+
+  @override
+  State<_FullScreenPhotoViewer> createState() => _FullScreenPhotoViewerState();
+}
+
+class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(widget.studentName),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          // Photo viewer
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: widget.photos.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return Hero(
+                  tag: 'student_${widget.studentId}_photo_$index',
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Center(
+                      child: CachedNetworkImage(
+                        imageUrl: widget.photos[index]['photo_url'],
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(
+                          Icons.error,
+                          color: Colors.white,
+                          size: 64,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          
+          // Photo counter
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${_currentIndex + 1} / ${widget.photos.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

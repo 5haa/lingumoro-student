@@ -4,6 +4,7 @@ import 'package:student/services/chat_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:student/widgets/student_avatar_widget.dart';
 import 'package:student/screens/students/student_public_profile_screen.dart';
 import 'package:student/screens/chat/chat_requests_screen.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
@@ -480,20 +481,10 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
           padding: const EdgeInsets.all(16.0),
           child: Row(
           children: [
-            // Avatar
+            // Avatar with shadow
             Container(
-              width: 60,
-              height: 60,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.teal.shade300,
-                    Colors.teal.shade600,
-                  ],
-                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.teal.withOpacity(0.3),
@@ -502,18 +493,12 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                   ),
                 ],
               ),
-              child: student['avatar_url'] != null
-                  ? ClipOval(
-                      child: CachedNetworkImage(
-                        imageUrl: student['avatar_url'],
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                        errorWidget: (context, url, error) => _buildDefaultAvatar(student['full_name']),
-                      ),
-                    )
-                  : _buildDefaultAvatar(student['full_name']),
+              child: StudentAvatarWidget(
+                avatarUrl: student['avatar_url'],
+                fullName: student['full_name'],
+                size: 60,
+                heroTag: 'student_${student['id']}',
+              ),
             ),
             const SizedBox(width: 16),
 
