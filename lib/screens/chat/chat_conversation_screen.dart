@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:student/services/chat_service.dart';
+import 'package:student/services/presence_service.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:record/record.dart';
@@ -27,6 +28,7 @@ class ChatConversationScreen extends StatefulWidget {
 
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _chatService = ChatService();
+  final _presenceService = PresenceService();
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   
@@ -34,9 +36,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   bool _isLoading = true;
   bool _isSending = false;
   bool _isTyping = false;
+  bool _isOnline = false;
   String? _currentUserId;
   File? _selectedFile;
   Timer? _typingTimer;
+  Timer? _statusRefreshTimer;
   
   // Voice recording state
   AudioRecorder? _audioRecorder;
@@ -58,14 +62,41 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     _loadMessages();
     _setupRealtimeSubscriptions();
     _markMessagesAsRead();
+    _subscribeToOnlineStatus();
+  }
+
+  void _subscribeToOnlineStatus() {
+    // Subscribe to recipient's online status
+    _presenceService.subscribeToUserStatus(widget.recipientId, 'teacher').listen((isOnline) {
+      if (mounted) {
+        setState(() {
+          _isOnline = isOnline;
+        });
+      }
+    });
+    
+    // Periodically refresh online status (every 30 seconds)
+    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (mounted) {
+        final isOnline = await _presenceService.isUserOnline(widget.recipientId, 'teacher');
+        if (mounted) {
+          setState(() {
+            _isOnline = isOnline;
+          });
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
     _chatService.unsubscribeAll();
+    _presenceService.unsubscribeFromUser(widget.recipientId, 'teacher');
+    _presenceService.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     _typingTimer?.cancel();
+    _statusRefreshTimer?.cancel();
     _recordingTimer?.cancel();
     _audioRecorder?.dispose();
     for (var player in _audioPlayers.values) {
@@ -352,6 +383,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     widget.recipientName,
@@ -366,7 +398,29 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
+                        color: Colors.white70,
                       ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _isOnline ? Colors.greenAccent : Colors.grey[400],
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),

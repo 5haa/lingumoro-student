@@ -5,6 +5,7 @@ import 'package:student/screens/splash_screen.dart';
 import 'package:student/screens/teachers/teachers_list_screen.dart';
 import 'package:student/screens/payment/payment_submission_screen.dart';
 import 'package:student/screens/students/students_list_screen.dart';
+import 'package:student/services/presence_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,8 +18,59 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  final _presenceService = PresenceService();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializePresence();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _presenceService.stopTracking();
+    _presenceService.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App came to foreground
+        _presenceService.startTracking();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // App went to background
+        _presenceService.stopTracking();
+        break;
+    }
+  }
+
+  Future<void> _initializePresence() async {
+    // Wait for auth to be ready
+    await Future.delayed(const Duration(seconds: 2));
+    
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      await _presenceService.startTracking();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
