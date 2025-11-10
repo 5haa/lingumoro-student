@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ChatService {
   final _supabase = Supabase.instance.client;
@@ -310,6 +313,128 @@ class ChatService {
     } catch (e) {
       print('Error picking file: $e');
       return null;
+    }
+  }
+
+  /// Send voice message
+  Future<Map<String, dynamic>?> sendVoiceMessage({
+    required String conversationId,
+    required File audioFile,
+    required int durationSeconds,
+    String? messageText,
+  }) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Upload audio file to storage
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_voice.m4a';
+      final filePath = '$userId/$fileName';
+      
+      await _supabase.storage
+          .from('chat-attachments')
+          .upload(filePath, audioFile);
+
+      final fileUrl = _supabase.storage
+          .from('chat-attachments')
+          .getPublicUrl(filePath);
+
+      // Create message
+      final message = await _supabase
+          .from('chat_messages')
+          .insert({
+            'conversation_id': conversationId,
+            'sender_id': userId,
+            'sender_type': 'student',
+            'message_text': messageText ?? '',
+            'has_attachment': true,
+          })
+          .select()
+          .single();
+
+      // Create voice attachment record
+      await _supabase
+          .from('chat_attachments')
+          .insert({
+            'message_id': message['id'],
+            'file_name': 'Voice Message',
+            'file_url': fileUrl,
+            'file_type': 'm4a',
+            'file_size': await audioFile.length(),
+            'attachment_type': 'voice',
+            'duration_seconds': durationSeconds,
+          });
+
+      // Fetch complete message with attachments
+      final completeMessage = await _supabase
+          .from('chat_messages')
+          .select('''
+            *,
+            attachments:chat_attachments (*)
+          ''')
+          .eq('id', message['id'])
+          .single();
+
+      return completeMessage;
+    } catch (e) {
+      print('Error sending voice message: $e');
+      return null;
+    }
+  }
+
+  /// Request microphone permission
+  Future<bool> requestMicrophonePermission() async {
+    try {
+      final status = await Permission.microphone.request();
+      return status.isGranted;
+    } catch (e) {
+      print('Error requesting microphone permission: $e');
+      return false;
+    }
+  }
+
+  /// Start recording audio
+  Future<AudioRecorder?> startRecording() async {
+    try {
+      final hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) {
+        throw Exception('Microphone permission denied');
+      }
+
+      final recorder = AudioRecorder();
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      await recorder.start(const RecordConfig(), path: filePath);
+      return recorder;
+    } catch (e) {
+      print('Error starting recording: $e');
+      return null;
+    }
+  }
+
+  /// Stop recording and get file
+  Future<({File? file, int duration})?> stopRecording(AudioRecorder recorder, DateTime startTime) async {
+    try {
+      final path = await recorder.stop();
+      final duration = DateTime.now().difference(startTime).inSeconds;
+      
+      if (path != null) {
+        return (file: File(path), duration: duration);
+      }
+      return null;
+    } catch (e) {
+      print('Error stopping recording: $e');
+      return null;
+    }
+  }
+
+  /// Cancel recording
+  Future<void> cancelRecording(AudioRecorder recorder) async {
+    try {
+      await recorder.cancel();
+    } catch (e) {
+      print('Error cancelling recording: $e');
     }
   }
 

@@ -84,6 +84,10 @@ dependencies:
   speech_to_text: ^7.0.0
   just_audio: ^0.9.40
   permission_handler: ^11.3.1
+  
+  # Audio recording for voice messages
+  record: ^6.1.2
+  audio_session: ^0.1.21
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:record/record.dart';
+import 'package:just_audio/just_audio.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final String conversationId;
@@ -35,11 +37,24 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   String? _currentUserId;
   File? _selectedFile;
   Timer? _typingTimer;
+  
+  // Voice recording state
+  AudioRecorder? _audioRecorder;
+  bool _isRecording = false;
+  DateTime? _recordingStartTime;
+  String _recordingDuration = '0:00';
+  Timer? _recordingTimer;
+  
+  // Audio players for voice messages (one per message)
+  final Map<String, AudioPlayer> _audioPlayers = {};
 
   @override
   void initState() {
     super.initState();
     _currentUserId = _chatService.supabase.auth.currentUser?.id;
+    _messageController.addListener(() {
+      setState(() {}); // Rebuild to show/hide mic button
+    });
     _loadMessages();
     _setupRealtimeSubscriptions();
     _markMessagesAsRead();
@@ -51,6 +66,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     _typingTimer?.cancel();
+    _recordingTimer?.cancel();
+    _audioRecorder?.dispose();
+    for (var player in _audioPlayers.values) {
+      player.dispose();
+    }
     super.dispose();
   }
 
@@ -172,6 +192,79 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         _selectedFile = file;
       });
     }
+  }
+
+  Future<void> _startRecording() async {
+    final recorder = await _chatService.startRecording();
+    if (recorder != null) {
+      setState(() {
+        _audioRecorder = recorder;
+        _isRecording = true;
+        _recordingStartTime = DateTime.now();
+        _recordingDuration = '0:00';
+      });
+      
+      // Update duration every second
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_recordingStartTime != null) {
+          final duration = DateTime.now().difference(_recordingStartTime!);
+          setState(() {
+            _recordingDuration = '${duration.inMinutes}:${(duration.inSeconds % 60).toString().padLeft(2, '0')}';
+          });
+        }
+      });
+    } else {
+      _showError('Failed to start recording. Please check microphone permissions.');
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    if (_audioRecorder == null || _recordingStartTime == null) return;
+
+    _recordingTimer?.cancel();
+    
+    final result = await _chatService.stopRecording(_audioRecorder!, _recordingStartTime!);
+    
+    setState(() {
+      _isRecording = false;
+      _recordingTimer?.cancel();
+    });
+
+    if (result != null && result.file != null) {
+      // Send voice message
+      setState(() => _isSending = true);
+      
+      try {
+        final message = await _chatService.sendVoiceMessage(
+          conversationId: widget.conversationId,
+          audioFile: result.file!,
+          durationSeconds: result.duration,
+        );
+
+        if (message != null) {
+          _scrollToBottom();
+        } else {
+          _showError('Failed to send voice message');
+        }
+      } catch (e) {
+        _showError('Error sending voice message: $e');
+      } finally {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    if (_audioRecorder == null) return;
+    
+    await _chatService.cancelRecording(_audioRecorder!);
+    _recordingTimer?.cancel();
+    
+    setState(() {
+      _isRecording = false;
+      _audioRecorder = null;
+      _recordingStartTime = null;
+    });
   }
 
   void _showError(String message) {
@@ -435,7 +528,70 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final fileName = attachment['file_name'] ?? 'File';
     final fileType = attachment['file_type'] ?? '';
     final fileUrl = attachment['file_url'] ?? '';
+    final attachmentType = attachment['attachment_type'] ?? 'file';
+    final durationSeconds = attachment['duration_seconds'] as int?;
+    final messageId = attachment['message_id'] as String;
 
+    // Voice message player
+    if (attachmentType == 'voice') {
+      return _buildVoiceMessagePlayer(messageId, fileUrl, durationSeconds ?? 0, isMe);
+    }
+
+    // Image attachment - display inline
+    if (attachmentType == 'image' || _isImageFile(fileType)) {
+      return GestureDetector(
+        onTap: () => _showFullImage(fileUrl),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.6,
+            maxHeight: 300,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isMe ? Colors.deepPurple : Colors.grey[400]!,
+              width: 2,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.network(
+              fileUrl,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  height: 150,
+                  alignment: Alignment.center,
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  height: 150,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.broken_image, color: Colors.grey[600], size: 48),
+                      const SizedBox(height: 8),
+                      Text('Failed to load image', style: TextStyle(color: Colors.grey[600])),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Regular file attachment
     return GestureDetector(
       onTap: () async {
         if (fileUrl.isNotEmpty) {
@@ -477,6 +633,153 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
+  bool _isImageFile(String fileType) {
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(fileType.toLowerCase());
+  }
+
+  void _showFullImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: Image.network(imageUrl),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVoiceMessagePlayer(String messageId, String audioUrl, int durationSeconds, bool isMe) {
+    // Create player if it doesn't exist and initialize it
+    if (!_audioPlayers.containsKey(messageId)) {
+      final newPlayer = AudioPlayer();
+      _audioPlayers[messageId] = newPlayer;
+      // Pre-load the audio source
+      newPlayer.setUrl(audioUrl).catchError((e) {
+        print('Error loading audio: $e');
+      });
+    }
+    
+    final player = _audioPlayers[messageId]!;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isMe ? Colors.deepPurple[700] : Colors.grey[400],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          StreamBuilder<PlayerState>(
+            stream: player.playerStateStream,
+            builder: (context, snapshot) {
+              final playerState = snapshot.data;
+              final isPlaying = playerState?.playing ?? false;
+              final processingState = playerState?.processingState;
+              final isLoading = processingState == ProcessingState.loading ||
+                                processingState == ProcessingState.buffering;
+
+              return IconButton(
+                icon: isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            isMe ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: isMe ? Colors.white : Colors.black87,
+                      ),
+                onPressed: isLoading ? null : () async {
+                  try {
+                    if (isPlaying) {
+                      await player.pause();
+                    } else {
+                      if (processingState == ProcessingState.completed) {
+                        await player.seek(Duration.zero);
+                      }
+                      await player.play();
+                    }
+                  } catch (e) {
+                    print('Error playing audio: $e');
+                    _showError('Could not play audio');
+                  }
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: StreamBuilder<Duration?>(
+              stream: player.positionStream,
+              builder: (context, snapshot) {
+                final position = snapshot.data ?? Duration.zero;
+                final duration = player.duration ?? Duration(seconds: durationSeconds);
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      child: LinearProgressIndicator(
+                        value: duration.inSeconds > 0 ? position.inSeconds / duration.inSeconds : 0,
+                        backgroundColor: isMe ? Colors.deepPurple[800] : Colors.grey[300],
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isMe ? Colors.white : Colors.deepPurple,
+                        ),
+                        minHeight: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_formatDuration(position)} / ${_formatDuration(duration)}',
+                      style: TextStyle(
+                        color: isMe ? Colors.white70 : Colors.black54,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
+  }
+
   IconData _getFileIcon(String fileType) {
     switch (fileType.toLowerCase()) {
       case 'pdf':
@@ -494,6 +797,60 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   Widget _buildMessageInput() {
+    // Recording UI
+    if (_isRecording) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.red[50],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _recordingDuration,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: _cancelRecording,
+              tooltip: 'Cancel',
+            ),
+            const SizedBox(width: 8),
+            CircleAvatar(
+              backgroundColor: Colors.deepPurple,
+              child: IconButton(
+                icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                onPressed: _stopRecording,
+                tooltip: 'Send',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Normal input UI
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -540,22 +897,30 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          CircleAvatar(
-            backgroundColor: Colors.deepPurple,
-            child: _isSending
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
+          if (_messageController.text.isEmpty && !_isSending)
+            IconButton(
+              icon: const Icon(Icons.mic),
+              onPressed: _startRecording,
+              color: Colors.deepPurple,
+              tooltip: 'Voice message',
+            )
+          else
+            CircleAvatar(
+              backgroundColor: Colors.deepPurple,
+              child: _isSending
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                      onPressed: _isSending ? null : _sendMessage,
                     ),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                    onPressed: _isSending ? null : _sendMessage,
-                  ),
-          ),
+            ),
         ],
       ),
     );
