@@ -101,16 +101,9 @@ class _SignInContentState extends State<SignInContent> {
         // Sign In button
         CustomButton(
           text: 'SIGN IN',
-          onPressed: _isLoading ? () {} : _handleSignIn,
+          onPressed: _handleSignIn,
+          isLoading: _isLoading,
         ),
-        
-        if (_isLoading)
-          const Padding(
-            padding: EdgeInsets.only(top: 16),
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
-          ),
         
         const SizedBox(height: 20),
         

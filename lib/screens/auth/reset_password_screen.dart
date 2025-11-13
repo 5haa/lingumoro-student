@@ -169,16 +169,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     // Reset Password button
                     CustomButton(
                       text: 'RESET PASSWORD',
-                      onPressed: _isLoading ? () {} : _handleResetPassword,
+                      onPressed: _handleResetPassword,
+                      isLoading: _isLoading,
                     ),
-                    
-                    if (_isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 16),
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                        ),
-                      ),
                     
                     const SizedBox(height: 40),
                   ],

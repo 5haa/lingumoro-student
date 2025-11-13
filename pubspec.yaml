@@ -35,6 +35,12 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   
+  # Font Awesome icons
+  font_awesome_flutter: ^10.7.0
+  
+  # Flag icons
+  flag: ^7.0.0
+  
   # Supabase
   supabase_flutter: ^2.8.0
   

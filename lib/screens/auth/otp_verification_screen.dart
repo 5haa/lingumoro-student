@@ -305,16 +305,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                     // Confirm button
                     CustomButton(
                       text: 'CONFIRM',
-                      onPressed: _isLoading ? () {} : _handleVerify,
+                      onPressed: _handleVerify,
+                      isLoading: _isLoading,
                     ),
-                    
-                    if (_isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 16),
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                        ),
-                      ),
                     
                     const SizedBox(height: 20),
                     

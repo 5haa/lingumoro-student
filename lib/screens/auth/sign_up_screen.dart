@@ -242,16 +242,9 @@ class _SignUpContentState extends State<SignUpContent> {
         // Confirm Account button
         CustomButton(
           text: 'CONFIRM ACCOUNT',
-          onPressed: _isLoading ? () {} : _handleSignUp,
+          onPressed: _handleSignUp,
+          isLoading: _isLoading,
         ),
-        
-        if (_isLoading)
-          const Padding(
-            padding: EdgeInsets.only(top: 16),
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
-          ),
       ],
     );
   }

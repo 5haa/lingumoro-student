@@ -7,6 +7,7 @@ class CustomButton extends StatelessWidget {
   final bool isOutlined;
   final double? width;
   final double height;
+  final bool isLoading;
   
   const CustomButton({
     super.key,
@@ -15,6 +16,7 @@ class CustomButton extends StatelessWidget {
     this.isOutlined = false,
     this.width,
     this.height = 55,
+    this.isLoading = false,
   });
   
   @override
@@ -32,18 +34,29 @@ class CustomButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onPressed,
+          onTap: isLoading ? () {} : onPressed,
           borderRadius: BorderRadius.circular(30),
           child: Center(
-            child: Text(
-              text,
-              style: TextStyle(
-                color: isOutlined ? AppColors.primary : AppColors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
+            child: isLoading
+                ? SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isOutlined ? AppColors.primary : AppColors.white,
+                      ),
+                    ),
+                  )
+                : Text(
+                    text,
+                    style: TextStyle(
+                      color: isOutlined ? AppColors.primary : AppColors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
           ),
         ),
       ),

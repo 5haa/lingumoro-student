@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:student/screens/home/home_screen.dart';
-import 'package:student/screens/packages/packages_screen.dart';
-import 'package:student/screens/classes/classes_screen.dart';
-import 'package:student/screens/practice/practice_screen.dart';
-import 'package:student/screens/chat/chat_screen.dart';
-import 'package:student/screens/profile/profile_screen.dart';
-import 'package:student/screens/ai_voice/ai_voice_assistant_screen.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:student/config/app_colors.dart';
+import 'package:student/widgets/app_drawer.dart';
+import 'home/home_screen.dart';
+import 'classes/classes_screen.dart';
+import 'practice/practice_screen.dart';
+import 'chat/chat_screen.dart';
+import 'profile/profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -16,81 +17,117 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
-
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const PackagesScreen(),
-    const ClassesScreen(),
-    const PracticeScreen(),
-    const ChatScreen(),
-    const ProfileScreen(),
-  ];
-
-  void _openAIVoiceAssistant() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AiVoiceAssistantScreen(),
-      ),
-    );
+  
+  late final List<Widget> _screens;
+  
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      const HomeScreen(),
+      const ClassesScreen(),
+      const PracticeScreen(),
+      const ChatScreen(),
+      const ProfileScreen(),
+    ];
   }
+  
+  final List<Map<String, dynamic>> _navItems = [
+    {
+      'icon': FontAwesomeIcons.house,
+      'label': 'Home',
+    },
+    {
+      'icon': FontAwesomeIcons.graduationCap,
+      'label': 'Classes',
+    },
+    {
+      'icon': FontAwesomeIcons.clipboardList,
+      'label': 'Practice',
+    },
+    {
+      'icon': FontAwesomeIcons.message,
+      'label': 'Chat',
+    },
+    {
+      'icon': FontAwesomeIcons.user,
+      'label': 'Profile',
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAIVoiceAssistant,
-        backgroundColor: const Color(0xFF6C63FF),
-        icon: const Icon(Icons.mic, color: Colors.white),
-        label: const Text(
-          'AI Tutor',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+      drawer: const AppDrawer(),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(_navItems.length, (index) {
+                return _buildNavItem(
+                  _navItems[index]['icon'],
+                  _navItems[index]['label'],
+                  index,
+                  _currentIndex == index,
+                );
+              }),
+            ),
           ),
         ),
-        elevation: 8,
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.deepPurple,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+    );
+  }
+  
+  Widget _buildNavItem(IconData icon, String label, int index, bool isActive) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: isActive ? AppColors.redGradient : null,
+              color: isActive ? null : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
+            child: FaIcon(
+              icon,
+              color: isActive ? AppColors.white : AppColors.grey,
+              size: 20,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.card_giftcard),
-            label: 'Packages',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.class_),
-            label: 'Classes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school),
-            label: 'Practice',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: 'Chat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: isActive ? AppColors.primary : AppColors.grey,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            ),
           ),
         ],
       ),
     );
   }
 }
-

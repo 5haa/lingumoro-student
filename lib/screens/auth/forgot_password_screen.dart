@@ -138,16 +138,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     // Send Code button
                     CustomButton(
                       text: 'SEND CODE',
-                      onPressed: _isLoading ? () {} : _handleSendCode,
+                      onPressed: _handleSendCode,
+                      isLoading: _isLoading,
                     ),
-                    
-                    if (_isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 16),
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                        ),
-                      ),
                     
                     const SizedBox(height: 40),
                   ],

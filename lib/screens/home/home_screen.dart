@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:student/services/auth_service.dart';
-import 'package:student/services/language_service.dart';
-import 'package:student/widgets/carousel_widget.dart';
+import 'package:flag/flag.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:student/screens/classes/classes_screen.dart';
-import 'package:student/screens/students/students_list_screen.dart';
-import 'package:student/screens/ai_voice/ai_voice_assistant_screen.dart';
+import 'dart:async';
+import '../../config/app_colors.dart';
+import '../../services/language_service.dart';
+import '../../services/carousel_service.dart';
+import '../teachers/teachers_list_screen.dart';
+import '../students/students_list_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,43 +18,63 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _authService = AuthService();
   final _languageService = LanguageService();
-  Map<String, dynamic>? _profile;
+  final _carouselService = CarouselService();
+  
+  int _currentCarouselPage = 0;
+  final PageController _pageController = PageController(viewportFraction: 0.85);
+  Timer? _timer;
+  
   List<Map<String, dynamic>> _languages = [];
-  String? _selectedLanguageId;
-  String? _selectedLanguageName;
-  bool _isLoading = true;
-  bool _isLoadingLanguages = false;
-
+  List<Map<String, dynamic>> _carouselSlides = [];
+  int _selectedLanguageIndex = 0;
+  bool _isLoadingLanguages = true;
+  bool _isLoadingCarousel = true;
+  
+  // Map language names to flag codes
+  final Map<String, FlagsCode> _languageFlagMap = {
+    'English': FlagsCode.GB,
+    'Arabic': FlagsCode.SA,
+    'Spanish': FlagsCode.ES,
+    'French': FlagsCode.FR,
+    'German': FlagsCode.DE,
+    'Italian': FlagsCode.IT,
+    'Turkish': FlagsCode.TR,
+    'Kurdish': FlagsCode.IQ, // Using Iraq flag as approximation
+  };
+  
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _loadLanguages();
+    _loadCarousel();
+    _startCarouselTimer();
   }
-
-  Future<void> _loadProfile() async {
-    try {
-      final profile = await _authService.getStudentProfile();
-      if (mounted) {
-        setState(() {
-          _profile = profile;
-          _isLoading = false;
-        });
-        // Load languages
-        _loadLanguages();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+  
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
   }
-
+  
+  void _startCarouselTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 5), (Timer timer) {
+      if (_pageController.hasClients && _carouselSlides.isNotEmpty) {
+        int nextPage = _currentCarouselPage + 1;
+        if (nextPage >= _carouselSlides.length) {
+          nextPage = 0;
+        }
+        _pageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeIn,
+        );
+      }
+    });
+  }
+  
   Future<void> _loadLanguages() async {
-    if (mounted) {
-      setState(() => _isLoadingLanguages = true);
-    }
     try {
       final languages = await _languageService.getActiveLanguages();
       if (mounted) {
@@ -66,515 +89,159 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
-
+  
+  Future<void> _loadCarousel() async {
+    try {
+      final slides = await _carouselService.getActiveSlides();
+      if (mounted) {
+        setState(() {
+          _carouselSlides = slides;
+          _isLoadingCarousel = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingCarousel = false);
+      }
+    }
+  }
+  
   void _navigateToTeachers() {
-    if (_selectedLanguageId == null) {
+    if (_languages.isEmpty || _selectedLanguageIndex >= _languages.length) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a language first'),
-          duration: Duration(seconds: 2),
+          backgroundColor: AppColors.primary,
         ),
       );
       return;
     }
     
-    // Navigate to teachers list for selected language
+    final selectedLanguage = _languages[_selectedLanguageIndex];
     Navigator.pushNamed(
       context,
       '/teachers',
       arguments: {
-        'languageId': _selectedLanguageId,
-        'languageName': _selectedLanguageName,
+        'languageId': selectedLanguage['id'],
+        'languageName': selectedLanguage['name'],
       },
     );
   }
-
+  
+  void _navigateToStudents() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const StudentsListScreen(),
+      ),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lingumoro Student'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadProfile,
+      backgroundColor: AppColors.background,
+      extendBody: true,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar
+            _buildTopBar(),
+            
+            // Main Content
+            Expanded(
               child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Welcome banner
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.deepPurple.shade400,
-                            Colors.deepPurple.shade800,
-                          ],
-                        ),
-                      ),
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome back,',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _profile?['full_name'] ?? 'Student',
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Continue your learning journey',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
+                    const SizedBox(height: 15),
+                    
                     // Carousel
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: CarouselWidget(),
-                    ),
-
-                    // AI Voice Tutor Button
+                    _buildCarousel(),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Choose Your Class Section
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AiVoiceAssistantScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                const Color(0xFF6C63FF),
-                                const Color(0xFF5A52D5),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF6C63FF).withOpacity(0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.mic,
-                                    color: Colors.white,
-                                    size: 36,
-                                  ),
-                                  SizedBox(width: 15),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'AI Voice Tutor',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      SizedBox(height: 6),
-                                      Text(
-                                        'Practice speaking with AI',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // My Classes Button
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ClassesScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                Colors.green.shade400,
-                                Colors.green.shade600,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: const [
-                                  Icon(
-                                    Icons.video_library,
-                                    color: Colors.white,
-                                    size: 32,
-                                  ),
-                                  SizedBox(width: 15),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'My Classes',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        'View your scheduled sessions',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const Icon(
-                                Icons.arrow_forward_ios,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Choose Your Course Section
-                    Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'CHOOSE YOUR COURSE',
+                            'CHOOSE YOUR CLASS',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                              color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 15),
                           
-                          // Language Buttons Grid
+                          // Language Cards
                           _isLoadingLanguages
                               ? const Center(
                                   child: Padding(
                                     padding: EdgeInsets.all(32.0),
-                                    child: CircularProgressIndicator(),
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                    ),
                                   ),
                                 )
-                              : GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 3,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 12,
-                                    childAspectRatio: 1.0,
-                                  ),
-                                  itemCount: _languages.length,
-                                  itemBuilder: (context, index) {
-                                    final language = _languages[index];
-                                    final isSelected = _selectedLanguageId == language['id'];
-                                    
-                                    return InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedLanguageId = language['id'];
-                                          _selectedLanguageName = language['name'];
-                                        });
-                                      },
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(
-                                            color: isSelected
-                                                ? Colors.deepPurple
-                                                : Colors.grey.shade300,
-                                            width: isSelected ? 3 : 2,
+                              : _languages.isEmpty
+                                  ? const Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(32.0),
+                                        child: Text(
+                                          'No languages available',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
                                           ),
-                                          boxShadow: isSelected
-                                              ? [
-                                                  BoxShadow(
-                                                    color: Colors.deepPurple.withOpacity(0.3),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 4),
-                                                  ),
-                                                ]
-                                              : [],
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            // Flag
-                                            if (language['flag_url'] != null)
-                                              Container(
-                                                width: 60,
-                                                height: 60,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: Colors.black.withOpacity(0.1),
-                                                      blurRadius: 4,
-                                                      offset: const Offset(0, 2),
-                                                    ),
-                                                  ],
-                                                ),
-                                                child: ClipOval(
-                                                  child: CachedNetworkImage(
-                                                    imageUrl: language['flag_url'],
-                                                    fit: BoxFit.cover,
-                                                    placeholder: (context, url) => Container(
-                                                      color: Colors.grey[200],
-                                                      child: const Icon(
-                                                        Icons.language,
-                                                        size: 30,
-                                                      ),
-                                                    ),
-                                                    errorWidget: (context, url, error) =>
-                                                        Container(
-                                                      color: Colors.grey[200],
-                                                      child: const Icon(
-                                                        Icons.language,
-                                                        size: 30,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              )
-                                            else
-                                              Container(
-                                                width: 60,
-                                                height: 60,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color: Colors.grey[200],
-                                                ),
-                                                child: const Icon(
-                                                  Icons.language,
-                                                  size: 30,
-                                                ),
-                                              ),
-                                            const SizedBox(height: 12),
-                                            // Language Name
-                                            Text(
-                                              language['name'] ?? '',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: isSelected
-                                                    ? Colors.deepPurple
-                                                    : Colors.black87,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ],
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
+                                    )
+                                  : Row(
+                                      children: _languages.asMap().entries.take(3).map((entry) {
+                                        int index = entry.key;
+                                        Map<String, dynamic> lang = entry.value;
+                                        return Expanded(
+                                          child: _buildLanguageCard(
+                                            lang['name'] ?? '',
+                                            lang['flag_url'],
+                                            _selectedLanguageIndex == index,
+                                            index,
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
                           
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 20),
                           
-                          // Teachers and Students Buttons
+                          // Student and Teacher Cards
                           Row(
                             children: [
                               Expanded(
-                                child: _buildActionCard(
-                                  'Teachers',
-                                  Icons.person_outline,
-                                  'Find your perfect instructor',
-                                  Colors.deepPurple,
-                                  _navigateToTeachers,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildActionCard(
+                                child: _buildRoleCard(
                                   'Students',
-                                  Icons.school_outlined,
-                                  'Connect with learners',
-                                  Colors.teal,
-                                  () {
-                                    // Navigate to students list
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const StudentsListScreen(),
-                                      ),
-                                    );
-                                  },
+                                  Colors.red.shade400,
+                                  'assets/images/student.jpg',
+                                  imageOnRight: false,
+                                  onTap: _navigateToStudents,
+                                ),
+                              ),
+                              const SizedBox(width: 15),
+                              Expanded(
+                                child: _buildRoleCard(
+                                  'Teachers',
+                                  Colors.blue.shade400,
+                                  'assets/images/teacher.jpg',
+                                  imageOnRight: true,
+                                  onTap: _navigateToTeachers,
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-
-                    // Dashboard cards
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Dashboard',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Quick stats
-                          GridView.count(
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            children: [
-                              _buildStatCard(
-                                'My Courses',
-                                '0',
-                                Icons.book,
-                                Colors.blue,
-                              ),
-                              _buildStatCard(
-                                'Completed',
-                                '0',
-                                Icons.check_circle,
-                                Colors.green,
-                              ),
-                              _buildStatCard(
-                                'In Progress',
-                                '0',
-                                Icons.hourglass_empty,
-                                Colors.orange,
-                              ),
-                              _buildStatCard(
-                                'Certificates',
-                                '0',
-                                Icons.workspace_premium,
-                                Colors.purple,
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          // Quick actions
-                          const Text(
-                            'Quick Actions',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildActionButton(
-                            'Browse Courses',
-                            Icons.search,
-                            () {},
-                          ),
-                          const SizedBox(height: 12),
-                          _buildActionButton(
-                            'My Schedule',
-                            Icons.calendar_today,
-                            () {},
-                          ),
-                          const SizedBox(height: 12),
-                          _buildActionButton(
-                            'Assignments',
-                            Icons.assignment,
-                            () {},
-                          ),
-                          const SizedBox(height: 12),
-                          _buildActionButton(
-                            'Messages',
-                            Icons.message,
-                            () {},
-                          ),
+                          
+                          const SizedBox(height: 15),
                         ],
                       ),
                     ),
@@ -582,139 +249,520 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
     );
   }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+  
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          // Menu Icon
+          Container(
+            width: 45,
+            height: 45,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: const FaIcon(
+                FontAwesomeIcons.bars,
+                size: 18,
+                color: AppColors.textPrimary,
+              ),
+              onPressed: () {
+                Scaffold.of(context).openDrawer();
+              },
+            ),
+          ),
+          
+          const Expanded(
+            child: Center(
+              child: Text(
+                'LINGUMORO',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          ),
+          
+          // Notification Icon
+          Container(
+            width: 45,
+            height: 45,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const FaIcon(FontAwesomeIcons.bell, size: 20),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              color.withOpacity(0.7),
-              color,
-            ],
+    );
+  }
+  
+  Widget _buildCarousel() {
+    if (_isLoadingCarousel) {
+      return const SizedBox(
+        height: 180,
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: Colors.white),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton(String title, IconData icon, VoidCallback onTap) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.deepPurple),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  Widget _buildActionCard(
-    String title,
-    IconData icon,
-    String subtitle,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        height: 160,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.2),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 70,
-              height: 70,
+      );
+    }
+    
+    if (_carouselSlides.isEmpty) {
+      // Fallback carousel with default content
+      return SizedBox(
+        height: 180,
+        child: PageView.builder(
+          controller: _pageController,
+          onPageChanged: (int page) {
+            setState(() {
+              _currentCarouselPage = page;
+            });
+          },
+          itemBuilder: (context, index) {
+            final actualIndex = index % 3;
+            final defaultTexts = [
+              'Web Designing\nONLINE COURSE',
+              'Instagram Banner\nWeb course online',
+              'Mobile Development\nONLINE COURSE',
+            ];
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 36,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4A5568), Color(0xFF6B46C1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 20,
+                    top: 20,
+                    child: Text(
+                      defaultTexts[actualIndex],
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 20,
+                    bottom: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Text(
+                        'JOIN NOW',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    }
+    
+    return SizedBox(
+      height: 180,
+      child: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (int page) {
+          setState(() {
+            _currentCarouselPage = page;
+          });
+        },
+        itemBuilder: (context, index) {
+          final actualIndex = index % _carouselSlides.length;
+          final slide = _carouselSlides[actualIndex];
+          
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4A5568), Color(0xFF6B46C1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
             ),
-          ],
+            child: Stack(
+              children: [
+                // Background image if available
+                if (slide['image_url'] != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: CachedNetworkImage(
+                      imageUrl: slide['image_url'],
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => const SizedBox(),
+                    ),
+                  ),
+                Positioned(
+                  left: 20,
+                  top: 20,
+                  child: Text(
+                    slide['title'] ?? 'ONLINE COURSE',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 20,
+                  bottom: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Text(
+                      'JOIN NOW',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+  
+  Widget _buildLanguageCard(String name, String? flagUrl, bool isSelected, int index) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedLanguageIndex = index;
+        });
+      },
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double flagSize = (constraints.maxWidth * 0.5).clamp(45.0, 60.0);
+              final double fontSize = (constraints.maxWidth * 0.16).clamp(12.0, 15.0);
+              final double spacing = (constraints.maxWidth * 0.08).clamp(8.0, 12.0);
+              
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Flag
+                  ClipOval(
+                    child: flagUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: flagUrl,
+                            width: flagSize,
+                            height: flagSize,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width: flagSize,
+                              height: flagSize,
+                              color: AppColors.lightGrey,
+                              child: Icon(
+                                Icons.language,
+                                size: flagSize * 0.5,
+                                color: AppColors.grey,
+                              ),
+                            ),
+                            errorWidget: (context, url, error) {
+                              // Try to use flag code if available
+                              final flagCode = _languageFlagMap[name];
+                              if (flagCode != null) {
+                                return Flag.fromCode(
+                                  flagCode,
+                                  height: flagSize,
+                                  width: flagSize,
+                                  fit: BoxFit.cover,
+                                );
+                              }
+                              return Container(
+                                width: flagSize,
+                                height: flagSize,
+                                color: AppColors.lightGrey,
+                                child: Icon(
+                                  Icons.language,
+                                  size: flagSize * 0.5,
+                                  color: AppColors.grey,
+                                ),
+                              );
+                            },
+                          )
+                        : _languageFlagMap.containsKey(name)
+                            ? Flag.fromCode(
+                                _languageFlagMap[name]!,
+                                height: flagSize,
+                                width: flagSize,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                width: flagSize,
+                                height: flagSize,
+                                decoration: BoxDecoration(
+                                  color: AppColors.lightGrey,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.language,
+                                  size: flagSize * 0.5,
+                                  color: AppColors.grey,
+                                ),
+                              ),
+                  ),
+                  SizedBox(height: spacing),
+                  // Language Name
+                  Flexible(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildRoleCard(
+    String title,
+    Color color,
+    String imagePath,
+    {required bool imageOnRight, required VoidCallback onTap}
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double imageSize = (constraints.maxWidth * 0.55).clamp(80.0, 120.0);
+              final double iconSize = (constraints.maxWidth * 0.25).clamp(30.0, 45.0);
+              final double fontSize = (constraints.maxWidth * 0.12).clamp(14.0, 16.0);
+              final double padding = (constraints.maxWidth * 0.1).clamp(10.0, 15.0);
+              
+              return Stack(
+                children: [
+                  if (!imageOnRight) ...[
+                    // Students: Text on top right, Image on bottom left
+                    Positioned(
+                      top: padding,
+                      right: padding,
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(15),
+                        ),
+                        child: Image.asset(
+                          imagePath,
+                          width: imageSize,
+                          height: imageSize,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: imageSize,
+                              height: imageSize,
+                              color: color.withOpacity(0.2),
+                              child: FaIcon(
+                                FontAwesomeIcons.graduationCap,
+                                color: color,
+                                size: iconSize,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    // Teachers: Text on top left, Image on bottom right
+                    Positioned(
+                      top: padding,
+                      left: padding,
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          bottomRight: Radius.circular(15),
+                        ),
+                        child: Image.asset(
+                          imagePath,
+                          width: imageSize,
+                          height: imageSize,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: imageSize,
+                              height: imageSize,
+                              color: color.withOpacity(0.2),
+                              child: FaIcon(
+                                FontAwesomeIcons.chalkboardUser,
+                                color: color,
+                                size: iconSize,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
-
