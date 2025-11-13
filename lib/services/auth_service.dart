@@ -159,7 +159,6 @@ class AuthService {
   /// Update student profile
   Future<void> updateProfile({
     required String fullName,
-    String? phone,
     String? avatarUrl,
     String? bio,
   }) async {
@@ -167,7 +166,6 @@ class AuthService {
 
     await _supabase.from('students').update({
       'full_name': fullName,
-      if (phone != null) 'phone': phone,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (bio != null) 'bio': bio,
     }).eq('id', currentUser!.id);

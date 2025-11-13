@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/language_service.dart';
 import 'package:student/services/rating_service.dart';
 import 'package:student/screens/teachers/teacher_detail_screen.dart';
-import 'package:student/widgets/rating_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../config/app_colors.dart';
+import '../../widgets/custom_back_button.dart';
 
 class TeachersListScreen extends StatefulWidget {
   final String languageId;
@@ -36,8 +38,6 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
     setState(() => _isLoading = true);
     try {
       final teacherLanguages = await _languageService.getTeachersForLanguage(widget.languageId);
-      print('Teachers response: $teacherLanguages');
-      print('Number of teachers: ${teacherLanguages.length}');
       
       // Load ratings for each teacher
       final ratings = <String, Map<String, dynamic>>{};
@@ -57,7 +57,6 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading teachers: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -65,199 +64,247 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.languageName} Teachers'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _teachers.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.person_search,
-                        size: 80,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No Teachers Available',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No teachers found for ${widget.languageName}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
+              child: Row(
+                children: [
+                  const CustomBackButton(),
+                  const Spacer(),
+                  const Text(
+                    'TEACHERS',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 1,
+                    ),
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadTeachers,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _teachers.length,
-                    itemBuilder: (context, index) {
-                      final teacherData = _teachers[index];
-                      print('Teacher data at index $index: $teacherData');
-                      
-                      // Handle both possible data structures
-                      final teacher = teacherData['teachers'] ?? teacherData['teacher'] ?? teacherData;
-                      
-                      if (teacher == null || teacher['full_name'] == null) {
-                        print('Skipping invalid teacher data');
-                        return const SizedBox.shrink();
-                      }
-                      
-                      return _buildTeacherCard(teacher);
-                    },
-                  ),
-                ),
-    );
-  }
-
-  Widget _buildTeacherCard(Map<String, dynamic> teacher) {
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TeacherDetailScreen(
-                teacherId: teacher['id'],
-                languageId: widget.languageId,
-                languageName: widget.languageName,
+                  const Spacer(),
+                  const SizedBox(width: 40), // Balance the back button
+                ],
               ),
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              // Avatar
-              Hero(
-                tag: 'teacher_${teacher['id']}',
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.deepPurple.shade100,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.deepPurple.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
+            
+            const SizedBox(height: 20),
+            
+            // Teachers Grid
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                       ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: teacher['avatar_url'] != null
-                        ? CachedNetworkImage(
-                            imageUrl: teacher['avatar_url'],
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: Colors.deepPurple.shade100,
-                              child: const Icon(
-                                Icons.person,
-                                size: 40,
-                                color: Colors.deepPurple,
+                    )
+                  : _teachers.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.person_search,
+                                size: 80,
+                                color: AppColors.grey.withOpacity(0.5),
                               ),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.deepPurple.shade100,
-                              child: const Icon(
-                                Icons.person,
-                                size: 40,
-                                color: Colors.deepPurple,
+                              const SizedBox(height: 16),
+                              Text(
+                                'No Teachers Available',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
-                            ),
-                          )
-                        : Icon(
-                            Icons.person,
-                            size: 40,
-                            color: Colors.deepPurple.shade700,
+                              const SizedBox(height: 8),
+                              Text(
+                                'No teachers found for ${widget.languageName}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(width: 16),
-              
-              // Teacher Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      teacher['full_name'] ?? 'Teacher',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    if (teacher['specialization'] != null)
-                      Text(
-                        teacher['specialization'],
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadTeachers,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: GridView.builder(
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 1.1,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
+                              ),
+                              itemCount: _teachers.length,
+                              itemBuilder: (context, index) {
+                                final teacherData = _teachers[index];
+                                final teacher = teacherData['teachers'] ?? teacherData['teacher'] ?? teacherData;
+                                
+                                if (teacher == null || teacher['full_name'] == null) {
+                                  return const SizedBox.shrink();
+                                }
+                                
+                                return _buildTeacherCard(teacher);
+                              },
+                            ),
+                          ),
                         ),
-                      ),
-                    const SizedBox(height: 8),
-                    // Rating Display
-                    if (_teacherRatings.containsKey(teacher['id']))
-                      RatingDisplay(
-                        averageRating: (_teacherRatings[teacher['id']]!['average_rating'] as num?)?.toDouble() ?? 0.0,
-                        totalRatings: (_teacherRatings[teacher['id']]!['total_ratings'] as int?) ?? 0,
-                        compact: true,
-                      ),
-                    if (teacher['bio'] != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        teacher['bio'],
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              
-              // Arrow icon
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 20,
-                color: Colors.grey[400],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
+  
+  Widget _buildTeacherCard(Map<String, dynamic> teacher) {
+    final teacherId = teacher['id'] as String?;
+    final ratingStats = teacherId != null ? _teacherRatings[teacherId] : null;
+    final averageRating = (ratingStats?['average_rating'] as num?)?.toDouble() ?? 0.0;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Teacher Image - Left Side (Full Height)
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              bottomLeft: Radius.circular(16),
+            ),
+            child: Container(
+              width: 80,
+              decoration: BoxDecoration(
+                color: AppColors.lightGrey,
+              ),
+              child: teacher['avatar_url'] != null
+                  ? CachedNetworkImage(
+                      imageUrl: teacher['avatar_url'],
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: AppColors.lightGrey,
+                        child: const Icon(
+                          Icons.person,
+                          size: 30,
+                          color: AppColors.grey,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: AppColors.lightGrey,
+                        child: const Icon(
+                          Icons.person,
+                          size: 30,
+                          color: AppColors.grey,
+                        ),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.person,
+                      size: 30,
+                      color: AppColors.grey,
+                    ),
+            ),
+          ),
+          
+          // Right Side Content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Teacher Name
+                  Text(
+                    teacher['full_name'] ?? 'Teacher',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  const SizedBox(height: 6),
+                  
+                  // Star Rating
+                  if (averageRating > 0)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (starIndex) {
+                        if (starIndex < averageRating.floor()) {
+                          return const Icon(Icons.star, color: Colors.amber, size: 14);
+                        } else if (starIndex < averageRating) {
+                          return const Icon(Icons.star_half, color: Colors.amber, size: 14);
+                        } else {
+                          return Icon(Icons.star_border, color: Colors.grey.shade300, size: 14);
+                        }
+                      }),
+                    )
+                  else
+                    const SizedBox(height: 14),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Arrow Button - Centered
+                  Container(
+                    width: 35,
+                    height: 35,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      iconSize: 14,
+                      icon: const FaIcon(
+                        FontAwesomeIcons.arrowRight,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      onPressed: () {
+                        if (teacherId != null) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => TeacherDetailScreen(
+                                teacherId: teacherId,
+                                languageId: widget.languageId,
+                                languageName: widget.languageName,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
-

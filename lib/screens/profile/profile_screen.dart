@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/screens/auth/auth_screen.dart';
 import 'package:student/screens/profile/edit_profile_screen.dart';
-import 'package:student/widgets/student_avatar_widget.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../config/app_colors.dart';
+import '../../widgets/custom_button.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -51,373 +54,359 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load profile: $e')),
-        );
       }
     }
   }
 
-  Future<void> _handleLogout() async {
-    try {
-      await _authService.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const AuthScreen()),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Logout failed: $e')),
-        );
-      }
+  String _getLevelStatus(int level) {
+    if (level >= 1 && level <= 10) {
+      return 'Beginner';
+    } else if (level >= 11 && level <= 20) {
+      return 'Intermediate';
+    } else if (level >= 21 && level <= 30) {
+      return 'Advanced';
+    } else if (level >= 31 && level <= 40) {
+      return 'Expert';
+    } else if (level >= 41 && level <= 50) {
+      return 'Master';
+    } else if (level >= 51 && level <= 60) {
+      return 'Grand Master';
+    } else if (level >= 61 && level <= 70) {
+      return 'Legend';
+    } else if (level >= 71 && level <= 80) {
+      return 'Mythic';
+    } else if (level >= 81 && level <= 90) {
+      return 'Transcendent';
+    } else {
+      return 'Supreme';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _handleLogout,
-            tooltip: 'Logout',
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadProfile,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    // Profile header
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.deepPurple.shade400,
-                            Colors.deepPurple.shade800,
-                          ],
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 45,
+                    height: 45,
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const FaIcon(
+                        FontAwesomeIcons.bars,
+                        size: 18,
+                        color: AppColors.textPrimary,
+                      ),
+                      onPressed: () {
+                        Scaffold.of(context).openDrawer();
+                      },
+                    ),
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'PROFILE',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                          letterSpacing: 1,
                         ),
                       ),
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 3,
-                              ),
-                            ),
-                            child: StudentAvatarWidget(
-                              avatarUrl: _profile?['avatar_url'],
-                              fullName: _profile?['full_name'],
-                              size: 100,
-                              backgroundColor: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _profile?['full_name'] ?? 'Student',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              if (_proSubscription != null) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Colors.amber.shade300,
-                                        Colors.amber.shade600,
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.workspace_premium,
-                                        size: 16,
-                                        color: Colors.amber.shade900,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'PRO',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.amber.shade900,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _profile?['email'] ?? '',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          if (_profile?['phone'] != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              _profile!['phone'],
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 24),
-                          // PRO Subscription Status
-                          if (_proSubscription != null) _buildProSubscriptionWidget(),
-                          if (_proSubscription != null) const SizedBox(height: 16),
-                          // Level and Points Display
-                          if (_levelProgress != null) _buildLevelProgressWidget(),
-                        ],
-                      ),
                     ),
-
-                    // Profile details
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Account Information',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildInfoCard(
-                            'Full Name',
-                            _profile?['full_name'] ?? 'N/A',
-                            Icons.person,
-                          ),
-                          const SizedBox(height: 12),
-
-                          _buildInfoCard(
-                            'Email',
-                            _profile?['email'] ?? 'N/A',
-                            Icons.email,
-                          ),
-                          const SizedBox(height: 12),
-
-                          _buildInfoCard(
-                            'Phone',
-                            _profile?['phone'] ?? 'N/A',
-                            Icons.phone,
-                          ),
-                          const SizedBox(height: 12),
-
-                          _buildInfoCard(
-                            'Member Since',
-                            _profile?['created_at'] != null
-                                ? _formatDate(_profile!['created_at'])
-                                : 'N/A',
-                            Icons.calendar_today,
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          // Settings section
-                          const Text(
-                            'Settings',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildActionButton(
-                            'Edit Profile',
-                            Icons.edit,
-                            () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => EditProfileScreen(profile: _profile!),
-                                ),
-                              );
-                              if (result == true) {
-                                _loadProfile(); // Refresh profile after edit
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 12),
-
-                          _buildActionButton(
-                            'Notifications',
-                            Icons.notifications,
-                            () {
-                              // TODO: Implement notifications settings
-                            },
-                          ),
-                          const SizedBox(height: 12),
-
-                          _buildActionButton(
-                            'Privacy & Security',
-                            Icons.security,
-                            () {
-                              // TODO: Implement privacy settings
-                            },
-                          ),
-                          const SizedBox(height: 12),
-
-                          _buildActionButton(
-                            'Help & Support',
-                            Icons.help,
-                            () {
-                              // TODO: Implement help
-                            },
-                          ),
-                          
-                          const SizedBox(height: 32),
-
-                          // PRO Subscription Section
-                          const Text(
-                            'PRO Subscription',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildActionButton(
-                            _proSubscription != null ? 'Extend PRO Subscription' : 'Activate PRO',
-                            Icons.workspace_premium,
-                            () => _showRedeemVoucherDialog(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 45),
+                ],
               ),
             ),
+            
+            // Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          // Profile Avatar and Basic Info
+                          _buildProfileHeader(context),
+                          const SizedBox(height: 25),
+                          
+                          // User Level Card
+                          if (_levelProgress != null) _buildUserLevelCard(),
+                          if (_levelProgress != null) const SizedBox(height: 15),
+                          
+                          // Subscription Card
+                          _buildSubscriptionCard(context),
+                          const SizedBox(height: 25),
+                          
+                          // Personal Information Section
+                          _buildSectionTitle('Personal Information'),
+                          const SizedBox(height: 12),
+                          _buildInfoCard(
+                            icon: FontAwesomeIcons.envelope,
+                            title: 'Email',
+                            value: _profile?['email'] ?? 'N/A',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditProfileScreen(profile: _profile ?? {}),
+                                ),
+                              ).then((result) {
+                                if (result == true) {
+                                  _loadProfile();
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 25),
+                          
+                          // Security Section
+                          _buildSectionTitle('Security'),
+                          const SizedBox(height: 12),
+                          _buildActionCard(
+                            icon: FontAwesomeIcons.lock,
+                            title: 'Change Password',
+                            subtitle: 'Update your password',
+                            onTap: () {
+                              // TODO: Navigate to change password screen
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Change password feature coming soon'),
+                                  backgroundColor: AppColors.primary,
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 30),
+                          
+                          // Logout Button
+                          CustomButton(
+                            text: 'LOGOUT',
+                            onPressed: () => _showLogoutDialog(context),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildProSubscriptionWidget() {
-    final expiresAt = _proSubscription!['expires_at'] as String;
-    final daysRemaining = _proService.getDaysRemaining(expiresAt);
-    final expiryText = _proService.formatExpiryDate(expiresAt);
-
+  Widget _buildProfileHeader(BuildContext context) {
+    final fullName = _profile?['full_name'] ?? 'Student';
+    final initials = fullName.isNotEmpty
+        ? fullName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
+        : 'ST';
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.amber.shade300,
-            Colors.amber.shade600,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.amber.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
+          // Profile Picture Section (Left)
+          Stack(
             children: [
-              Icon(
-                Icons.workspace_premium,
-                color: Colors.amber.shade900,
-                size: 32,
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  gradient: AppColors.redGradient,
+                  shape: BoxShape.circle,
+                ),
+                child: _profile?['avatar_url'] != null
+                    ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: _profile!['avatar_url'],
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Center(
+                            child: Text(
+                              initials,
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Center(
+                            child: Text(
+                              initials,
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          initials,
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'PRO Member',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade900,
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditProfileScreen(profile: _profile ?? {}),
                       ),
+                    ).then((result) {
+                      if (result == true) {
+                        _loadProfile();
+                      }
+                    });
+                  },
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.redGradient,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.white, width: 2),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      expiryText,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.amber.shade900,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      size: 14,
+                      color: Colors.white,
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const SizedBox(width: 20),
+          
+          // User Info Section (Right)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Expires on:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.amber.shade900,
+                  fullName,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                Text(
-                  DateTime.parse(expiresAt).toString().split(' ')[0],
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber.shade900,
+                const SizedBox(height: 5),
+                if (_profile?['bio'] != null && (_profile!['bio'] as String).isNotEmpty)
+                  Text(
+                    _profile!['bio'] ?? '',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                else
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.school,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          'Language Learner',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditProfileScreen(profile: _profile ?? {}),
+                      ),
+                    ).then((result) {
+                      if (result == true) {
+                        _loadProfile();
+                      }
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.redGradient,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FaIcon(
+                          FontAwesomeIcons.penToSquare,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Edit Profile',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -428,15 +417,486 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildUserLevelCard() {
+    final level = _levelProgress!['level'] as int;
+    final points = _levelProgress!['points'] as int;
+    final isMaxLevel = _levelProgress!['isMaxLevel'] as bool;
+    final progressPercent = _levelProgress!['progressPercent'] as double;
+    final nextLevel = _levelProgress!['nextLevel'] as int?;
+    final pointsToNext = _levelProgress!['pointsToNext'] as int;
+    final status = _getLevelStatus(level);
+    
+    // Calculate XP for current level
+    final pointsForCurrentLevel = (level - 1) * LevelService.pointsPerLevel;
+    final pointsForNextLevel = level * LevelService.pointsPerLevel;
+    final currentLevelXP = points - pointsForCurrentLevel;
+    final totalLevelXP = pointsForNextLevel - pointsForCurrentLevel;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF5FC3E4).withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Current Level',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    status,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Level $level',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const FaIcon(
+                  FontAwesomeIcons.trophy,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          if (!isMaxLevel)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: progressPercent / 100,
+                minHeight: 8,
+                backgroundColor: Colors.white.withOpacity(0.3),
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          else
+            Container(
+              height: 8,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$points XP',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (!isMaxLevel)
+                Text(
+                  '$pointsToNext XP to Level $nextLevel',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                )
+              else
+                const Text(
+                  'Max Level Reached!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionCard(BuildContext context) {
+    final isPro = _proSubscription != null;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: isPro ? AppColors.redGradient : null,
+        color: isPro ? null : AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: isPro ? null : Border.all(color: AppColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: isPro 
+              ? AppColors.primary.withOpacity(0.3)
+              : Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isPro ? Colors.white.withOpacity(0.2) : AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: FaIcon(
+              isPro ? FontAwesomeIcons.crown : FontAwesomeIcons.user,
+              color: isPro ? Colors.white : AppColors.primary,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isPro ? 'PRO Member' : 'Free Member',
+                  style: TextStyle(
+                    color: isPro ? Colors.white : AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isPro 
+                    ? 'Unlimited access to all features'
+                    : 'Limited features available',
+                  style: TextStyle(
+                    color: isPro ? Colors.white.withOpacity(0.9) : AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isPro)
+            GestureDetector(
+              onTap: () => _showRedeemVoucherDialog(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: AppColors.redGradient,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Text(
+                  'Upgrade',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: FaIcon(
+                icon,
+                color: AppColors.primary,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const FaIcon(
+              FontAwesomeIcons.chevronRight,
+              size: 14,
+              color: AppColors.grey,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: FaIcon(
+                icon,
+                color: AppColors.primary,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const FaIcon(
+              FontAwesomeIcons.chevronRight,
+              size: 14,
+              color: AppColors.grey,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              FaIcon(
+                FontAwesomeIcons.rightFromBracket,
+                color: AppColors.primary,
+                size: 24,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Logout',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 16,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: AppColors.grey,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await _authService.signOut();
+                  if (mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (context) => const AuthScreen(),
+                      ),
+                      (route) => false,
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Logout failed: $e'),
+                        backgroundColor: AppColors.primary,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: AppColors.redGradient,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showRedeemVoucherDialog() {
     final voucherController = TextEditingController();
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         title: Row(
           children: [
-            Icon(Icons.card_giftcard, color: Colors.deepPurple),
+            const FaIcon(
+              FontAwesomeIcons.crown,
+              color: AppColors.primary,
+            ),
             const SizedBox(width: 12),
             const Text('Redeem Voucher'),
           ],
@@ -463,27 +923,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               textCapitalization: TextCapitalization.characters,
               maxLength: 16,
             ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, size: 20, color: Colors.blue.shade700),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'PRO features: Student chat & Practice videos',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
         actions: [
@@ -496,7 +935,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final code = voucherController.text.trim();
               if (code.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a voucher code')),
+                  const SnackBar(
+                    content: Text('Please enter a voucher code'),
+                    backgroundColor: AppColors.primary,
+                  ),
                 );
                 return;
               }
@@ -505,7 +947,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               await _redeemVoucher(code);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
             child: const Text('Redeem'),
@@ -516,12 +958,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _redeemVoucher(String code) async {
-    // Show loading
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(
-        child: CircularProgressIndicator(),
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+        ),
       ),
     );
 
@@ -533,77 +976,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final result = await _proService.redeemVoucher(studentId, code);
       
-      // Close loading dialog
       if (mounted) Navigator.pop(context);
 
       if (result['success'] == true) {
-        // Show success dialog
         if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green),
-                  const SizedBox(width: 12),
-                  const Text('Success!'),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Your PRO subscription has been activated!',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.workspace_premium,
-                          size: 48,
-                          color: Colors.amber.shade700,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '+${result['days_added']} days',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _loadProfile(); // Refresh profile
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Awesome!'),
-                ),
-              ],
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('PRO subscription activated! +${result['days_added']} days'),
+              backgroundColor: Colors.green,
             ),
           );
+          _loadProfile();
         }
       } else {
         throw Exception(result['error'] ?? 'Failed to redeem voucher');
       }
     } catch (e) {
-      // Close loading dialog if still open
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
@@ -618,226 +1006,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
-
-  Widget _buildInfoCard(String label, String value, IconData icon) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.deepPurple, size: 24),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton(String title, IconData icon, VoidCallback onTap) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.deepPurple),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  String _formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
-      return dateString;
-    }
-  }
-
-  Widget _buildLevelProgressWidget() {
-    final points = _levelProgress!['points'] as int;
-    final level = _levelProgress!['level'] as int;
-    final isMaxLevel = _levelProgress!['isMaxLevel'] as bool;
-    final progressPercent = _levelProgress!['progressPercent'] as double;
-    final nextLevel = _levelProgress!['nextLevel'] as int?;
-    final pointsToNext = _levelProgress!['pointsToNext'] as int;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        children: [
-          // Current level
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.stars,
-                    color: Colors.amber.shade300,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Current Level',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      Text(
-                        'Level $level',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade300,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.star,
-                      size: 18,
-                      color: Colors.amber.shade900,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$points',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          
-          if (!isMaxLevel) ...[
-            const SizedBox(height: 16),
-            // Progress bar
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Progress to Level $nextLevel',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    Text(
-                      '$pointsToNext points to go',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: progressPercent / 100,
-                    minHeight: 8,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.amber.shade300,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ] else ...[
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.emoji_events,
-                  color: Colors.amber.shade300,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Max Level Reached!',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 }
-

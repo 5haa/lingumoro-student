@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/student_service.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:student/widgets/student_avatar_widget.dart';
 import 'package:student/screens/students/student_public_profile_screen.dart';
 import 'package:student/screens/chat/chat_requests_screen.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
+import '../../config/app_colors.dart';
+import '../../widgets/custom_back_button.dart';
 
 class StudentsListScreen extends StatefulWidget {
   const StudentsListScreen({super.key});
@@ -114,6 +116,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   }
   
   Future<void> _sendChatRequest(String recipientId, String recipientName) async {
+    final messageController = TextEditingController();
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -124,8 +127,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
             border: OutlineInputBorder(),
           ),
           maxLines: 3,
-          onChanged: (value) {},
-          controller: TextEditingController(),
+          controller: messageController,
         ),
         actions: [
           TextButton(
@@ -134,11 +136,10 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              final controller = (context as Element).findAncestorStateOfType<State>();
-              Navigator.pop(context, '');
+              Navigator.pop(context, messageController.text);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
             child: const Text('Send'),
@@ -200,31 +201,113 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Fellow Students'),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.mail),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ChatRequestsScreen(),
-                ),
-              );
-              _loadStudents();
-            },
-            tooltip: 'Chat Requests',
-          ),
-        ],
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
+              child: Row(
+                children: [
+                  const CustomBackButton(),
+                  const Spacer(),
+                  const Text(
+                    'STUDENTS',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Chat requests button
+                  IconButton(
+                    icon: const FaIcon(
+                      FontAwesomeIcons.envelope,
+                      size: 20,
+                      color: AppColors.textPrimary,
+                    ),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChatRequestsScreen(),
+                        ),
+                      );
+                      _loadStudents();
+                    },
+                    tooltip: 'Chat Requests',
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Students Grid
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    )
+                  : _errorMessage != null
+                      ? _buildErrorState()
+                      : _students.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.people_outline,
+                                    size: 80,
+                                    color: AppColors.grey.withOpacity(0.5),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No other students found',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Be the first in your language!',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _loadStudents,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: GridView.builder(
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 1.1,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                  ),
+                                  itemCount: _students.length,
+                                  itemBuilder: (context, index) {
+                                    return _buildStudentCard(_students[index]);
+                                  },
+                                ),
+                              ),
+                            ),
+            ),
+          ],
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? _buildErrorState()
-              : _buildStudentsList(),
     );
   }
 
@@ -240,16 +323,11 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.amber.shade300,
-                      Colors.amber.shade600,
-                    ],
-                  ),
+                  gradient: AppColors.redGradient,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.workspace_premium,
+                child: const FaIcon(
+                  FontAwesomeIcons.crown,
                   size: 64,
                   color: Colors.white,
                 ),
@@ -260,6 +338,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -268,55 +347,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                 'Connect with fellow students with a PRO subscription',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey[600],
+                  color: AppColors.textSecondary,
                 ),
                 textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton.icon(
-                onPressed: () {
-                  // Show dialog with instructions
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Row(
-                        children: [
-                          Icon(Icons.workspace_premium, color: Colors.amber),
-                          SizedBox(width: 12),
-                          Text('Activate PRO'),
-                        ],
-                      ),
-                      content: const Text(
-                        'To activate PRO subscription:\n\n'
-                        '1. Go to your Profile tab\n'
-                        '2. Tap "Activate PRO" button\n'
-                        '3. Enter your voucher code\n\n'
-                        'Get your voucher code from your teacher or admin.',
-                        style: TextStyle(fontSize: 15),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.workspace_premium),
-                label: const Text('How to Activate PRO'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
               ),
             ],
           ),
@@ -334,324 +367,197 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
             Icon(
               Icons.school_outlined,
               size: 80,
-              color: Colors.grey[400],
+              color: AppColors.grey.withOpacity(0.5),
             ),
             const SizedBox(height: 24),
             Text(
-              _errorMessage!,
+              _errorMessage ?? 'Error loading students',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey[700],
+                color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Go Back'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildStudentsList() {
-    if (_students.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.people_outline,
-                size: 80,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'No other students found',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Be the first in your language!',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadStudents,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Colors.teal.shade400,
-                  Colors.teal.shade600,
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Connect with Fellow Learners',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${_students.length} student${_students.length != 1 ? 's' : ''} learning your languages',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Students List
-          ...(_students.map((student) => _buildStudentCard(student))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStudentCard(Map<String, dynamic> student) {
-    final languages = student['languages'] as List<Map<String, dynamic>>? ?? [];
-    final province = student['province'] as Map<String, dynamic>?;
-
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => StudentPublicProfileScreen(
-                studentId: student['id'],
-                studentData: student,
-              ),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-          children: [
-            // Avatar with shadow
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.teal.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: StudentAvatarWidget(
-                avatarUrl: student['avatar_url'],
-                fullName: student['full_name'],
-                size: 60,
-                heroTag: 'student_${student['id']}',
-              ),
-            ),
-            const SizedBox(width: 16),
-
-            // Student Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    student['full_name'] ?? 'Unknown',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    student['email'] ?? '',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  if (province != null) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Colors.grey[500],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${province['name']} (${province['name_ar']})',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (languages.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: languages.map((language) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.teal.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.teal.shade200,
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (language['flag_url'] != null)
-                                ClipOval(
-                                  child: CachedNetworkImage(
-                                    imageUrl: language['flag_url'],
-                                    width: 16,
-                                    height: 16,
-                                    fit: BoxFit.cover,
-                                    errorWidget: (context, url, error) =>
-                                        const Icon(Icons.language, size: 16),
-                                  ),
-                                )
-                              else
-                                const Icon(Icons.language, size: 16, color: Colors.teal),
-                              const SizedBox(width: 4),
-                              Text(
-                                language['name'] ?? '',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.teal.shade800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            // Chat Button
-            const SizedBox(width: 8),
-            _buildChatButton(student),
-          ],
-        ),
-      ),
       ),
     );
   }
   
-  Widget _buildChatButton(Map<String, dynamic> student) {
+  Widget _buildStudentCard(Map<String, dynamic> student) {
     final studentId = student['id'] as String;
-    final studentName = student['full_name'] as String?  ?? 'Student';
+    final studentName = student['full_name'] ?? 'Student';
     final status = _chatRequestStatus[studentId];
     
-    if (status == 'accepted') {
-      // Can chat
-      return IconButton(
-        icon: const Icon(Icons.chat, color: Colors.green),
-        onPressed: () => _openChat(studentId, studentName),
-        tooltip: 'Chat',
-      );
-    } else if (status == 'pending') {
-      // Request sent, waiting
-      return const Chip(
-        label: Text('Pending', style: TextStyle(fontSize: 11)),
-        backgroundColor: Colors.orange,
-        labelStyle: TextStyle(color: Colors.white),
-        padding: EdgeInsets.symmetric(horizontal: 8),
-      );
-    } else {
-      // Can send request
-      return IconButton(
-        icon: const Icon(Icons.person_add, color: Colors.deepPurple),
-        onPressed: () => _sendChatRequest(studentId, studentName),
-        tooltip: 'Send Chat Request',
-      );
-    }
-  }
-
-  Widget _buildDefaultAvatar(String? fullName) {
-    final initial = (fullName?.isNotEmpty ?? false) 
-        ? fullName![0].toUpperCase() 
-        : '?';
+    // Calculate level from languages or use default
+    final languages = student['languages'] as List<Map<String, dynamic>>? ?? [];
+    final level = languages.length > 0 ? languages.length : 1;
     
-    return Center(
-      child: Text(
-        initial,
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Student Image - Left Side (Full Height)
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              bottomLeft: Radius.circular(16),
+            ),
+            child: Container(
+              width: 80,
+              decoration: BoxDecoration(
+                color: AppColors.lightGrey,
+              ),
+              child: student['avatar_url'] != null
+                  ? CachedNetworkImage(
+                      imageUrl: student['avatar_url'],
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: AppColors.lightGrey,
+                        child: const Icon(
+                          Icons.person,
+                          size: 30,
+                          color: AppColors.grey,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: AppColors.lightGrey,
+                        child: const Icon(
+                          Icons.person,
+                          size: 30,
+                          color: AppColors.grey,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: AppColors.lightGrey,
+                      child: Center(
+                        child: Text(
+                          studentName.isNotEmpty ? studentName[0].toUpperCase() : '?',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.grey,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          
+          // Right Side Content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Student Name
+                  Text(
+                    studentName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  const SizedBox(height: 6),
+                  
+                  // Level Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.redGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Lvl $level',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.white,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  // Chat Button - Centered
+                  status == 'pending'
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Pending',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 35,
+                          height: 35,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            iconSize: 14,
+                            icon: FaIcon(
+                              status == 'accepted'
+                                  ? FontAwesomeIcons.comment
+                                  : FontAwesomeIcons.userPlus,
+                              size: 14,
+                              color: status == 'accepted' 
+                                  ? Colors.green 
+                                  : AppColors.primary,
+                            ),
+                            onPressed: () {
+                              if (status == 'accepted') {
+                                _openChat(studentId, studentName);
+                              } else {
+                                _sendChatRequest(studentId, studentName);
+                              }
+                            },
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
-

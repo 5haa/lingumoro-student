@@ -9,6 +9,8 @@ class CustomTextField extends StatefulWidget {
   final TextInputType? keyboardType;
   final Widget? prefixIcon;
   final Widget? suffixIcon;
+  final String? Function(String?)? validator;
+  final bool enabled;
   
   const CustomTextField({
     super.key,
@@ -19,6 +21,8 @@ class CustomTextField extends StatefulWidget {
     this.keyboardType,
     this.prefixIcon,
     this.suffixIcon,
+    this.validator,
+    this.enabled = true,
   });
   
   @override
@@ -63,13 +67,15 @@ class _CustomTextFieldState extends State<CustomTextField> {
               ),
             ],
           ),
-          child: TextField(
+          child: TextFormField(
             controller: widget.controller,
             obscureText: _isObscured,
             keyboardType: widget.keyboardType,
-            style: const TextStyle(
+            enabled: widget.enabled,
+            validator: widget.validator,
+            style: TextStyle(
               fontSize: 16,
-              color: AppColors.textPrimary,
+              color: widget.enabled ? AppColors.textPrimary : AppColors.textSecondary,
             ),
             decoration: InputDecoration(
               hintText: widget.hintText,
