@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
-import 'package:student/screens/auth/login_screen.dart';
+import 'package:student/screens/auth/auth_screen.dart';
 import 'package:student/screens/profile/edit_profile_screen.dart';
 import 'package:student/widgets/student_avatar_widget.dart';
 
@@ -63,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _authService.signOut();
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          MaterialPageRoute(builder: (context) => const AuthScreen()),
         );
       }
     } catch (e) {

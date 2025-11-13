@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:student/config/app_colors.dart';
 import 'package:student/config/supabase_config.dart';
 import 'package:student/screens/splash_screen.dart';
 import 'package:student/screens/teachers/teachers_list_screen.dart';
@@ -78,15 +79,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       title: 'Lingumoro Student',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        primaryColor: AppColors.primary,
+        scaffoldBackgroundColor: AppColors.background,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.light,
+          seedColor: AppColors.primary,
+          primary: AppColors.primary,
+          secondary: AppColors.accent,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppColors.white,
+          elevation: 0,
+          iconTheme: IconThemeData(color: AppColors.textPrimary),
+          titleTextStyle: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+          centerTitle: true,
         ),
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
       ),
       home: const SplashScreen(),
       routes: {

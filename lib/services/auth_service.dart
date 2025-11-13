@@ -173,9 +173,32 @@ class AuthService {
     }).eq('id', currentUser!.id);
   }
 
-  /// Reset password
+  /// Reset password (sends OTP)
   Future<void> resetPassword(String email) async {
     await _supabase.auth.resetPasswordForEmail(email);
+  }
+
+  /// Verify password reset OTP
+  Future<AuthResponse> verifyPasswordResetOTP({
+    required String email,
+    required String token,
+  }) async {
+    // Verify the password reset OTP
+    final response = await _supabase.auth.verifyOTP(
+      type: OtpType.recovery,
+      email: email,
+      token: token,
+    );
+
+    return response;
+  }
+
+  /// Resend password reset OTP
+  Future<void> resendPasswordResetOTP(String email) async {
+    await _supabase.auth.resend(
+      type: OtpType.recovery,
+      email: email,
+    );
   }
 }
 
