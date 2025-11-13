@@ -200,5 +200,16 @@ class AuthService {
       email: email,
     );
   }
+
+  /// Update password after OTP verification
+  Future<void> updatePassword(String newPassword) async {
+    if (currentUser == null) {
+      throw Exception('No user logged in. Please verify OTP first.');
+    }
+
+    await _supabase.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
 }
 

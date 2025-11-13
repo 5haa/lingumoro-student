@@ -5,6 +5,7 @@ import 'package:student/config/app_colors.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_back_button.dart';
+import 'reset_password_screen.dart';
 import '../main_navigation.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   );
   final _authService = AuthService();
   
-  int _remainingSeconds = 113; // 1:53
+  int _remainingSeconds = 60; // 1 minute
   Timer? _timer;
   bool _isLoading = false;
   
@@ -74,7 +75,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   
   Future<void> _handleResendCode() async {
     setState(() {
-      _remainingSeconds = 113;
+      _remainingSeconds = 60;
     });
     _startTimer();
     
@@ -126,18 +127,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           email: widget.email,
           token: code,
         );
-        // After OTP verification, user can reset password
-        // For now, navigate to main navigation (password reset screen can be added later)
+        // After OTP verification, navigate to reset password screen
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('OTP verified. You can now reset your password.'),
-              backgroundColor: AppColors.primary,
-            ),
-          );
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (_) => const MainNavigation(),
+              builder: (_) => const ResetPasswordScreen(),
             ),
           );
         }
@@ -194,7 +188,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   String _formatTime() {
     int minutes = _remainingSeconds ~/ 60;
     int seconds = _remainingSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')} SEC';
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
   
   @override
@@ -326,7 +320,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                     
                     // Resend button
                     CustomButton(
-                      text: 'RESEND AT (${_formatTime()})',
+                      text: _remainingSeconds == 0 
+                          ? 'RESEND' 
+                          : 'RESEND (${_formatTime()})',
                       onPressed: _remainingSeconds == 0 ? _handleResendCode : () {},
                       isOutlined: true,
                     ),
