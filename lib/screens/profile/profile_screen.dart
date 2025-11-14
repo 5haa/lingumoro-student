@@ -554,6 +554,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildSubscriptionCard(BuildContext context) {
     final isPro = _proSubscription != null;
+    String? expiryText;
+    
+    if (isPro && _proSubscription!['expires_at'] != null) {
+      try {
+        final expiresAt = _proSubscription!['expires_at'] as String;
+        expiryText = _proService.formatExpiryDate(expiresAt);
+      } catch (e) {
+        expiryText = null;
+      }
+    }
     
     return Container(
       padding: const EdgeInsets.all(20),
@@ -602,7 +612,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 3),
                 Text(
                   isPro 
-                    ? 'Unlimited access to all features'
+                    ? (expiryText != null 
+                        ? 'Expires: $expiryText'
+                        : 'Unlimited access to all features')
                     : 'Limited features available',
                   style: TextStyle(
                     color: isPro ? Colors.white.withOpacity(0.9) : AppColors.textSecondary,
