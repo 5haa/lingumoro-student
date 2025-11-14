@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flag/flag.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../../config/app_colors.dart';
 import '../../services/language_service.dart';
@@ -346,87 +347,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     
     if (_carouselSlides.isEmpty) {
-      // Fallback carousel with default content
-      return SizedBox(
-        height: 180,
-        child: PageView.builder(
-          controller: _pageController,
-          onPageChanged: (int page) {
-            setState(() {
-              _currentCarouselPage = page;
-            });
-          },
-          itemBuilder: (context, index) {
-            final actualIndex = index % 3;
-            final defaultTexts = [
-              'Web Designing\nONLINE COURSE',
-              'Instagram Banner\nWeb course online',
-              'Mobile Development\nONLINE COURSE',
-            ];
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4A5568), Color(0xFF6B46C1)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 20,
-                    top: 20,
-                    child: Text(
-                      defaultTexts[actualIndex],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 20,
-                    bottom: 20,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: const Text(
-                        'JOIN NOW',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
+      // Empty state - no carousel slides
+      return const SizedBox.shrink();
     }
     
     return SizedBox(
@@ -442,77 +364,60 @@ class _HomeScreenState extends State<HomeScreen> {
           final actualIndex = index % _carouselSlides.length;
           final slide = _carouselSlides[actualIndex];
           
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF4A5568), Color(0xFF6B46C1)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          return GestureDetector(
+            onTap: () async {
+              final linkUrl = slide['link_url'] as String?;
+              if (linkUrl != null && linkUrl.isNotEmpty) {
+                try {
+                  final uri = Uri.parse(linkUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                } catch (e) {
+                  // Handle error silently or show a snackbar
+                }
+              }
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                // Background image if available
-                if (slide['image_url'] != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: CachedNetworkImage(
-                      imageUrl: slide['image_url'],
-                      width: double.infinity,
-                      height: double.infinity,
-                      fit: BoxFit.cover,
-                      errorWidget: (context, url, error) => const SizedBox(),
-                    ),
-                  ),
-                Positioned(
-                  left: 20,
-                  top: 20,
-                  child: Text(
-                    slide['title'] ?? 'ONLINE COURSE',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 20,
-                  bottom: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: slide['image_url'] != null
+                    ? CachedNetworkImage(
+                        imageUrl: slide['image_url'],
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF4A5568), Color(0xFF6B46C1)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF4A5568), Color(0xFF6B46C1)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'JOIN NOW',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         },
@@ -674,89 +579,48 @@ class _HomeScreenState extends State<HomeScreen> {
               
               return Stack(
                 children: [
-                  if (!imageOnRight) ...[
-                    // Students: Text on top right, Image on bottom left
-                    Positioned(
-                      top: padding,
-                      right: padding,
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
+                  // Background image covering the whole card
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image.asset(
+                      imagePath,
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: double.infinity,
+                          height: double.infinity,
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.2),
+                          ),
+                          child: Center(
+                            child: FaIcon(
+                              imageOnRight 
+                                ? FontAwesomeIcons.chalkboardUser
+                                : FontAwesomeIcons.graduationCap,
+                              color: color,
+                              size: iconSize * 2,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  // Title text
+                  Positioned(
+                    top: padding,
+                    left: imageOnRight ? padding : null,
+                    right: imageOnRight ? null : padding,
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(15),
-                        ),
-                        child: Image.asset(
-                          imagePath,
-                          width: imageSize,
-                          height: imageSize,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: imageSize,
-                              height: imageSize,
-                              color: color.withOpacity(0.2),
-                              child: FaIcon(
-                                FontAwesomeIcons.graduationCap,
-                                color: color,
-                                size: iconSize,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    // Teachers: Text on top left, Image on bottom right
-                    Positioned(
-                      top: padding,
-                      left: padding,
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          bottomRight: Radius.circular(15),
-                        ),
-                        child: Image.asset(
-                          imagePath,
-                          width: imageSize,
-                          height: imageSize,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: imageSize,
-                              height: imageSize,
-                              color: color.withOpacity(0.2),
-                              child: FaIcon(
-                                FontAwesomeIcons.chalkboardUser,
-                                color: color,
-                                size: iconSize,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
               );
             },
