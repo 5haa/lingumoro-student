@@ -11,6 +11,7 @@ class CustomTextField extends StatefulWidget {
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
   final bool enabled;
+  final int? maxLines;
   
   const CustomTextField({
     super.key,
@@ -23,6 +24,7 @@ class CustomTextField extends StatefulWidget {
     this.suffixIcon,
     this.validator,
     this.enabled = true,
+    this.maxLines = 1,
   });
   
   @override
@@ -73,6 +75,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
             keyboardType: widget.keyboardType,
             enabled: widget.enabled,
             validator: widget.validator,
+            maxLines: widget.obscureText ? 1 : widget.maxLines,
             style: TextStyle(
               fontSize: 16,
               color: widget.enabled ? AppColors.textPrimary : AppColors.textSecondary,

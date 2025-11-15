@@ -10,6 +10,7 @@ import '../../services/carousel_service.dart';
 import '../teachers/teachers_list_screen.dart';
 import '../students/students_list_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../ai_voice/ai_voice_assistant_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -63,9 +64,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _timer = Timer.periodic(const Duration(seconds: 5), (Timer timer) {
       if (_pageController.hasClients && _carouselSlides.isNotEmpty) {
         int nextPage = _currentCarouselPage + 1;
-        if (nextPage >= _carouselSlides.length) {
-          nextPage = 0;
-        }
         _pageController.animateToPage(
           nextPage,
           duration: const Duration(milliseconds: 350),
@@ -253,6 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+      floatingActionButton: _buildAiPracticeButton(),
     );
   }
   
@@ -624,6 +623,63 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildAiPracticeButton() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10, right: 5),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6C63FF).withOpacity(0.5),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AiVoiceAssistantScreen(),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                FaIcon(
+                  FontAwesomeIcons.brain,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'AI Practice',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
