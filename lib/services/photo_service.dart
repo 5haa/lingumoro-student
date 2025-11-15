@@ -164,5 +164,25 @@ class PhotoService {
       return [];
     }
   }
+
+  /// Get main photo for a student
+  Future<Map<String, dynamic>?> getMainPhoto(String studentId) async {
+    try {
+      final photos = await _supabase
+          .from('student_photos')
+          .select()
+          .eq('student_id', studentId)
+          .eq('is_main', true)
+          .limit(1);
+
+      if (photos.isNotEmpty) {
+        return photos[0] as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching main photo: $e');
+      return null;
+    }
+  }
 }
 

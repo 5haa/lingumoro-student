@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
+import 'package:student/services/photo_service.dart';
 import 'package:student/screens/auth/auth_screen.dart';
 import 'package:student/screens/profile/edit_profile_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -21,9 +22,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
   final _levelService = LevelService();
   final _proService = ProSubscriptionService();
+  final _photoService = PhotoService();
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _levelProgress;
   Map<String, dynamic>? _proSubscription;
+  Map<String, dynamic>? _mainPhoto;
   bool _isLoading = true;
 
   @override
@@ -39,9 +42,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       
       Map<String, dynamic>? progress;
       Map<String, dynamic>? proSub;
+      Map<String, dynamic>? mainPhoto;
       if (studentId != null) {
         progress = await _levelService.getStudentProgress(studentId);
         proSub = await _proService.getProStatus(studentId);
+        mainPhoto = await _photoService.getMainPhoto(studentId);
       }
       
       if (mounted) {
@@ -49,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _profile = profile;
           _levelProgress = progress;
           _proSubscription = proSub;
+          _mainPhoto = mainPhoto;
           _isLoading = false;
         });
       }
@@ -251,10 +257,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   gradient: AppColors.redGradient,
                   shape: BoxShape.circle,
                 ),
-                child: _profile?['avatar_url'] != null
+                child: (_mainPhoto?['photo_url'] != null || _profile?['avatar_url'] != null)
                     ? ClipOval(
                         child: CachedNetworkImage(
-                          imageUrl: _profile!['avatar_url'],
+                          imageUrl: _mainPhoto?['photo_url'] ?? _profile!['avatar_url'],
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Center(
                             child: Text(
