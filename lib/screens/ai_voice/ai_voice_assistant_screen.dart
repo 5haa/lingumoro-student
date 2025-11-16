@@ -34,6 +34,12 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
   String? _errorMessage;
   String? _currentListeningText;
   bool _serverConfigured = false;
+  String _selectedVoice = 'heart'; // Default voice
+  
+  // Inactivity timer for AI follow-ups
+  Timer? _inactivityTimer;
+  DateTime? _lastUserInteraction;
+  static const Duration _inactivityDuration = Duration(seconds: 30);
 
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
@@ -49,6 +55,7 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
 
   @override
   void dispose() {
+    _inactivityTimer?.cancel();
     _animationController.dispose();
     _audioPlayer.dispose();
     _speech.stop();
@@ -92,14 +99,25 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
     _audioPlayer.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         if (_isSpeaking) {
+          print('🔊 Audio playback completed, will restart listening...');
+          
+          // Stop player explicitly to clear playing state
+          _audioPlayer.stop();
+          
           setState(() => _isSpeaking = false);
           _animationController.stop();
 
-          // Auto-resume listening if active
-          if (_isActive && !_isListening) {
-            Future.delayed(const Duration(milliseconds: 800), () {
-              if (!_isSpeaking && !_isListening && _isActive) {
+          // Reset timer AFTER AI finishes speaking
+          _lastUserInteraction = DateTime.now();
+
+          // Auto-resume listening if active - single coordinated restart
+          if (_isActive) {
+            Future.delayed(const Duration(milliseconds: 1500), () {
+              if (_isActive && !_isSpeaking && !_isProcessing && !_isListening) {
+                print('🎤 Restarting listening after AI speech');
                 _startListening();
+              } else {
+                print('⏭️ Skipping restart - already listening or not in correct state');
               }
             });
           }
@@ -119,25 +137,22 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
               _showError('Speech error: ${error.errorMsg}');
             }
 
-            // Auto-retry listening if active
-            if (_isActive && !_isProcessing) {
-              Future.delayed(const Duration(seconds: 1), () {
-                if (_isActive && !_isProcessing) _startListening();
+            // Auto-retry listening if active and got an error (not normal timeout)
+            if (_isActive && !_isProcessing && !_isSpeaking) {
+              Future.delayed(const Duration(seconds: 2), () {
+                if (_isActive && !_isProcessing && !_isSpeaking && !_isListening) {
+                  print('🔄 Restarting listening after error');
+                  _startListening();
+                }
               });
             }
           },
           onStatus: (status) {
+            print('🎙️ Speech status: $status');
             if (status == 'done' || status == 'notListening') {
               setState(() => _isListening = false);
-
-              // Auto-resume if active
-              if (_isActive && !_isSpeaking && !_isProcessing) {
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  if (!_isSpeaking && !_isProcessing && _isActive) {
-                    _startListening();
-                  }
-                });
-              }
+              // Don't auto-restart here - let the audio player callback handle it
+              // This prevents restart loops
             }
           },
         );
@@ -171,10 +186,13 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
       _isActive = true;
       _statusText = 'Listening...';
     });
+    _lastUserInteraction = DateTime.now();
     _startListening();
+    _startInactivityTimer(); // Start timer monitoring
   }
 
   void _stopAgent() {
+    _inactivityTimer?.cancel();
     setState(() {
       _isActive = false;
       _isListening = false;
@@ -189,9 +207,31 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
   }
 
   void _startListening() {
-    if (!_isActive || _isListening || _isSpeaking || _isProcessing) return;
+    if (!_isActive) {
+      print('❌ Not starting listening - agent not active');
+      return;
+    }
+    
+    if (_isListening) {
+      print('❌ Already listening');
+      return;
+    }
+    
+    if (_isSpeaking) {
+      print('❌ Not starting listening - AI is speaking');
+      return;
+    }
+    
+    if (_isProcessing) {
+      print('❌ Not starting listening - processing');
+      return;
+    }
+
+    // Don't check _audioPlayer.playing - it can still be true briefly after completion
+    // We rely on _isSpeaking flag which is more reliable
 
     try {
+      print('✅ Starting listening...');
       setState(() {
         _isListening = true;
         _statusText = 'Listening...';
@@ -208,11 +248,13 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
           if (result.finalResult) {
             final text = result.recognizedWords.trim();
             if (text.isNotEmpty) {
+              _lastUserInteraction = DateTime.now();
               _handleUserMessage(text);
             }
           }
           // Interrupt AI if user starts speaking
           else if (result.recognizedWords.trim().length >= 2 && _isSpeaking) {
+            _lastUserInteraction = DateTime.now();
             _stopSpeaking();
           }
         },
@@ -259,6 +301,7 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
         message: message,
         history: _conversationHistory,
         language: 'EN',
+        voice: _selectedVoice,
       );
 
       if (response != null) {
@@ -291,7 +334,11 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
   }
 
   Future<void> _speakResponse(Uint8List audioData) async {
+    // Stop listening to prevent AI hearing itself
+    _speech.stop();
+    
     setState(() {
+      _isListening = false;
       _isSpeaking = true;
       _statusText = 'AI is speaking...';
     });
@@ -299,10 +346,10 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
 
     try {
       if (_isSpeaking) {
-        // Save audio to temporary file
+        // Save audio to temporary file (MP3 format from LemonFox)
         final tempDir = await getTemporaryDirectory();
         final tempFile = File(
-            '${tempDir.path}/ai_speech_${DateTime.now().millisecondsSinceEpoch}.wav');
+            '${tempDir.path}/ai_speech_${DateTime.now().millisecondsSinceEpoch}.mp3');
         await tempFile.writeAsBytes(audioData);
 
         // Play audio
@@ -325,6 +372,7 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
     if (text.isEmpty) return;
 
     _textController.clear();
+    _lastUserInteraction = DateTime.now();
     await _handleUserMessage(text);
   }
 
@@ -340,6 +388,152 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
       _conversationHistory.clear();
       _statusText = _isActive ? 'Listening...' : 'Tap to start voice chat';
     });
+  }
+
+  void _startInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Don't check while AI is speaking or processing
+      if (!_isActive || _isSpeaking || _isProcessing) {
+        return;
+      }
+
+      final now = DateTime.now();
+      final lastInteraction = _lastUserInteraction ?? now;
+      final inactiveDuration = now.difference(lastInteraction);
+
+      if (inactiveDuration >= _inactivityDuration) {
+        // User has been inactive for 30+ seconds AFTER AI finished speaking
+        _generateAIFollowUp();
+      }
+    });
+  }
+
+  Future<void> _generateAIFollowUp() async {
+    if (!_isActive || _isSpeaking || _isProcessing) return;
+
+    // Stop listening before AI speaks to prevent feedback
+    _speech.stop();
+    
+    setState(() {
+      _isListening = false;
+      _isProcessing = true;
+      _statusText = 'AI is checking in...';
+    });
+    _animationController.repeat(reverse: true);
+
+    try {
+      // Create a meta-prompt for the AI to generate a check-in
+      String metaPrompt;
+      
+      if (_conversationHistory.isEmpty) {
+        metaPrompt = "The user hasn't started speaking yet. Greet them warmly and ask what they'd like to practice today. Keep it brief and friendly.";
+      } else {
+        metaPrompt = "The user hasn't been speaking for 30 seconds. Check in with them in a natural, friendly way. Ask if they're still there, if they want to continue, or if they need help. Keep it brief and conversational - just 1-2 short sentences.";
+      }
+
+      // Use AI to generate a contextual check-in based on conversation history
+      final response = await _aiService.chatWithVoice(
+        message: metaPrompt,
+        history: _conversationHistory,
+        language: 'EN',
+        voice: _selectedVoice,
+      );
+
+      if (response != null) {
+        setState(() {
+          _conversationHistory.add({'role': 'assistant', 'content': response.text});
+          _isProcessing = false;
+        });
+        _scrollToBottom();
+
+        // Play audio response
+        await _speakResponse(response.audioBytes);
+      } else {
+        setState(() => _isProcessing = false);
+        _animationController.stop();
+        
+        // Resume listening
+        if (_isActive && !_isListening) {
+          _startListening();
+        }
+      }
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      _animationController.stop();
+      print('Follow-up generation error: $e');
+      
+      // Resume listening
+      if (_isActive && !_isListening) {
+        _startListening();
+      }
+    }
+  }
+
+  void _showVoiceSelector() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A1A2E),
+          title: const Text(
+            'Select AI Voice',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: AvailableVoices.voices.length,
+              itemBuilder: (context, index) {
+                final voice = AvailableVoices.voices[index];
+                final isSelected = _selectedVoice == voice.id;
+                
+                return ListTile(
+                  leading: Icon(
+                    voice.icon,
+                    color: isSelected ? Colors.blueAccent : Colors.grey,
+                  ),
+                  title: Text(
+                    voice.name,
+                    style: TextStyle(
+                      color: isSelected ? Colors.blueAccent : Colors.white,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  subtitle: Text(
+                    voice.description,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  trailing: isSelected
+                      ? const Icon(Icons.check_circle, color: Colors.blueAccent)
+                      : null,
+                  onTap: () {
+                    setState(() {
+                      _selectedVoice = voice.id;
+                    });
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Voice changed to ${voice.name}'),
+                        duration: const Duration(seconds: 2),
+                        backgroundColor: Colors.blueAccent,
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close', style: TextStyle(color: Colors.blueAccent)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _scrollToBottom() {
@@ -363,6 +557,11 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
         backgroundColor: const Color(0xFF1A1A2E),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.record_voice_over),
+            onPressed: _showVoiceSelector,
+            tooltip: 'Select voice',
+          ),
           if (_conversationHistory.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline),
@@ -437,14 +636,38 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                 // Status text
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    _statusText,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    children: [
+                      Text(
+                        _statusText,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            AvailableVoices.getVoiceById(_selectedVoice).icon,
+                            size: 14,
+                            color: Colors.blueAccent,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Voice: ${AvailableVoices.getVoiceById(_selectedVoice).name}',
+                            style: const TextStyle(
+                              color: Colors.blueAccent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
 
