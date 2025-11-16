@@ -37,20 +37,20 @@ class ChatService {
       if (userId == null) throw Exception('User not authenticated');
 
       // Check if student has active subscription with this teacher
-      final subscription = await _supabase
+      final subscriptions = await _supabase
           .from('student_subscriptions')
           .select()
           .eq('student_id', userId)
           .eq('teacher_id', teacherId)
           .eq('status', 'active')
-          .maybeSingle();
+          .limit(1);
 
-      if (subscription == null) {
+      if (subscriptions.isEmpty) {
         throw Exception('You must have an active subscription with this teacher to chat');
       }
 
-      // Check if conversation exists
-      var conversation = await _supabase
+      // Check if conversation exists (get all to clean up duplicates)
+      final conversations = await _supabase
           .from('chat_conversations')
           .select('''
             *,
@@ -63,28 +63,75 @@ class ChatService {
           ''')
           .eq('student_id', userId)
           .eq('teacher_id', teacherId)
-          .maybeSingle();
-
-      // Create conversation if it doesn't exist
-      if (conversation == null) {
-        final newConversation = await _supabase
-            .from('chat_conversations')
-            .insert({
-              'student_id': userId,
-              'teacher_id': teacherId,
-            })
-            .select('''
-              *,
-              teacher:teacher_id (
-                id,
-                full_name,
-                avatar_url,
-                email
-              )
-            ''')
-            .single();
+          .order('created_at', ascending: true);
+      
+      Map<String, dynamic>? conversation;
+      
+      if (conversations.isNotEmpty) {
+        // Keep the first (oldest) conversation
+        conversation = conversations.first;
         
-        conversation = newConversation;
+        // Delete duplicates if they exist
+        if (conversations.length > 1) {
+          print('Found ${conversations.length} duplicate conversations, cleaning up...');
+          final duplicateIds = conversations.skip(1).map((c) => c['id']).toList();
+          for (var id in duplicateIds) {
+            try {
+              await _supabase
+                  .from('chat_conversations')
+                  .delete()
+                  .eq('id', id);
+            } catch (deleteError) {
+              print('Error deleting duplicate conversation $id: $deleteError');
+            }
+          }
+        }
+      } else {
+        // Create conversation if it doesn't exist
+        try {
+          final newConversation = await _supabase
+              .from('chat_conversations')
+              .insert({
+                'student_id': userId,
+                'teacher_id': teacherId,
+              })
+              .select('''
+                *,
+                teacher:teacher_id (
+                  id,
+                  full_name,
+                  avatar_url,
+                  email
+                )
+              ''')
+              .single();
+          
+          conversation = newConversation;
+        } catch (insertError) {
+          // If insert fails (maybe duplicate was created by another request), try fetching again
+          print('Insert failed, fetching conversation again: $insertError');
+          final retryConversations = await _supabase
+              .from('chat_conversations')
+              .select('''
+                *,
+                teacher:teacher_id (
+                  id,
+                  full_name,
+                  avatar_url,
+                  email
+                )
+              ''')
+              .eq('student_id', userId)
+              .eq('teacher_id', teacherId)
+              .order('created_at', ascending: true)
+              .limit(1);
+          
+          if (retryConversations.isNotEmpty) {
+            conversation = retryConversations.first;
+          } else {
+            rethrow;
+          }
+        }
       }
 
       return conversation;
@@ -126,7 +173,34 @@ class ChatService {
           .or('student_id.eq.$userId,participant2_id.eq.$userId')
           .order('last_message_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(conversations);
+      // Deduplicate conversations with the same student_id and teacher_id
+      final seenPairs = <String>{};
+      final uniqueConversations = <Map<String, dynamic>>[];
+
+      for (var conv in conversations) {
+        final studentId = conv['student_id'];
+        final teacherId = conv['teacher_id'];
+        final participant2Id = conv['participant2_id'];
+        
+        String key;
+        if (teacherId != null) {
+          // Teacher-student conversation
+          key = 'teacher:$studentId-$teacherId';
+        } else if (participant2Id != null) {
+          // Student-student conversation (normalize the key so A-B and B-A are the same)
+          final ids = [studentId, participant2Id]..sort();
+          key = 'student:${ids[0]}-${ids[1]}';
+        } else {
+          continue;
+        }
+
+        if (!seenPairs.contains(key)) {
+          seenPairs.add(key);
+          uniqueConversations.add(conv);
+        }
+      }
+
+      return uniqueConversations;
     } catch (e) {
       print('Error fetching conversations: $e');
       return [];
@@ -166,18 +240,27 @@ class ChatService {
           conv['teacher_id']: conv['student_unread_count'] ?? 0
       };
 
-      // Combine teacher data with unread counts
-      final teachers = subscriptions
-          .where((sub) => sub['teacher'] != null)
-          .map((sub) {
-        final teacher = sub['teacher'] as Map<String, dynamic>;
-        return {
-          ...teacher,
-          'unread_count': conversationMap[teacher['id']] ?? 0,
-        };
-      }).toList();
+      // Deduplicate teachers by ID
+      final seenTeacherIds = <String>{};
+      final uniqueTeachers = <Map<String, dynamic>>[];
 
-      return teachers;
+      for (var sub in subscriptions) {
+        final teacher = sub['teacher'];
+        if (teacher == null) continue;
+        
+        final teacherId = teacher['id'] as String;
+        
+        // Skip if we've already seen this teacher
+        if (seenTeacherIds.contains(teacherId)) continue;
+        
+        seenTeacherIds.add(teacherId);
+        uniqueTeachers.add({
+          ...teacher,
+          'unread_count': conversationMap[teacherId] ?? 0,
+        });
+      }
+
+      return uniqueTeachers;
     } catch (e) {
       print('Error fetching available teachers: $e');
       return [];
@@ -744,20 +827,20 @@ class ChatService {
       if (userId == null) throw Exception('User not authenticated');
 
       // Check if accepted chat request exists
-      final request = await _supabase
+      final requests = await _supabase
           .from('chat_requests')
           .select()
           .or('requester_id.eq.$userId,recipient_id.eq.$userId')
           .or('requester_id.eq.$otherStudentId,recipient_id.eq.$otherStudentId')
           .eq('status', 'accepted')
-          .maybeSingle();
+          .limit(1);
 
-      if (request == null) {
+      if (requests.isEmpty) {
         throw Exception('No accepted chat request found');
       }
 
-      // Check if conversation exists
-      var conversation = await _supabase
+      // Check if conversation exists (take the first one if duplicates exist)
+      final conversations = await _supabase
           .from('chat_conversations')
           .select('''
             *,
@@ -771,7 +854,10 @@ class ChatService {
           .eq('conversation_type', 'student_student')
           .or('student_id.eq.$userId,participant2_id.eq.$userId')
           .or('student_id.eq.$otherStudentId,participant2_id.eq.$otherStudentId')
-          .maybeSingle();
+          .order('created_at', ascending: true)
+          .limit(1);
+      
+      var conversation = conversations.isNotEmpty ? conversations.first : null;
 
       if (conversation == null) {
         // Create conversation
