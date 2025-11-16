@@ -4,7 +4,7 @@ import 'package:student/services/teacher_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/rating_service.dart';
 import 'package:student/services/chat_service.dart';
-import 'package:student/screens/teachers/package_selection_screen.dart';
+import 'package:student/screens/teachers/subscription_screen.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
 import 'package:student/widgets/rating_widget.dart';
 import 'package:student/widgets/custom_back_button.dart';
@@ -179,11 +179,11 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       return;
     }
 
-    // Navigate to package selection
+    // Navigate to subscription screen
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PackageSelectionScreen(
+        builder: (context) => SubscriptionScreen(
           teacherId: widget.teacherId,
           teacherName: _teacher?['full_name'] ?? 'Teacher',
           languageId: widget.languageId,
