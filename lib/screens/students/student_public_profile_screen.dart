@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:student/widgets/student_avatar_widget.dart';
 import 'package:student/services/photo_service.dart';
 import 'package:student/services/blocking_service.dart';
-import 'package:student/services/chat_service.dart';
-import 'package:student/screens/chat/chat_conversation_screen.dart';
-import 'package:student/config/app_colors.dart';
 
 class StudentPublicProfileScreen extends StatefulWidget {
   final String studentId;
@@ -23,29 +21,17 @@ class StudentPublicProfileScreen extends StatefulWidget {
 class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen> {
   final _photoService = PhotoService();
   final _blockingService = BlockingService();
-  final _chatService = ChatService();
-  final PageController _pageController = PageController();
   List<Map<String, dynamic>> _photos = [];
   bool _isLoadingPhotos = true;
   int _currentPhotoIndex = 0;
   bool _isBlocked = false;
   bool _isCheckingBlock = true;
-  String? _chatRequestStatus; // null = no request, 'pending', 'accepted'
-  bool _isLoadingChatStatus = true;
-  bool _isSendingRequest = false;
 
   @override
   void initState() {
     super.initState();
     _loadPhotos();
     _checkIfBlocked();
-    _checkChatRequestStatus();
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadPhotos() async {
@@ -77,284 +63,6 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
       if (mounted) {
         setState(() => _isCheckingBlock = false);
       }
-    }
-  }
-
-  Future<void> _checkChatRequestStatus() async {
-    try {
-      final sentRequests = await _chatService.getSentChatRequests();
-      
-      // Find request for this student
-      final request = sentRequests.firstWhere(
-        (req) {
-          final recipientData = req['recipient'];
-          if (recipientData != null) {
-            final recipientId = recipientData['id'] as String;
-            return recipientId == widget.studentId;
-          }
-          return false;
-        },
-        orElse: () => {},
-      );
-
-      if (mounted) {
-        setState(() {
-          if (request.isNotEmpty) {
-            _chatRequestStatus = request['status'] as String?;
-          } else {
-            _chatRequestStatus = null; // No request sent
-          }
-          _isLoadingChatStatus = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingChatStatus = false);
-      }
-    }
-  }
-
-  Future<void> _sendChatRequest() async {
-    final studentName = widget.studentData['full_name'] ?? 'Student';
-    final messageController = TextEditingController();
-    
-    final result = await showDialog<String>(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header with gradient - full width
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                decoration: BoxDecoration(
-                  gradient: AppColors.redGradient,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Send Message Request',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'To $studentName',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.white.withOpacity(0.9),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Message (Optional)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: messageController,
-                      maxLines: 3,
-                      maxLength: 200,
-                      decoration: InputDecoration(
-                        hintText: 'Hi! I\'d love to practice together...',
-                        hintStyle: TextStyle(
-                          color: AppColors.textHint,
-                          fontSize: 14,
-                        ),
-                        filled: true,
-                        fillColor: AppColors.lightGrey,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.all(14),
-                        counterText: '',
-                      ),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    
-                    // Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(
-                                  color: AppColors.grey.withOpacity(0.3),
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context, messageController.text);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Send',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (result == null) return;
-
-    setState(() => _isSendingRequest = true);
-
-    final success = await _chatService.sendChatRequest(
-      widget.studentId,
-      message: result.isEmpty ? null : result,
-    );
-
-    if (mounted) {
-      setState(() => _isSendingRequest = false);
-      
-      if (success != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chat request sent!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _checkChatRequestStatus();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to send request'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _openChat() async {
-    final studentName = widget.studentData['full_name'] ?? 'Student';
-    final studentAvatar = widget.studentData['avatar_url'];
-    
-    // Try to get/create conversation
-    final conversation = await _chatService.getOrCreateStudentConversation(widget.studentId);
-    
-    if (conversation != null && mounted) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ChatConversationScreen(
-            conversationId: conversation['id'],
-            recipientId: widget.studentId,
-            recipientName: studentName,
-            recipientAvatar: studentAvatar,
-          ),
-        ),
-      );
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to start chat. Make sure request is accepted.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
     }
   }
 
@@ -434,173 +142,256 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     final languages = widget.studentData['languages'] as List<Map<String, dynamic>>? ?? [];
     final province = widget.studentData['province'] as Map<String, dynamic>?;
     final bio = widget.studentData['bio'] as String?;
-    final level = languages.length > 0 ? languages.length : 1;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                // Photo Carousel Section (matching edit profile style)
-                _buildPhotoCarouselSection(level, province),
-                
-                const SizedBox(height: 20),
-                
-                // Content Section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          if (!_isCheckingBlock)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'block') {
+                  _toggleBlock();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'block',
+                  child: Row(
                     children: [
-                      // Bio Section
-                      if (bio != null && bio.isNotEmpty) ...[
-                        const Text(
-                          'About',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            bio,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: AppColors.textSecondary,
-                              height: 1.6,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // Languages Section
-                      if (languages.isNotEmpty) ...[
-                        const Text(
-                          'Learning Languages',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: languages.map((language) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Flag
-                                  if (language['flag_url'] != null)
-                                    Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(6),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
-                                            blurRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: CachedNetworkImage(
-                                          imageUrl: language['flag_url'],
-                                          fit: BoxFit.cover,
-                                          errorWidget: (context, url, error) =>
-                                              Container(
-                                            decoration: BoxDecoration(
-                                              gradient: AppColors.redGradient,
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: const Icon(
-                                              Icons.language,
-                                              size: 16,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        gradient: AppColors.redGradient,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Icon(
-                                        Icons.language,
-                                        size: 16,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  const SizedBox(width: 10),
-                                  // Language name
-                                  Text(
-                                    language['name'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      
-                      const SizedBox(height: 18),
-                      
-                      // Send Message Button
-                      _buildMessageButton(),
-                      
-                      const SizedBox(height: 20),
+                      Icon(
+                        _isBlocked ? Icons.check_circle : Icons.block,
+                        color: _isBlocked ? Colors.green : Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(_isBlocked ? 'Unblock User' : 'Block User'),
                     ],
                   ),
                 ),
               ],
+            ),
+        ],
+      ),
+      extendBodyBehindAppBar: true,
+      body: CustomScrollView(
+        slivers: [
+          // App bar with student header
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: Colors.teal,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.teal.shade400,
+                      Colors.teal.shade700,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 40),
+                      // Profile picture carousel
+                      _buildPhotoCarousel(),
+                      const SizedBox(height: 16),
+                      // Name
+                      Text(
+                        widget.studentData['full_name'] ?? 'Unknown',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      // Province
+                      if (province != null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              color: Colors.white70,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${province['name']} (${province['name_ar']})',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Content
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Contact Information Card
+                  _buildSectionCard(
+                    title: 'Contact Information',
+                    icon: Icons.email,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoRow(
+                          Icons.email_outlined,
+                          'Email',
+                          widget.studentData['email'] ?? 'Not provided',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Bio Section
+                  if (bio != null && bio.isNotEmpty)
+                    _buildSectionCard(
+                      title: 'About',
+                      icon: Icons.person,
+                      child: Text(
+                        bio,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.grey[700],
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  if (bio != null && bio.isNotEmpty) const SizedBox(height: 16),
+
+                  // Languages Section
+                  if (languages.isNotEmpty)
+                    _buildSectionCard(
+                      title: 'Learning Languages',
+                      icon: Icons.language,
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: languages.map((language) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.teal.shade50,
+                                  Colors.teal.shade100,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.teal.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (language['flag_url'] != null)
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 3,
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipOval(
+                                      child: CachedNetworkImage(
+                                        imageUrl: language['flag_url'],
+                                        fit: BoxFit.cover,
+                                        errorWidget: (context, url, error) =>
+                                            const Icon(
+                                          Icons.language,
+                                          size: 20,
+                                          color: Colors.teal,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  const Icon(
+                                    Icons.language,
+                                    size: 20,
+                                    color: Colors.teal,
+                                  ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  language['name'] ?? '',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.teal.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                  const SizedBox(height: 32),
+
+                  // Note about connecting
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.blue.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'You can connect with this student because you\'re both learning the same language!',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.blue.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -608,96 +399,88 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     );
   }
 
-  Widget _buildMessageButton() {
-    if (_isLoadingChatStatus) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-        ),
-      );
-    }
-
-    Widget buttonChild;
-    VoidCallback? onPressed;
-    Color backgroundColor;
-    Color textColor = Colors.white;
-
-    if (_chatRequestStatus == 'pending') {
-      // Request is pending
-      buttonChild = const Text(
-        'REQUEST PENDING',
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1,
-        ),
-      );
-      backgroundColor = Colors.orange;
-      onPressed = null; // Disabled
-    } else if (_chatRequestStatus == 'accepted') {
-      // Request accepted - can chat
-      buttonChild = Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.chat, color: Colors.white),
-          SizedBox(width: 12),
-          Text(
-            'START CHAT',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
-            ),
-          ),
-        ],
-      );
-      backgroundColor = Colors.green;
-      onPressed = _openChat;
-    } else {
-      // No request or rejected - can send request
-      buttonChild = Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.send, color: Colors.white),
-          SizedBox(width: 12),
-          Text(
-            'SEND MESSAGE REQUEST',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
-            ),
-          ),
-        ],
-      );
-      backgroundColor = AppColors.primary;
-      onPressed = _isSendingRequest ? null : _sendChatRequest;
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: textColor,
-          disabledBackgroundColor: backgroundColor.withOpacity(0.6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 2,
-        ),
-        child: _isSendingRequest
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: Colors.teal.shade700,
+                    size: 20,
+                  ),
                 ),
-              )
-            : buttonChild,
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -708,14 +491,12 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
         : '?';
 
     return Container(
-      decoration: BoxDecoration(
-        gradient: AppColors.redGradient,
-      ),
+      color: Colors.teal.shade600,
       child: Center(
         child: Text(
           initial,
           style: const TextStyle(
-            fontSize: 80,
+            fontSize: 48,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -724,318 +505,269 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     );
   }
 
-  Widget _buildPhotoCarouselSection(int level, Map<String, dynamic>? province) {
-    final fullName = widget.studentData['full_name'] ?? 'Student';
-    final initials = fullName.isNotEmpty
-        ? fullName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
-        : 'ST';
+  Widget _buildPhotoCarousel() {
+    if (_isLoadingPhotos) {
+      return Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(0.2),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+      );
+    }
 
-    return Container(
-      height: 450,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+    if (_photos.isEmpty) {
+      // Show default avatar if no photos
+      return Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white,
+            width: 4,
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Photo Carousel
-          if (_isLoadingPhotos)
-            Container(
-              decoration: BoxDecoration(
-                gradient: AppColors.redGradient,
-              ),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-            )
-          else if (_photos.isEmpty)
-            Container(
-              decoration: BoxDecoration(
-                gradient: AppColors.redGradient,
-              ),
-              child: Center(
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    fontSize: 80,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            )
-          else
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPhotoIndex = index;
-                  });
-                },
-                itemCount: _photos.length,
-                itemBuilder: (context, index) {
-                  final photo = _photos[index];
-                  return CachedNetworkImage(
-                    imageUrl: photo['photo_url'],
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    placeholder: (context, url) => Container(
-                      decoration: BoxDecoration(
-                        gradient: AppColors.redGradient,
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 80,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      decoration: BoxDecoration(
-                        gradient: AppColors.redGradient,
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 80,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
             ),
-          
-          // Gradient Overlay
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.8),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          
-          // Back Button
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 10,
-            child: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.4),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
+          ],
+        ),
+        child: ClipOval(
+          child: _buildDefaultAvatar(),
+        ),
+      );
+    }
 
-          // Block/Unblock Menu
-          if (!_isCheckingBlock)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 10,
-              right: 10,
-              child: PopupMenuButton<String>(
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.4),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+    return Column(
+      children: [
+        // Photo viewer with gestures
+        GestureDetector(
+          onTap: () => _showFullScreenPhoto(),
+          onHorizontalDragEnd: (details) {
+            if (details.primaryVelocity! > 0) {
+              // Swiped right - previous photo
+              _previousPhoto();
+            } else if (details.primaryVelocity! < 0) {
+              // Swiped left - next photo
+              _nextPhoto();
+            }
+          },
+          child: Hero(
+            tag: 'student_${widget.studentData['id']}_photo_$_currentPhotoIndex',
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white,
+                  width: 4,
                 ),
-                color: AppColors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                onSelected: (value) {
-                  if (value == 'block') {
-                    _toggleBlock();
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'block',
-                    child: Row(
-                      children: [
-                        Icon(
-                          _isBlocked ? Icons.check_circle : Icons.block,
-                          color: _isBlocked ? Colors.green : Colors.red,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(_isBlocked ? 'Unblock User' : 'Block User'),
-                      ],
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
-            ),
-          
-          // Photo Indicators
-          if (_photos.isNotEmpty)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 15,
-              left: 70,
-              right: 70,
-              child: Row(
-                children: List.generate(
-                  _photos.length,
-                  (index) => Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 4),
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: _currentPhotoIndex == index
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(2),
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: _photos[_currentPhotoIndex]['photo_url'],
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.white.withOpacity(0.2),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     ),
                   ),
+                  errorWidget: (context, url, error) => _buildDefaultAvatar(),
                 ),
               ),
             ),
-          
-          // Student Info at Bottom
-          Positioned(
-            bottom: 30,
-            left: 20,
-            right: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name
-                Text(
-                  fullName,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        offset: Offset(0, 2),
-                        blurRadius: 4,
-                        color: Colors.black,
-                      ),
-                    ],
+          ),
+        ),
+        
+        // Photo counter and navigation
+        if (_photos.length > 1) ...[
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Previous button
+              IconButton(
+                onPressed: _previousPhoto,
+                icon: const Icon(Icons.chevron_left, color: Colors.white),
+                iconSize: 28,
+              ),
+              
+              // Photo indicators
+              ...List.generate(_photos.length, (index) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: _currentPhotoIndex == index ? 10 : 6,
+                  height: _currentPhotoIndex == index ? 10 : 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _currentPhotoIndex == index
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.4),
                   ),
-                ),
-                const SizedBox(height: 12),
-                
-                Row(
-                  children: [
-                    // Level Badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: AppColors.redGradient,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Level $level',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(width: 12),
-                    
-                    // Province
-                    if (province != null)
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.location_on,
-                                color: Colors.white70,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  province['name'] ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                );
+              }),
+              
+              // Next button
+              IconButton(
+                onPressed: _nextPhoto,
+                icon: const Icon(Icons.chevron_right, color: Colors.white),
+                iconSize: 28,
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _previousPhoto() {
+    if (_photos.isEmpty) return;
+    setState(() {
+      _currentPhotoIndex = (_currentPhotoIndex - 1 + _photos.length) % _photos.length;
+    });
+  }
+
+  void _nextPhoto() {
+    if (_photos.isEmpty) return;
+    setState(() {
+      _currentPhotoIndex = (_currentPhotoIndex + 1) % _photos.length;
+    });
+  }
+
+  void _showFullScreenPhoto() {
+    if (_photos.isEmpty) return;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FullScreenPhotoViewer(
+          photos: _photos,
+          initialIndex: _currentPhotoIndex,
+          studentName: widget.studentData['full_name'] ?? 'Student',
+          studentId: widget.studentData['id'],
+        ),
+      ),
+    );
+  }
+}
+
+// Full screen photo viewer
+class _FullScreenPhotoViewer extends StatefulWidget {
+  final List<Map<String, dynamic>> photos;
+  final int initialIndex;
+  final String studentName;
+  final String studentId;
+
+  const _FullScreenPhotoViewer({
+    required this.photos,
+    required this.initialIndex,
+    required this.studentName,
+    required this.studentId,
+  });
+
+  @override
+  State<_FullScreenPhotoViewer> createState() => _FullScreenPhotoViewerState();
+}
+
+class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(widget.studentName),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          // Photo viewer
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: widget.photos.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return Hero(
+                  tag: 'student_${widget.studentId}_photo_$index',
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Center(
+                      child: CachedNetworkImage(
+                        imageUrl: widget.photos[index]['photo_url'],
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         ),
+                        errorWidget: (context, url, error) => const Icon(
+                          Icons.error,
+                          color: Colors.white,
+                          size: 64,
+                        ),
                       ),
-                  ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          
+          // Photo counter
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${_currentIndex + 1} / ${widget.photos.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -1044,6 +776,5 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
       ),
     );
   }
-
 }
 

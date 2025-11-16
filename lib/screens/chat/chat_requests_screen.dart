@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/services/chat_service.dart';
+import 'package:student/config/app_colors.dart';
+import 'package:student/widgets/custom_back_button.dart';
 import 'package:intl/intl.dart';
 
 class ChatRequestsScreen extends StatefulWidget {
@@ -122,34 +126,152 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chat Requests'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          onTap: (index) => setState(() => _selectedTab = index),
-          tabs: [
-            Tab(
-              text: 'Received${_pendingRequests.isNotEmpty ? ' (${_pendingRequests.length})' : ''}',
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
+              child: Row(
+                children: [
+                  const CustomBackButton(),
+                  const Spacer(),
+                  const Text(
+                    'CHAT REQUESTS',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const Spacer(),
+                  const SizedBox(width: 40), // Balance the back button
+                ],
+              ),
             ),
-            Tab(
-              text: 'Sent${_sentRequests.isNotEmpty ? ' (${_sentRequests.length})' : ''}',
+            
+            const SizedBox(height: 20),
+            
+            // Custom Tabs
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildTabButton(
+                        0,
+                        'Received',
+                        _pendingRequests.length,
+                        FontAwesomeIcons.inbox,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: AppColors.lightGrey,
+                    ),
+                    Expanded(
+                      child: _buildTabButton(
+                        1,
+                        'Sent',
+                        _sentRequests.length,
+                        FontAwesomeIcons.paperPlane,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadRequests,
+                      color: AppColors.primary,
+                      child: _selectedTab == 0
+                          ? _buildPendingRequests()
+                          : _buildSentRequests(),
+                    ),
             ),
           ],
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          controller: TabController(length: 2, vsync: Navigator.of(context)),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadRequests,
-              child: _selectedTab == 0
-                  ? _buildPendingRequests()
-                  : _buildSentRequests(),
+    );
+  }
+
+  Widget _buildTabButton(int index, String label, int count, IconData icon) {
+    final isSelected = _selectedTab == index;
+    return InkWell(
+      onTap: () => setState(() => _selectedTab = index),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          gradient: isSelected ? AppColors.redGradient : null,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FaIcon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
             ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.3)
+                      : AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -159,19 +281,28 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.inbox,
+            FaIcon(
+              FontAwesomeIcons.inbox,
               size: 80,
-              color: Colors.grey[400],
+              color: AppColors.grey.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'No pending requests',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You\'ll see requests here when students want to chat',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -179,6 +310,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: _pendingRequests.length,
       itemBuilder: (context, index) {
         final request = _pendingRequests[index];
@@ -190,65 +322,176 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
         
         final requester = requesterData as Map<String, dynamic>;
         final message = request['message'] as String?;
+        final requesterName = requester['full_name'] ?? 'Student';
+        final initials = requesterName.isNotEmpty
+            ? requesterName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
+            : 'ST';
 
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: CircleAvatar(
-              radius: 28,
-              backgroundImage: requester['avatar_url'] != null
-                  ? NetworkImage(requester['avatar_url'])
-                  : null,
-              backgroundColor: Colors.deepPurple[100],
-              child: requester['avatar_url'] == null
-                  ? Text(
-                      requester['full_name']?[0]?.toUpperCase() ?? 'S',
-                      style: TextStyle(
-                        color: Colors.deepPurple[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    )
-                  : null,
-            ),
-            title: Text(
-              requester['full_name'] ?? 'Student',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Column(
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (message != null) ...[
-                  const SizedBox(height: 4),
+                Row(
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: requester['avatar_url'] == null
+                            ? AppColors.redGradient
+                            : null,
+                      ),
+                      child: requester['avatar_url'] != null
+                          ? ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: requester['avatar_url'],
+                                fit: BoxFit.cover,
+                                errorWidget: (context, url, error) => Container(
+                                  decoration: BoxDecoration(
+                                    gradient: AppColors.redGradient,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      initials,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                initials,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Name and time
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            requesterName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatTimestamp(request['created_at']),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Action buttons - horizontal thin card
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Accept button
+                        Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.redGradient,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _acceptRequest(request['id']),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: const Center(
+                                  child: Text(
+                                    'Accept',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Reject button with X icon
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.lightGrey,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.grey.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _rejectRequest(request['id']),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Center(
+                                child: FaIcon(
+                                  FontAwesomeIcons.xmark,
+                                  size: 14,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                
+                // Message
+                if (message != null && message.isNotEmpty) ...[
+                  const SizedBox(height: 12),
                   Text(
                     message,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                      height: 1.4,
+                    ),
                   ),
                 ],
-                const SizedBox(height: 4),
-                Text(
-                  _formatTimestamp(request['created_at']),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.check, color: Colors.green),
-                  onPressed: () => _acceptRequest(request['id']),
-                  tooltip: 'Accept',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () => _rejectRequest(request['id']),
-                  tooltip: 'Reject',
-                ),
               ],
             ),
           ),
@@ -263,19 +506,28 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.send,
+            FaIcon(
+              FontAwesomeIcons.paperPlane,
               size: 80,
-              color: Colors.grey[400],
+              color: AppColors.grey.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'No sent requests',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Requests you send will appear here',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -283,6 +535,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: _sentRequests.length,
       itemBuilder: (context, index) {
         final request = _sentRequests[index];
@@ -294,54 +547,142 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
         
         final recipient = recipientData as Map<String, dynamic>;
         final status = request['status'] as String;
+        final recipientName = recipient['full_name'] ?? 'Student';
+        final initials = recipientName.isNotEmpty
+            ? recipientName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
+            : 'ST';
 
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: CircleAvatar(
-              radius: 28,
-              backgroundImage: recipient['avatar_url'] != null
-                  ? NetworkImage(recipient['avatar_url'])
-                  : null,
-              backgroundColor: Colors.deepPurple[100],
-              child: recipient['avatar_url'] == null
-                  ? Text(
-                      recipient['full_name']?[0]?.toUpperCase() ?? 'S',
-                      style: TextStyle(
-                        color: Colors.deepPurple[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    )
-                  : null,
-            ),
-            title: Text(
-              recipient['full_name'] ?? 'Student',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        Color statusColor;
+        Color statusBgColor;
+        IconData statusIcon;
+        
+        if (status == 'accepted') {
+          statusColor = Colors.green;
+          statusBgColor = Colors.green.withOpacity(0.1);
+          statusIcon = FontAwesomeIcons.circleCheck;
+        } else if (status == 'rejected') {
+          statusColor = Colors.red;
+          statusBgColor = Colors.red.withOpacity(0.1);
+          statusIcon = FontAwesomeIcons.circleXmark;
+        } else {
+          statusColor = Colors.orange;
+          statusBgColor = Colors.orange.withOpacity(0.1);
+          statusIcon = FontAwesomeIcons.clock;
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                const SizedBox(height: 4),
-                Text(
-                  _formatTimestamp(request['created_at']),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                // Avatar
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: recipient['avatar_url'] == null
+                        ? AppColors.redGradient
+                        : null,
+                  ),
+                  child: recipient['avatar_url'] != null
+                      ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: recipient['avatar_url'],
+                            fit: BoxFit.cover,
+                            errorWidget: (context, url, error) => Container(
+                              decoration: BoxDecoration(
+                                gradient: AppColors.redGradient,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  initials,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                // Name and time
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        recipientName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTimestamp(request['created_at']),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FaIcon(
+                        statusIcon,
+                        size: 12,
+                        color: statusColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-            trailing: Chip(
-              label: Text(
-                status.toUpperCase(),
-                style: const TextStyle(fontSize: 12),
-              ),
-              backgroundColor: status == 'accepted'
-                  ? Colors.green[100]
-                  : status == 'rejected'
-                      ? Colors.red[100]
-                      : Colors.orange[100],
             ),
           ),
         );

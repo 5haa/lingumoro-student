@@ -22,6 +22,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   List<Map<String, dynamic>> _conversations = [];
   List<Map<String, dynamic>> _filteredConversations = [];
   List<Map<String, dynamic>> _availableTeachers = [];
+  List<Map<String, dynamic>> _pendingRequests = [];
   bool _isLoading = true;
   bool _showAvailable = false;
   Timer? _statusRefreshTimer;
@@ -97,12 +98,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
     
     final conversations = await _chatService.getConversations();
     final teachers = await _chatService.getAvailableTeachers();
+    final pendingRequests = await _chatService.getPendingChatRequests();
     
     if (mounted) {
       setState(() {
         _conversations = conversations;
         _filteredConversations = conversations;
         _availableTeachers = teachers;
+        _pendingRequests = pendingRequests;
         _isLoading = false;
       });
       
@@ -135,6 +138,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
         final teacherId = teacher['id'];
         if (teacherId != null) {
           _subscribeToUserStatus(teacherId, 'teacher');
+        }
+      }
+      
+      // Subscribe to online status for pending requests
+      for (var request in pendingRequests) {
+        final requester = request['requester'] as Map<String, dynamic>?;
+        if (requester != null && requester['id'] != null) {
+          _subscribeToUserStatus(requester['id'], 'student');
         }
       }
     }
@@ -173,6 +184,70 @@ class _ChatListScreenState extends State<ChatListScreen> {
         }
       } catch (e) {
         print('Error refreshing status for $key: $e');
+      }
+    }
+  }
+
+  Future<void> _acceptRequest(String requestId, String studentId, String studentName) async {
+    final success = await _chatService.acceptChatRequest(requestId);
+    
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Request accepted!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Reload data to refresh the list
+        await _loadData();
+        
+        // Open the chat immediately
+        final conversation = await _chatService.getOrCreateStudentConversation(studentId);
+        if (conversation != null && mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatConversationScreen(
+                conversationId: conversation['id'],
+                recipientId: studentId,
+                recipientName: studentName,
+                recipientAvatar: null,
+              ),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to accept request'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectRequest(String requestId) async {
+    final success = await _chatService.rejectChatRequest(requestId);
+    
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Request rejected'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        _loadData(); // Refresh the list
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to reject request'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -494,7 +569,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildConversationsList() {
-    if (_filteredConversations.isEmpty) {
+    if (_filteredConversations.isEmpty && _pendingRequests.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
@@ -560,15 +635,301 @@ class _ChatListScreenState extends State<ChatListScreen> {
       );
     }
 
+    // Combine pending requests and conversations, with requests first
+    final allItems = <Map<String, dynamic>>[];
+    
+    // Add pending requests first (only if not searching)
+    if (_searchController.text.isEmpty) {
+      for (var request in _pendingRequests) {
+        allItems.add({
+          'type': 'pending_request',
+          'data': request,
+        });
+      }
+    }
+    
+    // Add conversations
+    for (var conversation in _filteredConversations) {
+      allItems.add({
+        'type': 'conversation',
+        'data': conversation,
+      });
+    }
+
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: EdgeInsets.zero,
-      itemCount: _filteredConversations.length,
+      itemCount: allItems.length,
       itemBuilder: (context, index) {
-        final conversation = _filteredConversations[index];
-        return _buildChatItem(conversation);
+        final item = allItems[index];
+        if (item['type'] == 'pending_request') {
+          return _buildPendingRequestItem(item['data'] as Map<String, dynamic>);
+        } else {
+          return _buildChatItem(item['data'] as Map<String, dynamic>);
+        }
       },
+    );
+  }
+
+  Widget _buildPendingRequestItem(Map<String, dynamic> request) {
+    final requester = request['requester'] as Map<String, dynamic>?;
+    if (requester == null) return const SizedBox.shrink();
+    
+    final requesterId = requester['id'] as String;
+    final requesterName = requester['full_name'] ?? 'Student';
+    final requesterAvatar = requester['avatar_url'];
+    final requestId = request['id'] as String;
+    final message = request['message'] as String?;
+    final createdAt = request['created_at'] as String?;
+    
+    final userKey = '$requesterId-student';
+    final isOnline = _onlineStatus[userKey] ?? false;
+    
+    return GestureDetector(
+      onTap: () {
+        // Show request message dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: AppColors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    image: requesterAvatar != null
+                        ? DecorationImage(
+                            image: NetworkImage(requesterAvatar),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                    gradient: requesterAvatar == null ? AppColors.redGradient : null,
+                  ),
+                  child: requesterAvatar == null
+                      ? Center(
+                          child: Text(
+                            requesterName[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        requesterName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        'Chat Request',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: message != null && message.isNotEmpty
+                ? Text(
+                    message,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
+                      height: 1.5,
+                    ),
+                  )
+                : const Text(
+                    'No message provided',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
+          border: Border(
+            bottom: BorderSide(
+              color: Color(0xFFEEEEEE),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            // Profile Image with Online Status
+            Stack(
+              children: [
+                Container(
+                  width: 55,
+                  height: 55,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    image: requesterAvatar != null && requesterAvatar.toString().isNotEmpty
+                        ? DecorationImage(
+                            image: NetworkImage(requesterAvatar),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                    color: Colors.teal.withOpacity(0.1),
+                  ),
+                  child: requesterAvatar == null || requesterAvatar.toString().isEmpty
+                      ? Center(
+                          child: Text(
+                            requesterName[0].toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal,
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+                if (isOnline)
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4CAF50),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.white,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(width: 12),
+
+            // Message Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    requesterName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message != null && message.isNotEmpty
+                        ? message
+                        : 'Sent a chat request',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF999999),
+                      fontWeight: FontWeight.normal,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // Accept/Reject Buttons
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Reject Button
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.red.withOpacity(0.5),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    iconSize: 16,
+                    icon: const FaIcon(
+                      FontAwesomeIcons.xmark,
+                      color: Colors.red,
+                      size: 14,
+                    ),
+                    onPressed: () => _rejectRequest(requestId),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Accept Button
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    iconSize: 16,
+                    icon: const FaIcon(
+                      FontAwesomeIcons.check,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    onPressed: () => _acceptRequest(requestId, requesterId, requesterName),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 

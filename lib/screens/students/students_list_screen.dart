@@ -27,6 +27,8 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   List<String> _myLanguages = [];
   List<Map<String, dynamic>> _sentRequests = [];
   Map<String, String> _chatRequestStatus = {}; // studentId -> status
+  Map<String, bool> _isRecipientOfRequest = {}; // studentId -> isRecipient
+  Map<String, String> _chatRequestIds = {}; // studentId -> requestId
   bool _isLoading = true;
   bool _hasProSubscription = false;
   String? _errorMessage;
@@ -83,18 +85,36 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
       // Get students learning the same languages
       final students = await _studentService.getStudentsInSameLanguages();
       
-      // Get sent chat requests to check status
-      final sentRequests = await _chatService.getSentChatRequests();
+      // Get current user ID
+      final currentUserId = _chatService.supabase.auth.currentUser?.id;
       
-      // Build status map
+      // Build status maps by checking all students
       final statusMap = <String, String>{};
-      for (var request in sentRequests) {
-        final recipientData = request['recipient'];
-        if (recipientData != null) {
-          final recipientId = recipientData['id'] as String;
-          statusMap[recipientId] = request['status'] as String;
+      final recipientMap = <String, bool>{};
+      final requestIdMap = <String, String>{};
+      
+      if (currentUserId != null) {
+        for (var student in students) {
+          final studentId = student['id'] as String;
+          
+          // Check for chat request in both directions
+          final requests = await _chatService.supabase
+              .from('chat_requests')
+              .select('id, status, requester_id, recipient_id')
+              .or('and(requester_id.eq.$currentUserId,recipient_id.eq.$studentId),and(requester_id.eq.$studentId,recipient_id.eq.$currentUserId)')
+              .limit(1);
+          
+          if (requests.isNotEmpty) {
+            final request = requests.first;
+            statusMap[studentId] = request['status'] as String;
+            requestIdMap[studentId] = request['id'] as String;
+            recipientMap[studentId] = request['recipient_id'] == currentUserId;
+          }
         }
       }
+      
+      // Get sent chat requests for backwards compatibility
+      final sentRequests = await _chatService.getSentChatRequests();
 
       if (mounted) {
         setState(() {
@@ -102,6 +122,8 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
           _students = students;
           _sentRequests = sentRequests;
           _chatRequestStatus = statusMap;
+          _isRecipientOfRequest = recipientMap;
+          _chatRequestIds = requestIdMap;
           _isLoading = false;
         });
       }
@@ -321,6 +343,29 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     }
   }
   
+  Future<void> _acceptAndOpenChat(String studentId, String studentName) async {
+    final requestId = _chatRequestIds[studentId];
+    if (requestId == null) return;
+
+    // Accept the request
+    final success = await _chatService.acceptChatRequest(requestId);
+
+    if (mounted) {
+      if (success) {
+        // Refresh status and open chat
+        await _loadStudents();
+        _openChat(studentId, studentName);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to accept request'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _openChat(String studentId, String studentName) async {
     // Try to get/create conversation
     final conversation = await _chatService.getOrCreateStudentConversation(studentId);
@@ -664,7 +709,31 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                   const SizedBox(height: 8),
                   
                   // Chat Button - Centered
-                  status == 'pending'
+                  (status == 'pending' && _isRecipientOfRequest[studentId] == true)
+                      ? Container(
+                          width: 35,
+                          height: 35,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.green.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            iconSize: 14,
+                            icon: const FaIcon(
+                              FontAwesomeIcons.comment,
+                              size: 14,
+                              color: Colors.green,
+                            ),
+                            onPressed: () {
+                              _acceptAndOpenChat(studentId, studentName);
+                            },
+                          ),
+                        )
+                      : status == 'pending'
                       ? Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,

@@ -795,10 +795,42 @@ class ChatService {
   /// Accept chat request
   Future<bool> acceptChatRequest(String requestId) async {
     try {
+      // Get the chat request details first
+      final request = await _supabase
+          .from('chat_requests')
+          .select()
+          .eq('id', requestId)
+          .single();
+      
+      final requesterId = request['requester_id'] as String;
+      final recipientId = request['recipient_id'] as String;
+      
+      // Update the request status to accepted
       await _supabase
           .from('chat_requests')
           .update({'status': 'accepted'})
           .eq('id', requestId);
+      
+      // Create the conversation immediately so both students can see it
+      // Check if conversation already exists
+      final existingConversations = await _supabase
+          .from('chat_conversations')
+          .select()
+          .eq('conversation_type', 'student_student')
+          .or('and(student_id.eq.$requesterId,participant2_id.eq.$recipientId),and(student_id.eq.$recipientId,participant2_id.eq.$requesterId)')
+          .limit(1);
+      
+      if (existingConversations.isEmpty) {
+        // Create new conversation
+        await _supabase
+            .from('chat_conversations')
+            .insert({
+              'student_id': requesterId,
+              'participant2_id': recipientId,
+              'conversation_type': 'student_student',
+            });
+      }
+      
       return true;
     } catch (e) {
       print('Error accepting chat request: $e');
@@ -826,12 +858,11 @@ class ChatService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      // Check if accepted chat request exists
+      // Check if accepted chat request exists (in either direction)
       final requests = await _supabase
           .from('chat_requests')
           .select()
-          .or('requester_id.eq.$userId,recipient_id.eq.$userId')
-          .or('requester_id.eq.$otherStudentId,recipient_id.eq.$otherStudentId')
+          .or('and(requester_id.eq.$userId,recipient_id.eq.$otherStudentId),and(requester_id.eq.$otherStudentId,recipient_id.eq.$userId)')
           .eq('status', 'accepted')
           .limit(1);
 
@@ -839,7 +870,7 @@ class ChatService {
         throw Exception('No accepted chat request found');
       }
 
-      // Check if conversation exists (take the first one if duplicates exist)
+      // Check if conversation exists (in either direction)
       final conversations = await _supabase
           .from('chat_conversations')
           .select('''
@@ -849,11 +880,16 @@ class ChatService {
               full_name,
               avatar_url,
               email
+            ),
+            student:student_id (
+              id,
+              full_name,
+              avatar_url,
+              email
             )
           ''')
           .eq('conversation_type', 'student_student')
-          .or('student_id.eq.$userId,participant2_id.eq.$userId')
-          .or('student_id.eq.$otherStudentId,participant2_id.eq.$otherStudentId')
+          .or('and(student_id.eq.$userId,participant2_id.eq.$otherStudentId),and(student_id.eq.$otherStudentId,participant2_id.eq.$userId)')
           .order('created_at', ascending: true)
           .limit(1);
       
