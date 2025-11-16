@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/services/presence_service.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
 import 'package:intl/intl.dart';
+import '../../config/app_colors.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -15,7 +17,10 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   final _chatService = ChatService();
   final _presenceService = PresenceService();
+  final _searchController = TextEditingController();
+  
   List<Map<String, dynamic>> _conversations = [];
+  List<Map<String, dynamic>> _filteredConversations = [];
   List<Map<String, dynamic>> _availableTeachers = [];
   bool _isLoading = true;
   bool _showAvailable = false;
@@ -35,6 +40,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
       _loadData();
     });
     
+    // Search listener
+    _searchController.addListener(_filterConversations);
+    
     // Periodically refresh online status (every 30 seconds)
     _statusRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _refreshOnlineStatus();
@@ -44,9 +52,42 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void dispose() {
     _statusRefreshTimer?.cancel();
+    _searchController.dispose();
     _chatService.dispose();
     _presenceService.dispose();
     super.dispose();
+  }
+
+  void _filterConversations() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredConversations = _conversations;
+      } else {
+        _filteredConversations = _conversations.where((conv) {
+          final conversationType = conv['conversation_type'] ?? 'teacher_student';
+          String name = '';
+          
+          if (conversationType == 'teacher_student') {
+            final teacher = conv['teacher'] as Map<String, dynamic>?;
+            name = teacher?['full_name'] ?? '';
+          } else {
+            final currentUserId = _chatService.supabase.auth.currentUser?.id;
+            if (conv['student_id'] == currentUserId) {
+              final peer = conv['peer'] as Map<String, dynamic>?;
+              name = peer?['full_name'] ?? '';
+            } else {
+              final student = conv['student'] as Map<String, dynamic>?;
+              name = student?['full_name'] ?? '';
+            }
+          }
+          
+          final lastMessage = conv['last_message'] ?? '';
+          return name.toLowerCase().contains(query) || 
+                 lastMessage.toLowerCase().contains(query);
+        }).toList();
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -60,6 +101,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (mounted) {
       setState(() {
         _conversations = conversations;
+        _filteredConversations = conversations;
         _availableTeachers = teachers;
         _isLoading = false;
       });
@@ -143,12 +185,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final now = DateTime.now();
       final difference = now.difference(date);
 
-      if (difference.inDays == 0) {
+      if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m ago';
+      } else if (difference.inDays == 0) {
         return DateFormat.jm().format(date);
       } else if (difference.inDays == 1) {
-        return 'Yesterday';
+        return '1d ago';
       } else if (difference.inDays < 7) {
-        return DateFormat.E().format(date);
+        return '${difference.inDays}d ago';
       } else {
         return DateFormat.MMMd().format(date);
       }
@@ -157,374 +201,633 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
+  // Get online users from conversations
+  List<Map<String, dynamic>> get _onlineUsers {
+    return _conversations.where((conv) {
+      final conversationType = conv['conversation_type'] ?? 'teacher_student';
+      String? otherPartyId;
+      String otherPartyType;
+      
+      if (conversationType == 'teacher_student') {
+        otherPartyId = conv['teacher_id'];
+        otherPartyType = 'teacher';
+      } else {
+        final currentUserId = _chatService.supabase.auth.currentUser?.id;
+        if (conv['student_id'] == currentUserId) {
+          otherPartyId = conv['participant2_id'];
+        } else {
+          otherPartyId = conv['student_id'];
+        }
+        otherPartyType = 'student';
+      }
+      
+      if (otherPartyId == null) return false;
+      final key = '$otherPartyId-$otherPartyType';
+      return _onlineStatus[key] == true;
+    }).map((conv) {
+      final conversationType = conv['conversation_type'] ?? 'teacher_student';
+      Map<String, dynamic>? otherParty;
+      
+      if (conversationType == 'teacher_student') {
+        otherParty = conv['teacher'] as Map<String, dynamic>?;
+      } else {
+        final currentUserId = _chatService.supabase.auth.currentUser?.id;
+        if (conv['student_id'] == currentUserId) {
+          otherParty = conv['peer'] as Map<String, dynamic>?;
+        } else {
+          final studentData = conv['student'];
+          if (studentData != null) {
+            otherParty = {'id': conv['student_id'], ...studentData};
+          }
+        }
+      }
+      
+      return {
+        'name': (otherParty?['full_name'] ?? 'User').split(' ')[0], // First name only
+        'image': otherParty?['avatar_url'] ?? '',
+      };
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chat'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(_showAvailable ? Icons.chat : Icons.person_add),
-            onPressed: () {
-              setState(() {
-                _showAvailable = !_showAvailable;
-              });
-            },
-            tooltip: _showAvailable ? 'Show Conversations' : 'Start New Chat',
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: _showAvailable
-                  ? _buildAvailableTeachersList()
-                  : _buildConversationsList(),
+      backgroundColor: AppColors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 45,
+                    height: 45,
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const FaIcon(
+                        FontAwesomeIcons.bars,
+                        size: 18,
+                        color: AppColors.textPrimary,
+                      ),
+                      onPressed: () {
+                        Scaffold.of(context).openDrawer();
+                      },
+                    ),
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'MESSAGES',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 45,
+                    height: 45,
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: FaIcon(
+                        _showAvailable ? FontAwesomeIcons.message : FontAwesomeIcons.userPlus,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _showAvailable = !_showAvailable;
+                        });
+                      },
+                      tooltip: _showAvailable ? 'Show Conversations' : 'Start New Chat',
+                    ),
+                  ),
+                ],
+              ),
             ),
+
+            // Scrollable Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                  : SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 15),
+
+                          // Search Bar - Bean Shaped
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: AppColors.white,
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 15,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  const FaIcon(
+                                    FontAwesomeIcons.magnifyingGlass,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 15),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _searchController,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Search messages...',
+                                        hintStyle: TextStyle(
+                                          color: Color(0xFF999999),
+                                          fontSize: 15,
+                                        ),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Online Users Horizontal List
+                          if (_onlineUsers.isNotEmpty && !_showAvailable)
+                            SizedBox(
+                              height: 90,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: _onlineUsers.length,
+                                itemBuilder: (context, index) {
+                                  final user = _onlineUsers[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 16),
+                                    child: Column(
+                                      children: [
+                                        Stack(
+                                          children: [
+                                            ClipOval(
+                                              child: user['image'] != null && user['image'].toString().isNotEmpty
+                                                  ? Image.network(
+                                                      user['image'],
+                                                      width: 60,
+                                                      height: 60,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (_, __, ___) => Container(
+                                                        width: 60,
+                                                        height: 60,
+                                                        color: AppColors.primary.withOpacity(0.1),
+                                                        child: Center(
+                                                          child: Text(
+                                                            user['name'][0].toUpperCase(),
+                                                            style: const TextStyle(
+                                                              fontSize: 24,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: AppColors.primary,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : Container(
+                                                      width: 60,
+                                                      height: 60,
+                                                      color: AppColors.primary.withOpacity(0.1),
+                                                      child: Center(
+                                                        child: Text(
+                                                          user['name'][0].toUpperCase(),
+                                                          style: const TextStyle(
+                                                            fontSize: 24,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: AppColors.primary,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                            ),
+                                            // Online indicator
+                                            Positioned(
+                                              bottom: 2,
+                                              right: 2,
+                                              child: Container(
+                                                width: 14,
+                                                height: 14,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF4CAF50),
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: AppColors.white,
+                                                    width: 2,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          user['name'],
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                          const SizedBox(height: 20),
+
+                          // Chat List or Available Teachers
+                          _showAvailable
+                              ? _buildAvailableTeachersList()
+                              : _buildConversationsList(),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildConversationsList() {
-    if (_conversations.isEmpty) {
+    if (_filteredConversations.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 80,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No conversations yet',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: AppColors.grey.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  FontAwesomeIcons.message,
+                  size: 40,
+                  color: AppColors.grey.withOpacity(0.3),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Start chatting with teachers or students',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
+              const SizedBox(height: 20),
+              Text(
+                _searchController.text.isNotEmpty ? 'No results found' : 'No messages yet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textSecondary.withOpacity(0.6),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _showAvailable = true;
-                });
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Start New Chat'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              const SizedBox(height: 8),
+              Text(
+                _searchController.text.isNotEmpty 
+                    ? 'Try searching with different keywords'
+                    : 'Start a conversation with your teachers',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary.withOpacity(0.5),
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              if (_searchController.text.isEmpty) ...[
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _showAvailable = true;
+                    });
+                  },
+                  icon: const FaIcon(FontAwesomeIcons.plus, size: 14),
+                  label: const Text('Start New Chat'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       );
     }
 
     return ListView.builder(
-      itemCount: _conversations.length,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: _filteredConversations.length,
       itemBuilder: (context, index) {
-        final conversation = _conversations[index];
-        final conversationType = conversation['conversation_type'] ?? 'teacher_student';
-        
-        // Determine who is the other party
-        Map<String, dynamic>? otherParty;
-        String? otherPartyId;
-        String otherPartyType;
-        
-        if (conversationType == 'teacher_student') {
-          otherParty = conversation['teacher'] as Map<String, dynamic>?;
-          otherPartyId = conversation['teacher_id'];
-          otherPartyType = 'teacher';
-        } else {
-          // Student-to-student conversation
-          final currentUserId = _chatService.supabase.auth.currentUser?.id;
-          if (conversation['student_id'] == currentUserId) {
-            // I'm student_id, other is participant2
-            otherParty = conversation['peer'] as Map<String, dynamic>?;
-            otherPartyId = conversation['participant2_id'];
-          } else {
-            // I'm participant2, other is student
-            final studentData = conversation['student'];
-            if (studentData != null) {
-              otherParty = {'id': conversation['student_id'], ...studentData};
-            }
-            otherPartyId = conversation['student_id'];
-          }
-          otherPartyType = 'student';
-        }
-        
-        // Skip if other party data is null
-        if (otherParty == null || otherPartyId == null) {
-          return const SizedBox.shrink();
-        }
-        
-        final unreadCount = conversation['student_unread_count'] ?? 0;
-        final lastMessage = conversation['last_message'] ?? '';
-        final lastMessageAt = conversation['last_message_at'];
+        final conversation = _filteredConversations[index];
+        return _buildChatItem(conversation);
+      },
+    );
+  }
 
-        final userKey = '$otherPartyId-$otherPartyType';
-        final isOnline = _onlineStatus[userKey] ?? false;
+  Widget _buildChatItem(Map<String, dynamic> conversation) {
+    final conversationType = conversation['conversation_type'] ?? 'teacher_student';
+    
+    // Determine who is the other party
+    Map<String, dynamic>? otherParty;
+    String? otherPartyId;
+    String otherPartyType;
+    bool isTeacher = conversationType == 'teacher_student';
+    
+    if (conversationType == 'teacher_student') {
+      otherParty = conversation['teacher'] as Map<String, dynamic>?;
+      otherPartyId = conversation['teacher_id'];
+      otherPartyType = 'teacher';
+    } else {
+      // Student-to-student conversation
+      final currentUserId = _chatService.supabase.auth.currentUser?.id;
+      if (conversation['student_id'] == currentUserId) {
+        otherParty = conversation['peer'] as Map<String, dynamic>?;
+        otherPartyId = conversation['participant2_id'];
+      } else {
+        final studentData = conversation['student'];
+        if (studentData != null) {
+          otherParty = {'id': conversation['student_id'], ...studentData};
+        }
+        otherPartyId = conversation['student_id'];
+      }
+      otherPartyType = 'student';
+    }
+    
+    // Skip if other party data is null
+    if (otherParty == null || otherPartyId == null) {
+      return const SizedBox.shrink();
+    }
+    
+    final unreadCount = conversation['student_unread_count'] ?? 0;
+    final lastMessage = conversation['last_message'] ?? '';
+    final lastMessageAt = conversation['last_message_at'];
+    final name = otherParty['full_name'] ?? 'User';
+    final avatarUrl = otherParty['avatar_url'];
 
-        return ListTile(
-          leading: Stack(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundImage: otherParty['avatar_url'] != null
-                    ? NetworkImage(otherParty['avatar_url'])
-                    : null,
-                backgroundColor: otherPartyType == 'teacher' 
-                    ? Colors.deepPurple[100] 
-                    : Colors.teal[100],
-                child: otherParty['avatar_url'] == null
-                    ? Text(
-                        otherParty['full_name']?[0]?.toUpperCase() ?? 'U',
-                        style: TextStyle(
-                          color: otherPartyType == 'teacher' 
-                              ? Colors.deepPurple[700] 
-                              : Colors.teal[700],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      )
-                    : null,
-              ),
-              // Badge to indicate type
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
+    final userKey = '$otherPartyId-$otherPartyType';
+    final isOnline = _onlineStatus[userKey] ?? false;
+
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatConversationScreen(
+              conversationId: conversation['id'],
+              recipientId: otherPartyId!,
+              recipientName: name,
+              recipientAvatar: avatarUrl,
+            ),
+          ),
+        );
+        _loadData(); // Refresh after returning
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
+          border: Border(
+            bottom: BorderSide(
+              color: Color(0xFFEEEEEE),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            // Profile Image with Online Status
+            Stack(
+              children: [
+                Container(
+                  width: 55,
+                  height: 55,
                   decoration: BoxDecoration(
-                    color: otherPartyType == 'teacher' ? Colors.deepPurple : Colors.teal,
                     shape: BoxShape.circle,
+                    image: avatarUrl != null && avatarUrl.toString().isNotEmpty
+                        ? DecorationImage(
+                            image: NetworkImage(avatarUrl),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                    color: isTeacher
+                        ? AppColors.primary.withOpacity(0.1)
+                        : Colors.teal.withOpacity(0.1),
                   ),
-                  child: Icon(
-                    otherPartyType == 'teacher' ? Icons.school : Icons.person,
-                    size: 12,
-                    color: Colors.white,
-                  ),
+                  child: avatarUrl == null || avatarUrl.toString().isEmpty
+                      ? Center(
+                          child: Text(
+                            name[0].toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: isTeacher ? AppColors.primary : Colors.teal,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
-              ),
-              // Online status indicator
-              if (isOnline)
-                Positioned(
-                  left: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: Colors.greenAccent,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 2,
+                if (isOnline)
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4CAF50),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.white,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  otherParty['full_name'] ?? 'User',
-                  style: TextStyle(
-                    fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w500,
-                  ),
-                ),
-              ),
-              Text(
-                _formatTimestamp(lastMessageAt),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          subtitle: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  lastMessage,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: unreadCount > 0 ? Colors.black87 : Colors.grey[600],
-                    fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
-                  ),
-                ),
-              ),
-              if (unreadCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurple,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    unreadCount.toString(),
+              ],
+            ),
+
+            const SizedBox(width: 12),
+
+            // Message Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    lastMessage.isEmpty ? 'No messages yet' : lastMessage,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: const Color(0xFF999999),
+                      fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // Time and Badge
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _formatTimestamp(lastMessageAt),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF999999),
+                  ),
+                ),
+                if (unreadCount > 0) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 20),
+                    height: 20,
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00BFA5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(
+                        unreadCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatConversationScreen(
-                  conversationId: conversation['id'],
-                  recipientId: otherPartyId!,
-                  recipientName: otherParty!['full_name'] ?? 'User',
-                  recipientAvatar: otherParty['avatar_url'],
-                ),
-              ),
-            );
-            _loadData(); // Refresh after returning
-          },
-        );
-      },
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildAvailableTeachersList() {
     if (_availableTeachers.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.school_outlined,
-              size: 80,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No teachers available',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: AppColors.grey.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  FontAwesomeIcons.chalkboardUser,
+                  size: 40,
+                  color: AppColors.grey.withOpacity(0.3),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Subscribe to a course to chat with teachers',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
+              const SizedBox(height: 20),
+              Text(
+                'No teachers available',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textSecondary.withOpacity(0.6),
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Subscribe to a course to chat with teachers',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary.withOpacity(0.5),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       itemCount: _availableTeachers.length,
       itemBuilder: (context, index) {
         final teacher = _availableTeachers[index];
         final unreadCount = teacher['unread_count'] ?? 0;
         final userKey = '${teacher['id']}-teacher';
         final isOnline = _onlineStatus[userKey] ?? false;
+        final name = teacher['full_name'] ?? 'Teacher';
+        final avatarUrl = teacher['avatar_url'];
 
-        return ListTile(
-          leading: Stack(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundImage: teacher['avatar_url'] != null
-                    ? NetworkImage(teacher['avatar_url'])
-                    : null,
-                backgroundColor: Colors.deepPurple[100],
-                child: teacher['avatar_url'] == null
-                    ? Text(
-                        teacher['full_name']?[0]?.toUpperCase() ?? 'T',
-                        style: TextStyle(
-                          color: Colors.deepPurple[700],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      )
-                    : null,
-              ),
-              // Online status indicator
-              if (isOnline)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: Colors.greenAccent,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  teacher['full_name'] ?? 'Teacher',
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-              ),
-              if (unreadCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurple,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    unreadCount.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          subtitle: Text(
-            teacher['bio'] ?? teacher['email'] ?? '',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+        return GestureDetector(
           onTap: () async {
             // Create or get conversation
             final conversation = await _chatService.getOrCreateConversation(teacher['id']);
@@ -536,8 +839,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   builder: (context) => ChatConversationScreen(
                     conversationId: conversation['id'],
                     recipientId: teacher['id'],
-                    recipientName: teacher['full_name'] ?? 'Teacher',
-                    recipientAvatar: teacher['avatar_url'],
+                    recipientName: name,
+                    recipientAvatar: avatarUrl,
                   ),
                 ),
               );
@@ -554,9 +857,138 @@ class _ChatListScreenState extends State<ChatListScreen> {
               );
             }
           },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
+              border: Border(
+                bottom: BorderSide(
+                  color: Color(0xFFEEEEEE),
+                  width: 0.5,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Profile Image with Online Status
+                Stack(
+                  children: [
+                    Container(
+                      width: 55,
+                      height: 55,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: avatarUrl != null && avatarUrl.toString().isNotEmpty
+                            ? DecorationImage(
+                                image: NetworkImage(avatarUrl),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                        color: AppColors.primary.withOpacity(0.1),
+                      ),
+                      child: avatarUrl == null || avatarUrl.toString().isEmpty
+                          ? Center(
+                              child: Text(
+                                name[0].toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    if (isOnline)
+                      Positioned(
+                        bottom: 2,
+                        right: 2,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4CAF50),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.white,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                const SizedBox(width: 12),
+
+                // Teacher Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        teacher['bio'] ?? teacher['email'] ?? 'Teacher',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF999999),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                // Badge and Arrow
+                Row(
+                  children: [
+                    if (unreadCount > 0) ...[
+                      Container(
+                        constraints: const BoxConstraints(minWidth: 20),
+                        height: 20,
+                        padding: const EdgeInsets.symmetric(horizontal: 7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00BFA5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(
+                            unreadCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    const FaIcon(
+                      FontAwesomeIcons.chevronRight,
+                      size: 14,
+                      color: Color(0xFF999999),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
 }
-
