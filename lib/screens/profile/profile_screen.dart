@@ -815,8 +815,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
       builder: (BuildContext dialogContext) {
         return AlertDialog(
+          backgroundColor: AppColors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
