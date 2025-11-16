@@ -5,6 +5,7 @@ import 'package:student/services/chat_service.dart';
 import 'package:student/services/presence_service.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -1012,28 +1013,47 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   height: 55,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    image: avatarUrl != null && avatarUrl.toString().isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(avatarUrl),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                     color: isTeacher
                         ? AppColors.primary.withOpacity(0.1)
                         : Colors.teal.withOpacity(0.1),
                   ),
-                  child: avatarUrl == null || avatarUrl.toString().isEmpty
-                      ? Center(
-                          child: Text(
-                            name[0].toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: isTeacher ? AppColors.primary : Colors.teal,
+                  child: ClipOval(
+                    child: avatarUrl != null && avatarUrl.toString().isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: avatarUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Center(
+                              child: Text(
+                                name[0].toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: isTeacher ? AppColors.primary : Colors.teal,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Center(
+                              child: Text(
+                                name[0].toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: isTeacher ? AppColors.primary : Colors.teal,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              name[0].toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: isTeacher ? AppColors.primary : Colors.teal,
+                              ),
                             ),
                           ),
-                        )
-                      : null,
+                  ),
                 ),
                 if (isOnline)
                   Positioned(

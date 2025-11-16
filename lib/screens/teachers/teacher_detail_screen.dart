@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/teacher_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/rating_service.dart';
+import 'package:student/services/chat_service.dart';
 import 'package:student/screens/teachers/package_selection_screen.dart';
+import 'package:student/screens/chat/chat_conversation_screen.dart';
 import 'package:student/widgets/rating_widget.dart';
+import 'package:student/widgets/custom_back_button.dart';
+import 'package:student/widgets/custom_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import '../../config/app_colors.dart';
 
 class TeacherDetailScreen extends StatefulWidget {
   final String teacherId;
@@ -27,6 +33,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   final _teacherService = TeacherService();
   final _authService = AuthService();
   final _ratingService = RatingService();
+  final _chatService = ChatService();
   Map<String, dynamic>? _teacher;
   List<Map<String, dynamic>> _schedules = [];
   Map<String, dynamic>? _ratingStats;
@@ -251,504 +258,593 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     );
   }
 
+  Future<void> _openChat() async {
+    if (!_hasSubscription) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You need to subscribe to chat with this teacher'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final teacherName = _teacher?['full_name'] ?? 'Teacher';
+    final teacherAvatar = _teacher?['avatar_url'];
+    
+    // Try to get/create conversation
+    final conversation = await _chatService.getOrCreateConversation(widget.teacherId);
+    
+    if (conversation != null && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatConversationScreen(
+            conversationId: conversation['id'],
+            recipientId: widget.teacherId,
+            recipientName: teacherName,
+            recipientAvatar: teacherAvatar,
+          ),
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to start chat. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.deepPurple,
-          foregroundColor: Colors.white,
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_teacher == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Teacher Not Found'),
-          backgroundColor: Colors.deepPurple,
-          foregroundColor: Colors.white,
-        ),
-        body: const Center(
-          child: Text('Teacher not found'),
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.person_off,
+                  size: 64,
+                  color: AppColors.grey,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Teacher Not Found',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'The teacher you are looking for does not exist',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
 
+    final averageRating = (_ratingStats?['average_rating'] as num?)?.toDouble() ?? 0.0;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_teacher!['full_name'] ?? 'Teacher'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Teacher Header Card
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.deepPurple.shade600,
-                    Colors.deepPurple.shade800,
-                  ],
-                ),
-              ),
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  // Avatar
-                  Hero(
-                    tag: 'teacher_${widget.teacherId}',
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: _teacher!['avatar_url'] != null
-                            ? CachedNetworkImage(
-                                imageUrl: _teacher!['avatar_url'],
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: Colors.white,
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: Colors.deepPurple,
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.white,
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: Colors.deepPurple,
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                color: Colors.white,
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: Colors.deepPurple,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Name
-                  Text(
-                    _teacher!['full_name'] ?? 'Teacher',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Specialization
-                  if (_teacher!['specialization'] != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _teacher!['specialization'],
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Rating Display
-                  if (_ratingStats != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: RatingDisplay(
-                        averageRating: (_ratingStats!['average_rating'] as num?)?.toDouble() ?? 0.0,
-                        totalRatings: (_ratingStats!['total_ratings'] as int?) ?? 0,
-                        compact: true,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Intro Video Section
-            if (_youtubeController != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+            // Header
+            _buildHeader(),
+            
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Introduction Video',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: YoutubePlayer(
-                        controller: _youtubeController!,
-                        showVideoProgressIndicator: true,
-                        progressIndicatorColor: Colors.deepPurple,
-                        progressColors: ProgressBarColors(
-                          playedColor: Colors.deepPurple,
-                          handleColor: Colors.deepPurpleAccent,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    // Teacher Info Section
+                    _buildTeacherInfo(averageRating),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Video Section (Single Video)
+                    if (_youtubeController != null) ...[
+                      _buildVideoSection(),
+                      const SizedBox(height: 30),
+                    ],
+                    
+                    // Available Schedules Section
+                    _buildSchedulesSection(),
+                    
+                    const SizedBox(height: 30),
+                    
+                    // Subscribe Button
+                    _buildSubscribeButton(),
+                    
+                    const SizedBox(height: 30),
                   ],
-                ),
-              ),
-
-            // About Section
-            if (_teacher!['bio'] != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'About',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _teacher!['bio'],
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey[700],
-                        height: 1.6,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            const SizedBox(height: 24),
-
-            // Weekly Schedule Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Weekly Schedule',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  _schedules.isEmpty
-                      ? Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today_outlined,
-                                  size: 48,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'No schedule available',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : _buildScheduleList(),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Rating Stats Section
-            if (_ratingStats != null && ((_ratingStats!['total_ratings'] as int?) ?? 0) > 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: RatingDisplay(
-                  averageRating: (_ratingStats!['average_rating'] as num?)?.toDouble() ?? 0.0,
-                  totalRatings: (_ratingStats!['total_ratings'] as int?) ?? 0,
-                  starCounts: {
-                    5: (_ratingStats!['five_star_count'] as int?) ?? 0,
-                    4: (_ratingStats!['four_star_count'] as int?) ?? 0,
-                    3: (_ratingStats!['three_star_count'] as int?) ?? 0,
-                    2: (_ratingStats!['two_star_count'] as int?) ?? 0,
-                    1: (_ratingStats!['one_star_count'] as int?) ?? 0,
-                  },
-                ),
-              ),
-
-            if (_ratingStats != null && ((_ratingStats!['total_ratings'] as int?) ?? 0) > 0)
-              const SizedBox(height: 24),
-
-            // Rate Teacher Button (if eligible)
-            if (_canRate)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: OutlinedButton.icon(
-                  onPressed: _showRatingDialog,
-                  icon: Icon(
-                    _myRating != null ? Icons.edit : Icons.star_outline,
-                    color: Colors.deepPurple,
-                  ),
-                  label: Text(
-                    _myRating != null ? 'Update Your Rating' : 'Rate This Teacher',
-                    style: const TextStyle(
-                      color: Colors.deepPurple,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.deepPurple, width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-
-            if (_canRate)
-              const SizedBox(height: 24),
-
-            // Reviews Section
-            if (_reviews.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Student Reviews',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ..._reviews.map((review) => RatingReviewCard(review: review)),
-                  ],
-                ),
-              ),
-
-            if (_reviews.isNotEmpty)
-              const SizedBox(height: 32),
-
-            // Subscribe Button
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isCheckingSubscription ? null : _handleSubscribe,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _hasSubscription
-                        ? Colors.grey
-                        : Colors.deepPurple,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isCheckingSubscription
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text(
-                          _hasSubscription
-                              ? 'Already Subscribed'
-                              : 'Subscribe to ${_teacher!['full_name']}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
                 ),
               ),
             ),
-
-            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildScheduleList() {
-    // Group schedules by day
-    final Map<int, List<Map<String, dynamic>>> schedulesByDay = {};
-    for (var schedule in _schedules) {
-      final day = schedule['day_of_week'] as int;
-      if (!schedulesByDay.containsKey(day)) {
-        schedulesByDay[day] = [];
-      }
-      schedulesByDay[day]!.add(schedule);
-    }
-
-    return Column(
-      children: schedulesByDay.entries.map((entry) {
-        final dayOfWeek = entry.key;
-        final daySchedules = entry.value;
-        
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          const CustomBackButton(),
+          const Spacer(),
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.message, size: 20),
+            onPressed: _hasSubscription ? _openChat : null,
+            color: _hasSubscription ? AppColors.primary : AppColors.grey,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple.shade50,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today,
-                      color: Colors.deepPurple.shade700,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _dayNames[dayOfWeek],
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.deepPurple.shade700,
-                      ),
-                    ),
-                  ],
-                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTeacherInfo(double averageRating) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      constraints: const BoxConstraints(
+        minHeight: 180,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Teacher Image - Left Side (Full Height)
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                bottomLeft: Radius.circular(20),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: daySchedules.map((schedule) {
-                    final startTime = schedule['start_time'] as String;
-                    final endTime = schedule['end_time'] as String;
-                    
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.green.shade200,
+              child: Container(
+                width: 120,
+                decoration: BoxDecoration(
+                  gradient: _teacher!['avatar_url'] == null ? AppColors.redGradient : null,
+                ),
+                child: _teacher!['avatar_url'] != null
+                    ? CachedNetworkImage(
+                        imageUrl: _teacher!['avatar_url'],
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          decoration: BoxDecoration(
+                            gradient: AppColors.redGradient,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          decoration: BoxDecoration(
+                            gradient: AppColors.redGradient,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 50,
+                          color: Colors.white,
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+              ),
+            ),
+            
+            // Right Side Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Teacher Name
+                    Text(
+                      _teacher!['full_name'] ?? 'Teacher',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Specialization (if available)
+                    if (_teacher!['specialization'] != null)
+                      Text(
+                        _teacher!['specialization'],
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Rating
+                    if (averageRating > 0)
+                      Row(
                         children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 16,
-                            color: Colors.green.shade700,
-                          ),
+                          ...List.generate(5, (index) {
+                            if (index < averageRating.floor()) {
+                              return const Icon(Icons.star, color: Colors.amber, size: 18);
+                            } else if (index < averageRating) {
+                              return const Icon(Icons.star_half, color: Colors.amber, size: 18);
+                            } else {
+                              return Icon(Icons.star_border, color: Colors.grey.shade300, size: 18);
+                            }
+                          }),
                           const SizedBox(width: 6),
                           Text(
-                            '${_formatTime(startTime)} - ${_formatTime(endTime)}',
+                            '${averageRating.toStringAsFixed(1)} (${_ratingStats?['total_ratings'] ?? 0})',
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green.shade700,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  }).toList(),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Description/Bio
+                    if (_teacher!['bio'] != null)
+                      Text(
+                        _teacher!['bio'],
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
-        );
-      }).toList(),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: YoutubePlayer(
+          controller: _youtubeController!,
+          showVideoProgressIndicator: true,
+          progressIndicatorColor: AppColors.primary,
+          progressColors: ProgressBarColors(
+            playedColor: AppColors.primary,
+            handleColor: AppColors.primaryDark,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSchedulesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'AVAILABLE SCHEDULES',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 15),
+        
+        _schedules.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 48,
+                          color: AppColors.grey.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No schedule available',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : _buildScheduleList(),
+      ],
+    );
+  }
+
+  Widget _buildSubscribeButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: CustomButton(
+        text: _hasSubscription ? 'ALREADY SUBSCRIBED' : 'SUBSCRIBE',
+        onPressed: _isCheckingSubscription ? () {} : _handleSubscribe,
+        isLoading: _isCheckingSubscription,
+      ),
+    );
+  }
+
+  Widget _buildScheduleList() {
+    // Group schedules by day
+    final Map<int, List<String>> schedulesByDay = {};
+    for (var schedule in _schedules) {
+      final day = schedule['day_of_week'] as int;
+      final startTime = schedule['start_time'] as String;
+      final endTime = schedule['end_time'] as String;
+      final timeString = '${_formatTime(startTime)} - ${_formatTime(endTime)}';
+      
+      if (!schedulesByDay.containsKey(day)) {
+        schedulesByDay[day] = [];
+      }
+      schedulesByDay[day]!.add(timeString);
+    }
+
+    // Create a list of all 7 days, marking which ones have schedules
+    final List<Map<String, dynamic>> calendarDays = [];
+    for (int i = 0; i < 7; i++) {
+      calendarDays.add({
+        'day': i,
+        'name': _dayNames[i],
+        'hasSchedule': schedulesByDay.containsKey(i),
+        'times': schedulesByDay[i] ?? [],
+      });
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Calendar Grid - Horizontally Scrollable
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Container(
+              width: 700, // Fixed width to make it scrollable
+              child: Column(
+                children: [
+                  // Calendar Grid Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.redGradient,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(15),
+                        topRight: Radius.circular(15),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: calendarDays.map((day) {
+                        return SizedBox(
+                          width: 90,
+                          child: Center(
+                            child: Text(
+                              day['name'].toString().substring(0, 3).toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  
+                  // Calendar Grid Body
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: calendarDays.map((day) {
+                        final hasSchedule = day['hasSchedule'] as bool;
+                        final times = day['times'] as List<String>;
+                        
+                        return Container(
+                          width: 90,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: hasSchedule 
+                                ? AppColors.primary.withOpacity(0.05)
+                                : AppColors.lightGrey.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(12),
+                            border: hasSchedule
+                                ? Border.all(
+                                    color: AppColors.primary.withOpacity(0.3),
+                                    width: 1.5,
+                                  )
+                                : Border.all(
+                                    color: AppColors.grey.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                          ),
+                          child: Column(
+                            children: [
+                              // Day indicator dot
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: hasSchedule 
+                                      ? AppColors.primary 
+                                      : Colors.transparent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              // Times - Show all times
+                              if (hasSchedule)
+                                Column(
+                                  children: times.map((time) {
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 6),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: AppColors.redGradient,
+                                        borderRadius: BorderRadius.circular(8),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.primary.withOpacity(0.3),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Text(
+                                        time,
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          height: 1.3,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              if (!hasSchedule)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  child: Text(
+                                    '-',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      color: AppColors.grey.withOpacity(0.3),
+                                      fontWeight: FontWeight.w300,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

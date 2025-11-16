@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flag/flag.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../services/session_service.dart';
 
@@ -419,19 +420,26 @@ class _ClassesScreenState extends State<ClassesScreen>
                         color: AppColors.white,
                         width: 2,
                       ),
-                      image: teacher['profile_image_url'] != null
-                          ? DecorationImage(
-                              image: NetworkImage(teacher['profile_image_url']),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                      color: teacher['profile_image_url'] == null
-                          ? Colors.grey.shade300
-                          : null,
                     ),
-                    child: teacher['profile_image_url'] == null
-                        ? const Icon(Icons.person, color: Colors.grey)
-                        : null,
+                    child: ClipOval(
+                      child: teacher['avatar_url'] != null
+                          ? CachedNetworkImage(
+                              imageUrl: teacher['avatar_url'],
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey.shade300,
+                                child: const Icon(Icons.person, color: Colors.grey, size: 20),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey.shade300,
+                                child: const Icon(Icons.person, color: Colors.grey, size: 20),
+                              ),
+                            )
+                          : Container(
+                              color: Colors.grey.shade300,
+                              child: const Icon(Icons.person, color: Colors.grey, size: 20),
+                            ),
+                    ),
                   ),
                   // Online indicator - you can add logic to check if teacher is online
                   if (teacher['is_online'] == true)

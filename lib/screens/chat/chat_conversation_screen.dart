@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 
 class ChatConversationScreen extends StatefulWidget {
@@ -404,28 +405,45 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         height: 38,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          image: widget.recipientAvatar != null && widget.recipientAvatar!.isNotEmpty
-                              ? DecorationImage(
-                                  image: NetworkImage(widget.recipientAvatar!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                          color: widget.recipientAvatar == null || widget.recipientAvatar!.isEmpty
-                              ? AppColors.primary.withOpacity(0.1)
-                              : null,
+                          color: AppColors.primary.withOpacity(0.1),
                         ),
-                        child: widget.recipientAvatar == null || widget.recipientAvatar!.isEmpty
-                            ? Center(
-                                child: Text(
-                                  widget.recipientName[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
+                        child: ClipOval(
+                          child: widget.recipientAvatar != null && widget.recipientAvatar!.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: widget.recipientAvatar!,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Center(
+                                    child: Text(
+                                      widget.recipientName[0].toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) => Center(
+                                    child: Text(
+                                      widget.recipientName[0].toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    widget.recipientName[0].toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
                                 ),
-                              )
-                            : null,
+                        ),
                       ),
                       if (_isOnline)
                         Positioned(
