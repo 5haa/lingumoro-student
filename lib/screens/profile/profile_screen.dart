@@ -810,9 +810,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 
   void _showLogoutDialog(BuildContext context) {
+    // Capture the navigator context before showing dialog
+    final navigatorContext = Navigator.of(context).context;
+    
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -844,7 +847,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
               },
               child: const Text(
                 'Cancel',
@@ -857,11 +860,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             TextButton(
               onPressed: () async {
-                Navigator.of(context).pop();
+                // Close the dialog first
+                Navigator.of(dialogContext).pop();
+                
+                // Perform logout
                 try {
                   await _authService.signOut();
+                  
+                  // Navigate using the root navigator context
                   if (mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
+                    Navigator.of(navigatorContext).pushAndRemoveUntil(
                       MaterialPageRoute(
                         builder: (context) => const AuthScreen(),
                       ),
