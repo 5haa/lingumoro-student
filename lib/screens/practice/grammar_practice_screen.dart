@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/grammar_practice_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
+import 'package:student/config/app_colors.dart';
+import '../../widgets/custom_back_button.dart';
 
 class GrammarPracticeScreen extends StatefulWidget {
   const GrammarPracticeScreen({super.key});
@@ -191,15 +194,26 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         title: Row(
           children: [
-            Icon(
-              isCorrect ? Icons.check_circle : Icons.cancel,
+            FaIcon(
+              isCorrect ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.circleXmark,
               color: isCorrect ? Colors.green : Colors.red,
               size: 32,
             ),
             const SizedBox(width: 12),
-            Text(isCorrect ? 'Correct!' : 'Incorrect'),
+            Text(
+              isCorrect ? 'Correct!' : 'Incorrect',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -209,14 +223,17 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
             if (isCorrect) ...[
               Text(
                 'Well done! You earned $pointsEarned points.',
-                style: const TextStyle(fontSize: 16),
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ] else ...[
-              Text(
+              const Text(
                 'The correct answer is:',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey[700],
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -232,9 +249,9 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
             const SizedBox(height: 16),
             Text(
               _currentQuestion!['explanation'] ?? '',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
             ),
           ],
@@ -245,7 +262,17 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
               Navigator.pop(context);
               _generateNewQuestion();
             },
-            child: const Text('Next Question'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'Next Question',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
           ),
         ],
       ),
@@ -254,123 +281,219 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar
+            _buildTopBar(),
+            
+            // Main Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    )
+                  : !_hasProSubscription
+                      ? _buildProRequiredMessage()
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildHeader(),
+                              const SizedBox(height: 20),
+                              _buildStatisticsCard(),
+                              const SizedBox(height: 20),
+                              if (_currentQuestion == null && !_isGenerating)
+                                _buildStartButton()
+                              else if (_isGenerating)
+                                _buildLoadingState()
+                              else
+                                _buildQuestionCard(),
+                            ],
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    if (!_hasProSubscription) {
-      return _buildProRequiredMessage();
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
         children: [
-          _buildHeader(),
-          const SizedBox(height: 20),
-          _buildStatisticsCard(),
-          const SizedBox(height: 20),
-          if (_currentQuestion == null && !_isGenerating)
-            _buildStartButton()
-          else if (_isGenerating)
-            _buildLoadingState()
-          else
-            _buildQuestionCard(),
+          // Back Icon
+          const CustomBackButton(),
+          
+          const Expanded(
+            child: Center(
+              child: Text(
+                'GRAMMAR PRACTICE',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          ),
+          
+          // Placeholder for right side (to keep centered)
+          const SizedBox(width: 40),
         ],
       ),
     );
   }
 
   Widget _buildHeader() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Grammar Practice',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.deepPurple,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade400.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const FaIcon(
+                  FontAwesomeIcons.penToSquare,
+                  size: 24,
+                  color: Colors.purple,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your Level: $_studentLevel',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[700],
+              const SizedBox(width: 15),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Grammar Practice',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'AI-generated questions for your level',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade50,
+              borderRadius: BorderRadius.circular(8),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Practice grammar with AI-generated questions tailored to your level',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FaIcon(FontAwesomeIcons.star, size: 14, color: Colors.purple.shade700),
+                const SizedBox(width: 6),
+                Text(
+                  'Level $_studentLevel',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.purple.shade700,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildStatisticsCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Your Statistics',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Your Statistics',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem(
+                'Total',
+                _statistics['total_questions'].toString(),
+                FontAwesomeIcons.clipboardQuestion,
+                Colors.blue.shade400,
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem(
-                  'Total',
-                  _statistics['total_questions'].toString(),
-                  Icons.quiz,
-                  Colors.blue,
-                ),
-                _buildStatItem(
-                  'Correct',
-                  _statistics['correct_answers'].toString(),
-                  Icons.check_circle,
-                  Colors.green,
-                ),
-                _buildStatItem(
-                  'Accuracy',
-                  '${_statistics['accuracy'].toStringAsFixed(0)}%',
-                  Icons.trending_up,
-                  Colors.orange,
-                ),
-                _buildStatItem(
-                  'Points',
-                  _statistics['total_points_earned'].toString(),
-                  Icons.star,
-                  Colors.amber,
-                ),
-              ],
-            ),
-          ],
-        ),
+              _buildStatItem(
+                'Correct',
+                _statistics['correct_answers'].toString(),
+                FontAwesomeIcons.circleCheck,
+                Colors.green.shade400,
+              ),
+              _buildStatItem(
+                'Accuracy',
+                '${_statistics['accuracy'].toStringAsFixed(0)}%',
+                FontAwesomeIcons.chartLine,
+                Colors.orange.shade400,
+              ),
+              _buildStatItem(
+                'Points',
+                _statistics['total_points_earned'].toString(),
+                FontAwesomeIcons.star,
+                Colors.amber.shade600,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -378,7 +501,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
   Widget _buildStatItem(String label, String value, IconData icon, Color color) {
     return Column(
       children: [
-        Icon(icon, color: color, size: 32),
+        FaIcon(icon, color: color, size: 28),
         const SizedBox(height: 8),
         Text(
           value,
@@ -391,9 +514,9 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: AppColors.textSecondary,
           ),
         ),
       ],
@@ -401,146 +524,197 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
   }
 
   Widget _buildStartButton() {
-    return Center(
-      child: ElevatedButton.icon(
-        onPressed: _generateNewQuestion,
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Start Practice'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.deepPurple,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Center(
+        child: ElevatedButton.icon(
+          onPressed: _generateNewQuestion,
+          icon: const FaIcon(FontAwesomeIcons.play, size: 18),
+          label: const Text(
+            'Start Practice',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildLoadingState() {
-    return const Card(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Column(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Generating question...',
-              style: TextStyle(fontSize: 16),
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: const Column(
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Generating question...',
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.textSecondary,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildQuestionCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_currentQuestion!['grammar_topic'] != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _currentQuestion!['grammar_topic'],
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.deepPurple,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_currentQuestion!['grammar_topic'] != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.purple.shade200),
               ),
-              const SizedBox(height: 16),
-            ],
-            Text(
-              _currentQuestion!['question'],
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+              child: Text(
+                _currentQuestion!['grammar_topic'],
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.purple.shade700,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
-            const SizedBox(height: 24),
-            ...List.generate(
-              _currentQuestion!['options'].length,
-              (index) => _buildOptionButton(index),
-            ),
-            if (_showExplanation) ...[
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.lightbulb, color: Colors.blue, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'Explanation',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _currentQuestion!['explanation'] ?? '',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 20),
-            if (!_answerSubmitted)
-              ElevatedButton(
-                onPressed: _selectedOptionIndex != null ? _submitAnswer : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Submit Answer'),
-              )
-            else
-              ElevatedButton.icon(
-                onPressed: _generateNewQuestion,
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('Next Question'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
+            const SizedBox(height: 16),
           ],
-        ),
+          Text(
+            _currentQuestion!['question'],
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ...List.generate(
+            _currentQuestion!['options'].length,
+            (index) => _buildOptionButton(index),
+          ),
+          if (_showExplanation) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      FaIcon(FontAwesomeIcons.lightbulb, color: Colors.blue.shade700, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Explanation',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _currentQuestion!['explanation'] ?? '',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          if (!_answerSubmitted)
+            ElevatedButton(
+              onPressed: _selectedOptionIndex != null ? _submitAnswer : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+                disabledForegroundColor: Colors.grey.shade600,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Submit Answer',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            )
+          else
+            ElevatedButton.icon(
+              onPressed: _generateNewQuestion,
+              icon: const FaIcon(FontAwesomeIcons.arrowRight, size: 16),
+              label: const Text('Next Question'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -558,76 +732,80 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
       if (isCorrect) {
         backgroundColor = Colors.green.withOpacity(0.1);
         borderColor = Colors.green;
-        textColor = Colors.green[800];
+        textColor = Colors.green.shade800;
       } else if (isSelected) {
         backgroundColor = Colors.red.withOpacity(0.1);
         borderColor = Colors.red;
-        textColor = Colors.red[800];
+        textColor = Colors.red.shade800;
       }
     } else if (isSelected) {
-      backgroundColor = Colors.deepPurple.withOpacity(0.1);
-      borderColor = Colors.deepPurple;
-      textColor = Colors.deepPurple[800];
+      backgroundColor = AppColors.primary.withOpacity(0.1);
+      borderColor = AppColors.primary;
+      textColor = AppColors.primaryDark;
     }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: _answerSubmitted ? null : () {
-          setState(() {
-            _selectedOptionIndex = index;
-          });
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: backgroundColor ?? Colors.grey.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: borderColor ?? Colors.grey.withOpacity(0.3),
-              width: 2,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _answerSubmitted ? null : () {
+            setState(() {
+              _selectedOptionIndex = index;
+            });
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: backgroundColor ?? AppColors.lightGrey,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: borderColor ?? AppColors.border,
+                width: 2,
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: (backgroundColor ?? Colors.white),
-                  border: Border.all(
-                    color: borderColor ?? Colors.grey.withOpacity(0.5),
-                    width: 2,
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: backgroundColor ?? AppColors.white,
+                    border: Border.all(
+                      color: borderColor ?? AppColors.border,
+                      width: 2,
+                    ),
                   ),
-                ),
-                child: Center(
-                  child: Text(
-                    String.fromCharCode(65 + index), // A, B, C, D
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: textColor ?? Colors.grey[700],
+                  child: Center(
+                    child: Text(
+                      String.fromCharCode(65 + index), // A, B, C, D
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: textColor ?? AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  option,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: textColor ?? Colors.black87,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    option,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: textColor ?? AppColors.textPrimary,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
                 ),
-              ),
-              if (_answerSubmitted && isCorrect)
-                const Icon(Icons.check_circle, color: Colors.green, size: 24),
-              if (_answerSubmitted && isSelected && !isCorrect)
-                const Icon(Icons.cancel, color: Colors.red, size: 24),
-            ],
+                if (_answerSubmitted && isCorrect)
+                  FaIcon(FontAwesomeIcons.circleCheck, color: Colors.green, size: 20),
+                if (_answerSubmitted && isSelected && !isCorrect)
+                  FaIcon(FontAwesomeIcons.circleXmark, color: Colors.red, size: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -641,10 +819,17 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.lock,
-              size: 80,
-              color: Colors.grey,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: FaIcon(
+                FontAwesomeIcons.crown,
+                size: 64,
+                color: Colors.amber.shade600,
+              ),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -652,6 +837,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -660,22 +846,26 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
               'Grammar practice is available for PRO members only.',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
               },
+              icon: const FaIcon(FontAwesomeIcons.crown, size: 16),
+              label: const Text('Upgrade to PRO'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
+                backgroundColor: Colors.amber.shade600,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
               ),
-              child: const Text('Upgrade to PRO'),
             ),
           ],
         ),
@@ -683,4 +873,3 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
     );
   }
 }
-

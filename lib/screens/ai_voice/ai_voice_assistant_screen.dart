@@ -2,16 +2,21 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:just_audio/just_audio.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../services/ai_speech_service.dart';
+import '../../config/app_colors.dart';
+import '../../widgets/custom_back_button.dart';
 
 /// Enhanced AI Voice Assistant Screen
 /// Provides real-time voice conversation with AI tutor
 class AiVoiceAssistantScreen extends StatefulWidget {
-  const AiVoiceAssistantScreen({Key? key}) : super(key: key);
+  final bool hideAppBar;
+  
+  const AiVoiceAssistantScreen({Key? key, this.hideAppBar = false}) : super(key: key);
 
   @override
   State<AiVoiceAssistantScreen> createState() => _AiVoiceAssistantScreenState();
@@ -475,10 +480,17 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1A1A2E),
+          backgroundColor: AppColors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text(
             'Select AI Voice',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: SizedBox(
             width: double.maxFinite,
@@ -492,21 +504,21 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                 return ListTile(
                   leading: Icon(
                     voice.icon,
-                    color: isSelected ? Colors.blueAccent : Colors.grey,
+                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
                   ),
                   title: Text(
                     voice.name,
                     style: TextStyle(
-                      color: isSelected ? Colors.blueAccent : Colors.white,
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                   subtitle: Text(
                     voice.description,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),
                   trailing: isSelected
-                      ? const Icon(Icons.check_circle, color: Colors.blueAccent)
+                      ? FaIcon(FontAwesomeIcons.circleCheck, color: AppColors.primary, size: 20)
                       : null,
                   onTap: () {
                     setState(() {
@@ -517,7 +529,7 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                       SnackBar(
                         content: Text('Voice changed to ${voice.name}'),
                         duration: const Duration(seconds: 2),
-                        backgroundColor: Colors.blueAccent,
+                        backgroundColor: AppColors.primary,
                       ),
                     );
                   },
@@ -528,7 +540,13 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close', style: TextStyle(color: Colors.blueAccent)),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Close',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         );
@@ -548,49 +566,23 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F0F1E),
-      appBar: AppBar(
-        title: const Text('AI Voice Tutor'),
-        backgroundColor: const Color(0xFF1A1A2E),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.record_voice_over),
-            onPressed: _showVoiceSelector,
-            tooltip: 'Select voice',
-          ),
-          if (_conversationHistory.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: _clearConversation,
-              tooltip: 'Clear conversation',
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _checkServerHealth,
-            tooltip: 'Check server',
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
+  Widget _buildBody() {
+    return Column(
+      children: [
           // Server status indicator
           if (!_serverConfigured)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: Colors.red.withOpacity(0.2),
+              color: Colors.red.shade50,
               child: Row(
                 children: [
-                  const Icon(Icons.warning, color: Colors.redAccent, size: 20),
+                  FaIcon(FontAwesomeIcons.triangleExclamation, color: Colors.red.shade700, size: 18),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Server not connected. Start the AI server.',
-                      style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                      style: TextStyle(color: Colors.red.shade700, fontSize: 13),
                     ),
                   ),
                 ],
@@ -603,20 +595,19 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.2),
+                color: Colors.red.shade50,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                border: Border.all(color: Colors.red.shade200),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline,
-                      color: Colors.redAccent, size: 20),
+                  FaIcon(FontAwesomeIcons.circleExclamation,
+                      color: Colors.red.shade700, size: 18),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       _errorMessage!,
-                      style:
-                          const TextStyle(color: Colors.redAccent, fontSize: 13),
+                      style: TextStyle(color: Colors.red.shade700, fontSize: 13),
                     ),
                   ),
                 ],
@@ -641,7 +632,7 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                       Text(
                         _statusText,
                         style: const TextStyle(
-                          color: Colors.white70,
+                          color: AppColors.textPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
@@ -654,13 +645,13 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                           Icon(
                             AvailableVoices.getVoiceById(_selectedVoice).icon,
                             size: 14,
-                            color: Colors.blueAccent,
+                            color: AppColors.primary,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             'Voice: ${AvailableVoices.getVoiceById(_selectedVoice).name}',
                             style: const TextStyle(
-                              color: Colors.blueAccent,
+                              color: AppColors.textSecondary,
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                             ),
@@ -679,14 +670,14 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: Colors.blue.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                        border: Border.all(color: Colors.blue.shade200),
                       ),
                       child: Text(
                         _currentListeningText!,
-                        style: const TextStyle(
-                          color: Colors.blue,
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
                           fontSize: 15,
                           fontStyle: FontStyle.italic,
                         ),
@@ -703,12 +694,13 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                   children: [
                     ElevatedButton.icon(
                       onPressed: _serverConfigured ? _toggleAgent : null,
-                      icon: Icon(_isActive ? Icons.stop : Icons.mic),
+                      icon: FaIcon(_isActive ? FontAwesomeIcons.stop : FontAwesomeIcons.microphone, size: 18),
                       label: Text(_isActive ? 'Stop' : 'Start Voice'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            _isActive ? Colors.red : const Color(0xFF6C63FF),
+                        backgroundColor: _isActive ? Colors.red.shade400 : AppColors.primary,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade600,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 14,
@@ -716,14 +708,14 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
-                        elevation: 8,
+                        elevation: 0,
                       ),
                     ),
                   ],
                 ),
 
                 const SizedBox(height: 16),
-                const Divider(color: Colors.white12, height: 1),
+                Divider(color: AppColors.border, height: 1),
 
                 // Conversation history
                 Expanded(
@@ -732,24 +724,35 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.mic_none,
-                                size: 80,
-                                color: Colors.white.withOpacity(0.2),
+                              Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  color: AppColors.grey.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: FaIcon(
+                                    FontAwesomeIcons.microphone,
+                                    size: 40,
+                                    color: AppColors.grey.withOpacity(0.3),
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 20),
-                              const Text(
+                              Text(
                                 'Start speaking with your AI tutor',
                                 style: TextStyle(
-                                  color: Colors.white38,
+                                  color: AppColors.textSecondary.withOpacity(0.6),
                                   fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              const Text(
+                              Text(
                                 'Tap "Start Voice" to begin',
                                 style: TextStyle(
-                                  color: Colors.white24,
+                                  color: AppColors.textSecondary.withOpacity(0.5),
                                   fontSize: 14,
                                 ),
                               ),
@@ -775,10 +778,10 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1A2E),
+              color: AppColors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -789,15 +792,23 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                 Expanded(
                   child: TextField(
                     controller: _textController,
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(color: AppColors.textPrimary),
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                      hintStyle: TextStyle(color: AppColors.textHint),
                       filled: true,
-                      fillColor: const Color(0xFF0F0F1E),
+                      fillColor: AppColors.lightGrey,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
@@ -810,19 +821,153 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                 const SizedBox(width: 12),
                 Container(
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
-                    ),
+                    color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
                     onPressed: _sendTextMessage,
-                    icon: const Icon(Icons.send),
+                    icon: const FaIcon(FontAwesomeIcons.paperPlane, size: 18),
                     color: Colors.white,
                   ),
                 ),
               ],
             ),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final body = _buildBody();
+    
+    if (widget.hideAppBar) {
+      // When used as a tab, return just the body without Scaffold/AppBar
+      return Container(
+        color: AppColors.background,
+        child: Column(
+          children: [
+            // Action buttons bar when used as tab
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              color: AppColors.white,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: FaIcon(FontAwesomeIcons.recordVinyl, color: AppColors.textSecondary),
+                    onPressed: _showVoiceSelector,
+                    tooltip: 'Select voice',
+                  ),
+                  if (_conversationHistory.isNotEmpty)
+                    IconButton(
+                      icon: FaIcon(FontAwesomeIcons.trash, color: AppColors.textSecondary),
+                      onPressed: _clearConversation,
+                      tooltip: 'Clear conversation',
+                    ),
+                  IconButton(
+                    icon: FaIcon(FontAwesomeIcons.arrowRotateRight, color: AppColors.textSecondary),
+                    onPressed: _checkServerHealth,
+                    tooltip: 'Check server',
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+    
+    // When used standalone, return with Scaffold and custom top bar
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar
+            _buildTopBar(),
+            
+            // Body
+            Expanded(child: body),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          // Back Icon
+          const CustomBackButton(),
+          
+          const Expanded(
+            child: Center(
+              child: Text(
+                'AI VOICE TUTOR',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          ),
+          
+          // Action buttons
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 45,
+                height: 45,
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: FaIcon(FontAwesomeIcons.recordVinyl, color: AppColors.primary, size: 18),
+                  onPressed: _showVoiceSelector,
+                  tooltip: 'Select voice',
+                ),
+              ),
+              if (_conversationHistory.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: FaIcon(FontAwesomeIcons.trash, color: AppColors.textSecondary, size: 18),
+                    onPressed: _clearConversation,
+                    tooltip: 'Clear conversation',
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -842,41 +987,41 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
             height: 160,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: _isListening
-                    ? [const Color(0xFF00D4FF), const Color(0xFF0099CC)]
-                    : _isSpeaking
-                        ? [const Color(0xFF6C63FF), const Color(0xFF5A52D5)]
-                        : _isProcessing
-                            ? [
-                                const Color(0xFFFF6B6B),
-                                const Color(0xFFEE5A6F)
-                              ]
-                            : [
-                                const Color(0xFF2E2E3E),
-                                const Color(0xFF1A1A2E)
-                              ],
-              ),
+              color: _isListening
+                  ? Colors.blue.shade400
+                  : _isSpeaking
+                      ? AppColors.primary
+                      : _isProcessing
+                          ? Colors.orange.shade400
+                          : AppColors.lightGrey,
               boxShadow: [
                 BoxShadow(
                   color: (_isListening || _isSpeaking || _isProcessing)
-                      ? Colors.blue.withOpacity(0.5)
+                      ? (_isListening 
+                          ? Colors.blue.withOpacity(0.3)
+                          : _isSpeaking
+                              ? AppColors.primary.withOpacity(0.3)
+                              : Colors.orange.withOpacity(0.3))
                       : Colors.transparent,
                   blurRadius: 40,
                   spreadRadius: 10,
                 ),
               ],
             ),
-            child: Icon(
-              _isListening
-                  ? Icons.mic
-                  : _isSpeaking
-                      ? Icons.volume_up
-                      : _isProcessing
-                          ? Icons.psychology
-                          : Icons.mic_none,
-              size: 70,
-              color: Colors.white,
+            child: Center(
+              child: FaIcon(
+                _isListening
+                    ? FontAwesomeIcons.microphone
+                    : _isSpeaking
+                        ? FontAwesomeIcons.volumeHigh
+                        : _isProcessing
+                            ? FontAwesomeIcons.brain
+                            : FontAwesomeIcons.microphoneSlash,
+                size: 50,
+                color: (_isListening || _isSpeaking || _isProcessing)
+                    ? Colors.white
+                    : AppColors.textSecondary,
+              ),
             ),
           ),
         );
@@ -893,39 +1038,25 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
         constraints:
             BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
-          gradient: isUser
-              ? const LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
-                )
-              : null,
-          color: isUser ? null : const Color(0xFF1A1A2E),
+          color: isUser ? AppColors.primary : AppColors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment:
-              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              message['content']!,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                height: 1.4,
-              ),
-            ),
-          ],
+        child: Text(
+          message['content']!,
+          style: TextStyle(
+            color: isUser ? Colors.white : AppColors.textPrimary,
+            fontSize: 15,
+            height: 1.4,
+          ),
         ),
       ),
     );
   }
 }
-
-
-
