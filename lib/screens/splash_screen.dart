@@ -7,6 +7,7 @@ import 'package:student/screens/auth/auth_screen.dart';
 import 'package:student/screens/main_navigation.dart';
 import 'package:student/screens/onboarding_screen.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/firebase_notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -80,6 +81,15 @@ class _SplashScreenState extends State<SplashScreen> {
           });
         }
       } else {
+        // Initialize Firebase notifications for logged-in user
+        try {
+          final firebaseNotificationService = FirebaseNotificationService();
+          await firebaseNotificationService.initialize();
+          print('✅ Firebase notifications initialized on app startup');
+        } catch (e) {
+          print('❌ Failed to initialize Firebase notifications: $e');
+        }
+        
         nextScreen = const MainNavigation();
       }
     } else {

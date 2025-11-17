@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
+import '../../services/notification_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -11,61 +14,157 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  List<Map<String, dynamic>> _notifications = [
-    {
-      'id': 1,
-      'title': 'Class Reminder',
-      'message': 'Your English class starts in 30 minutes',
-      'time': '30 min ago',
-      'type': 'class',
-      'isRead': false,
-      'icon': FontAwesomeIcons.graduationCap,
-    },
-    {
-      'id': 2,
-      'title': 'New Message',
-      'message': 'You have a new message from your teacher',
-      'time': '1 hour ago',
-      'type': 'message',
-      'isRead': false,
-      'icon': FontAwesomeIcons.message,
-    },
-    {
-      'id': 3,
-      'title': 'Assignment Due',
-      'message': 'Your homework assignment is due tomorrow',
-      'time': '2 hours ago',
-      'type': 'assignment',
-      'isRead': false,
-      'icon': FontAwesomeIcons.clipboardList,
-    },
-  ];
+  final NotificationService _notificationService = NotificationService();
+  List<Map<String, dynamic>> _notifications = [];
+  bool _isLoading = true;
+  RealtimeChannel? _notificationChannel;
 
-  int get _unreadCount => _notifications.where((n) => !n['isRead']).length;
-
-  void _markAsRead(int id) {
-    setState(() {
-      final index = _notifications.indexWhere((n) => n['id'] == id);
-      if (index != -1) {
-        _notifications[index]['isRead'] = true;
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+    _subscribeToNotifications();
   }
 
-  void _markAllAsRead() {
-    setState(() {
-      for (var notification in _notifications) {
-        notification['isRead'] = true;
+  @override
+  void dispose() {
+    if (_notificationChannel != null) {
+      _notificationService.unsubscribe(_notificationChannel!);
+    }
+    super.dispose();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    try {
+      final notifications = await _notificationService.getNotifications();
+      setState(() {
+        _notifications = notifications;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading notifications: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _subscribeToNotifications() {
+    try {
+      _notificationChannel = _notificationService.subscribeToNotifications((notification) {
+        setState(() {
+          _notifications.insert(0, notification);
+        });
+        // Show snackbar for new notification
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(notification['title'] ?? 'New notification'),
+              backgroundColor: AppColors.primary,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      });
+    } catch (e) {
+      print('Error subscribing to notifications: $e');
+    }
+  }
+
+  int get _unreadCount => _notifications.where((n) => n['is_read'] == false).length;
+
+  Future<void> _markAsRead(String id) async {
+    final success = await _notificationService.markAsRead(id);
+    if (success) {
+      setState(() {
+        final index = _notifications.indexWhere((n) => n['id'] == id);
+        if (index != -1) {
+          _notifications[index]['is_read'] = true;
+        }
+      });
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    final count = await _notificationService.markAllAsRead();
+    if (count > 0) {
+      setState(() {
+        for (var notification in _notifications) {
+          notification['is_read'] = true;
+        }
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All notifications marked as read'),
+            backgroundColor: AppColors.primary,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('All notifications marked as read'),
-        backgroundColor: AppColors.primary,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    }
+  }
+
+  IconData _getIconForType(String type) {
+    switch (type) {
+      case 'chat_message':
+      case 'chat_request_received':
+      case 'chat_request_accepted':
+      case 'chat_request_rejected':
+        return FontAwesomeIcons.message;
+      case 'session_scheduled':
+      case 'session_reminder':
+      case 'session_cancelled':
+      case 'session_completed':
+      case 'meeting_link_available':
+        return FontAwesomeIcons.graduationCap;
+      case 'payment_approved':
+      case 'payment_rejected':
+      case 'subscription_expiry':
+      case 'points_low':
+        return FontAwesomeIcons.creditCard;
+      case 'points_awarded':
+        return FontAwesomeIcons.star;
+      case 'pro_activated':
+      case 'pro_expiry':
+        return FontAwesomeIcons.crown;
+      default:
+        return FontAwesomeIcons.bell;
+    }
+  }
+
+  String _getTimeAgo(String? createdAt) {
+    if (createdAt == null) return 'Unknown';
+    try {
+      final date = DateTime.parse(createdAt);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inMinutes < 1) return 'Just now';
+      if (difference.inMinutes < 60) return '${difference.inMinutes} min ago';
+      if (difference.inHours < 24) return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+      if (difference.inDays < 7) return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+      return DateFormat('MMM d, y').format(date);
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
+  void _handleNotificationTap(Map<String, dynamic> notification) {
+    // Mark as read
+    if (notification['is_read'] == false) {
+      _markAsRead(notification['id']);
+    }
+
+    // Navigate based on notification action
+    final data = notification['data'] as Map<String, dynamic>?;
+    if (data == null) return;
+
+    final action = data['action'];
+    // TODO: Implement navigation based on action
+    // Example:
+    // if (action == 'open_chat') Navigator.push(...);
+    // if (action == 'open_session') Navigator.push(...);
   }
 
   @override
@@ -120,8 +219,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
             // Notifications List
             Expanded(
-              child: _notifications.isEmpty
-                  ? Center(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                  : _notifications.isEmpty
+                      ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -174,14 +275,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildNotificationCard(Map<String, dynamic> notification) {
-    final bool isRead = notification['isRead'];
+    final bool isRead = notification['is_read'] ?? false;
+    final String type = notification['type'] ?? 'default';
+    final IconData icon = _getIconForType(type);
+    final String timeAgo = _getTimeAgo(notification['created_at']);
     
     return GestureDetector(
-      onTap: () {
-        if (!isRead) {
-          _markAsRead(notification['id']);
-        }
-      },
+      onTap: () => _handleNotificationTap(notification),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -213,7 +313,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
               child: Center(
                 child: FaIcon(
-                  notification['icon'],
+                  icon,
                   color: AppColors.white,
                   size: 18,
                 ),
@@ -250,7 +350,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    notification['message'],
+                    notification['body'] ?? '',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
@@ -267,7 +367,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        notification['time'],
+                        timeAgo,
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.grey,
