@@ -4,9 +4,11 @@ class NotificationService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   /// Get notifications for current user
+  /// Filters based on in-app notification preferences
   Future<List<Map<String, dynamic>>> getNotifications({
     int limit = 50,
     int offset = 0,
+    bool respectInAppPreferences = true,
   }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -20,7 +22,37 @@ class NotificationService {
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
-      return List<Map<String, dynamic>>.from(response);
+      List<Map<String, dynamic>> notifications = List<Map<String, dynamic>>.from(response);
+      
+      // Filter based on preferences if requested
+      if (respectInAppPreferences) {
+        final prefs = await getPreferences();
+        if (prefs != null) {
+          // Global in-app notification toggle
+          if (prefs['in_app_notifications_enabled'] == false) {
+            return [];
+          }
+          
+          // Filter by category preferences
+          notifications = notifications.where((notif) {
+            final type = notif['type'] as String?;
+            if (type == null) return true;
+            
+            // Check category-specific preferences for in-app display
+            if (type.startsWith('chat_') && prefs['chat_enabled'] == false) return false;
+            if (type.startsWith('session_') && prefs['session_enabled'] == false) return false;
+            if (type.startsWith('payment_') && prefs['payment_enabled'] == false) return false;
+            if (type.startsWith('points_') && prefs['points_enabled'] == false) return false;
+            if (type.startsWith('rating_') && prefs['rating_enabled'] == false) return false;
+            if (type.startsWith('marketing_') && prefs['marketing_enabled'] == false) return false;
+            if (type.startsWith('system_') && prefs['system_enabled'] == false) return false;
+            
+            return true;
+          }).toList();
+        }
+      }
+
+      return notifications;
     } catch (e) {
       print('Error fetching notifications: $e');
       return [];
@@ -28,20 +60,31 @@ class NotificationService {
   }
 
   /// Get unread notification count
-  Future<int> getUnreadCount() async {
+  /// Respects in-app notification preferences
+  Future<int> getUnreadCount({bool respectInAppPreferences = true}) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return 0;
 
-      final response = await _supabase.rpc(
-        'get_unread_notification_count',
-        params: {
-          'p_user_id': userId,
-          'p_user_type': 'student',
-        },
-      );
+      if (respectInAppPreferences) {
+        // Get notifications and filter, then count unread
+        final notifications = await getNotifications(
+          limit: 1000, // Get all unread
+          respectInAppPreferences: true,
+        );
+        return notifications.where((n) => n['is_read'] == false).length;
+      } else {
+        // Use RPC for faster count without filtering
+        final response = await _supabase.rpc(
+          'get_unread_notification_count',
+          params: {
+            'p_user_id': userId,
+            'p_user_type': 'student',
+          },
+        );
 
-      return response as int;
+        return response as int;
+      }
     } catch (e) {
       print('Error getting unread count: $e');
       return 0;
