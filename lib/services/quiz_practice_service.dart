@@ -4,23 +4,23 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/ai_speech_service.dart';
 import 'package:student/services/level_service.dart';
 
-class GrammarPracticeService {
+class QuizPracticeService {
   final _supabase = Supabase.instance.client;
   final _levelService = LevelService();
   
   // Use AI server URL from AiSpeechService
   String get _serverUrl => AiSpeechService.serverUrl;
 
-  /// Generate a single grammar question
+  /// Generate a single quiz question
   Future<Map<String, dynamic>?> generateQuestion({
     required int level,
     String language = 'English',
   }) async {
     try {
-      print('Generating grammar question for level $level...');
+      print('Generating quiz question for level $level...');
       
       final response = await http.post(
-        Uri.parse('$_serverUrl/api/grammar/question'),
+        Uri.parse('$_serverUrl/api/quiz/question'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'level': level,
@@ -28,7 +28,7 @@ class GrammarPracticeService {
         }),
       ).timeout(const Duration(seconds: 30));
 
-      print('Grammar question response: ${response.statusCode}');
+      print('Quiz question response: ${response.statusCode}');
 
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
@@ -45,22 +45,22 @@ class GrammarPracticeService {
       
       return null;
     } catch (e) {
-      print('Error generating grammar question: $e');
+      print('Error generating quiz question: $e');
       return null;
     }
   }
 
-  /// Generate multiple grammar questions
+  /// Generate multiple quiz questions
   Future<List<Map<String, dynamic>>?> generateQuestions({
     required int level,
     int count = 5,
     String language = 'English',
   }) async {
     try {
-      print('Generating $count grammar questions for level $level...');
+      print('Generating $count quiz questions for level $level...');
       
       final response = await http.post(
-        Uri.parse('$_serverUrl/api/grammar/questions'),
+        Uri.parse('$_serverUrl/api/quiz/questions'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'level': level,
@@ -69,7 +69,7 @@ class GrammarPracticeService {
         }),
       ).timeout(const Duration(seconds: 60));
 
-      print('Grammar questions response: ${response.statusCode}');
+      print('Quiz questions response: ${response.statusCode}');
 
       if (response.statusCode != 200) {
         final errorData = jsonDecode(response.body);
@@ -86,12 +86,12 @@ class GrammarPracticeService {
       
       return null;
     } catch (e) {
-      print('Error generating grammar questions: $e');
+      print('Error generating quiz questions: $e');
       return null;
     }
   }
 
-  /// Save a grammar practice result
+  /// Save a quiz practice result
   Future<bool> saveResult({
     required String studentId,
     required int level,
@@ -109,7 +109,7 @@ class GrammarPracticeService {
         pointsAwarded = 5 + (level ~/ 10); // 5-15 points depending on level
       }
 
-      await _supabase.from('grammar_practice_results').insert({
+      await _supabase.from('quiz_practice_results').insert({
         'student_id': studentId,
         'level': level,
         'question': question,
@@ -127,16 +127,16 @@ class GrammarPracticeService {
 
       return true;
     } catch (e) {
-      print('Error saving grammar result: $e');
+      print('Error saving quiz result: $e');
       return false;
     }
   }
 
-  /// Get student's grammar practice statistics
+  /// Get student's quiz practice statistics
   Future<Map<String, dynamic>> getStatistics(String studentId) async {
     try {
       final results = await _supabase
-          .from('grammar_practice_results')
+          .from('quiz_practice_results')
           .select()
           .eq('student_id', studentId)
           .order('completed_at', ascending: false);
@@ -172,7 +172,7 @@ class GrammarPracticeService {
         'recent_results': resultList.take(10).toList(),
       };
     } catch (e) {
-      print('Error getting grammar statistics: $e');
+      print('Error getting quiz statistics: $e');
       return {
         'total_questions': 0,
         'correct_answers': 0,
@@ -188,7 +188,7 @@ class GrammarPracticeService {
   Future<Map<int, Map<String, dynamic>>> getPerformanceByLevel(String studentId) async {
     try {
       final results = await _supabase
-          .from('grammar_practice_results')
+          .from('quiz_practice_results')
           .select()
           .eq('student_id', studentId);
 

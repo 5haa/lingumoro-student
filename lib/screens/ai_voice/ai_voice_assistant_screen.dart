@@ -38,7 +38,7 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
   List<Map<String, String>> _conversationHistory = [];
   String? _errorMessage;
   String? _currentListeningText;
-  bool _serverConfigured = false;
+  bool? _serverConfigured; // null = checking, true = connected, false = not connected
   String _selectedVoice = 'heart'; // Default voice
   
   // Inactivity timer for AI follow-ups
@@ -86,11 +86,12 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
   Future<void> _checkServerHealth() async {
     try {
       final health = await _aiService.checkHealth();
+      final isHealthy = health['status'] == 'healthy';
       setState(() {
-        _serverConfigured = health['status'] == 'healthy';
+        _serverConfigured = isHealthy;
       });
 
-      if (!_serverConfigured) {
+      if (!isHealthy) {
         _showError(
             'AI Server not configured. Please start the server and configure API keys.');
       }
@@ -182,7 +183,9 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
   }
 
   void _startAgent() {
-    if (!_serverConfigured) {
+    // Only block if server is explicitly not configured (false)
+    // Allow if still checking (null) or configured (true)
+    if (_serverConfigured == false) {
       _showError('Server not configured. Please check the AI server.');
       return;
     }
@@ -569,8 +572,8 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
   Widget _buildBody() {
     return Column(
       children: [
-          // Server status indicator
-          if (!_serverConfigured)
+          // Server status indicator - only show when explicitly checked and failed
+          if (_serverConfigured == false)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -693,7 +696,7 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ElevatedButton.icon(
-                      onPressed: _serverConfigured ? _toggleAgent : null,
+                      onPressed: _serverConfigured != false ? _toggleAgent : null,
                       icon: FaIcon(_isActive ? FontAwesomeIcons.stop : FontAwesomeIcons.microphone, size: 18),
                       label: Text(_isActive ? 'Stop' : 'Start Voice'),
                       style: ElevatedButton.styleFrom(

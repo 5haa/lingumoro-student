@@ -9,19 +9,23 @@ import 'package:http/http.dart' as http;
 class AiSpeechService {
   // Server configuration
   static String get baseUrl {
-    if (Platform.isAndroid) {
-      // Android emulator uses 10.0.2.2 to access host machine's localhost
-      return 'http://192.168.177.58:5000';
-    } else if (Platform.isIOS) {
-      // iOS simulator can use localhost directly
-      return 'http://localhost:5000';
-    } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-      // Desktop platforms
-      return 'http://localhost:5000';
-    } else {
-      // Fallback
-      return 'http://localhost:5000';
-    }
+    // Production server on Railway
+    return 'https://lingumoroai-production.up.railway.app';
+    
+    // Uncomment below for local development:
+    // if (Platform.isAndroid) {
+    //   // Android emulator uses 10.0.2.2 to access host machine's localhost
+    //   return 'http://192.168.177.58:5000';
+    // } else if (Platform.isIOS) {
+    //   // iOS simulator can use localhost directly
+    //   return 'http://localhost:5000';
+    // } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+    //   // Desktop platforms
+    //   return 'http://localhost:5000';
+    // } else {
+    //   // Fallback
+    //   return 'http://localhost:5000';
+    // }
   }
 
   /// Set a custom server URL (for production or custom deployments)

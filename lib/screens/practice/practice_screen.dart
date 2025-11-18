@@ -4,10 +4,10 @@ import 'package:student/services/practice_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
-import 'package:student/services/grammar_practice_service.dart';
+import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/ai_story_service.dart';
 import 'package:student/screens/practice/reading_screen.dart';
-import 'package:student/screens/practice/grammar_practice_screen.dart';
+import 'package:student/screens/practice/quiz_practice_screen.dart';
 import 'package:student/screens/ai_voice/ai_voice_assistant_screen.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -24,7 +24,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   final _practiceService = PracticeService();
   final _authService = AuthService();
   final _proService = ProSubscriptionService();
-  final _grammarService = GrammarPracticeService();
+  final _quizService = QuizPracticeService();
   final _aiStoryService = AIStoryService();
   
   List<Map<String, dynamic>> _videos = [];
@@ -35,7 +35,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   String? _studentId;
   
   // Statistics for cards
-  Map<String, dynamic> _grammarStats = {
+  Map<String, dynamic> _quizStats = {
     'total_questions': 0,
     'accuracy': 0.0,
   };
@@ -81,7 +81,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
       // Load all data in parallel
       await Future.wait([
         _loadVideosData(),
-        _loadGrammarStats(),
+        _loadQuizStats(),
         _loadReadingStats(),
       ]);
 
@@ -122,15 +122,15 @@ class _PracticeScreenState extends State<PracticeScreen> {
     }
   }
 
-  Future<void> _loadGrammarStats() async {
+  Future<void> _loadQuizStats() async {
     try {
       if (_studentId == null) return;
-      final stats = await _grammarService.getStatistics(_studentId!);
+      final stats = await _quizService.getStatistics(_studentId!);
       setState(() {
-        _grammarStats = stats;
+        _quizStats = stats;
       });
     } catch (e) {
-      print('Error loading grammar stats: $e');
+      print('Error loading quiz stats: $e');
     }
   }
 
@@ -219,14 +219,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         const SizedBox(height: 15),
 
                         _buildPracticeCard(
-                          title: 'Grammar Practice',
+                          title: 'Language Quiz',
                           icon: FontAwesomeIcons.penToSquare,
                           color: Colors.purple.shade400,
                           stat1Label: 'Questions',
-                          stat1Value: '${_grammarStats['total_questions'] ?? 0}',
+                          stat1Value: '${_quizStats['total_questions'] ?? 0}',
                           stat2Label: 'Accuracy',
-                          stat2Value: '${(_grammarStats['accuracy'] ?? 0.0).toInt()}%',
-                          onTap: () => _navigateToGrammar(),
+                          stat2Value: '${(_quizStats['accuracy'] ?? 0.0).toInt()}%',
+                          onTap: () => _navigateToQuiz(),
                           isLocked: !_hasProSubscription,
                         ),
                         const SizedBox(height: 15),
@@ -464,11 +464,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
     ).then((_) => _loadAllData());
   }
 
-  void _navigateToGrammar() {
+  void _navigateToQuiz() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const GrammarPracticeScreen(),
+        builder: (context) => const QuizPracticeScreen(),
       ),
     ).then((_) => _loadAllData());
   }

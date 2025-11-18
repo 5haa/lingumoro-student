@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:student/services/grammar_practice_service.dart';
+import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
 
-class GrammarPracticeScreen extends StatefulWidget {
-  const GrammarPracticeScreen({super.key});
+class QuizPracticeScreen extends StatefulWidget {
+  const QuizPracticeScreen({super.key});
 
   @override
-  State<GrammarPracticeScreen> createState() => _GrammarPracticeScreenState();
+  State<QuizPracticeScreen> createState() => _QuizPracticeScreenState();
 }
 
-class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
-  final _grammarService = GrammarPracticeService();
+class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
+  final _quizService = QuizPracticeService();
   final _authService = AuthService();
   final _levelService = LevelService();
   final _proService = ProSubscriptionService();
@@ -63,7 +63,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
       if (user == null) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Please log in to access grammar practice';
+          _errorMessage = 'Please log in to access quiz practice';
         });
         return;
       }
@@ -90,7 +90,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
       _studentLevel = progress['level'] ?? 1;
 
       // Get statistics
-      final stats = await _grammarService.getStatistics(_studentId!);
+      final stats = await _quizService.getStatistics(_studentId!);
       
       setState(() {
         _statistics = stats;
@@ -118,7 +118,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
       // Check if we need to generate a new batch
       if (_questionCache.isEmpty || _currentQuestionIndex >= _questionCache.length) {
         // Generate a batch of questions
-        final questions = await _grammarService.generateQuestions(
+        final questions = await _quizService.generateQuestions(
           level: _studentLevel,
           count: _batchSize,
           language: 'English',
@@ -160,7 +160,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
     final isCorrect = selectedAnswer == correctAnswer;
 
     // Save result
-    await _grammarService.saveResult(
+    await _quizService.saveResult(
       studentId: _studentId!,
       level: _studentLevel,
       question: _currentQuestion!['question'],
@@ -171,7 +171,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
     );
 
     // Update statistics
-    final stats = await _grammarService.getStatistics(_studentId!);
+    final stats = await _quizService.getStatistics(_studentId!);
 
     setState(() {
       _answerSubmitted = true;
@@ -335,7 +335,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
           const Expanded(
             child: Center(
               child: Text(
-                'GRAMMAR PRACTICE',
+                'LANGUAGE QUIZ',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -390,7 +390,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Grammar Practice',
+                      'Language Quiz',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -399,7 +399,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'AI-generated questions for your level',
+                      'Practice vocabulary, grammar & more',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -608,7 +608,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_currentQuestion!['grammar_topic'] != null) ...[
+          if (_currentQuestion!['topic'] != null) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -617,7 +617,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
                 border: Border.all(color: Colors.purple.shade200),
               ),
               child: Text(
-                _currentQuestion!['grammar_topic'],
+                _currentQuestion!['topic'],
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -843,7 +843,7 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Grammar practice is available for PRO members only.',
+              'Language Quiz is available for PRO members only.',
               style: TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
@@ -873,3 +873,4 @@ class _GrammarPracticeScreenState extends State<GrammarPracticeScreen> {
     );
   }
 }
+
