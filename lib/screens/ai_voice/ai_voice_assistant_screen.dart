@@ -8,6 +8,8 @@ import 'package:just_audio/just_audio.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../services/ai_speech_service.dart';
+import '../../services/ai_voice_session_service.dart';
+import '../../services/auth_service.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
 
@@ -25,6 +27,8 @@ class AiVoiceAssistantScreen extends StatefulWidget {
 class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
     with SingleTickerProviderStateMixin {
   final AiSpeechService _aiService = AiSpeechService();
+  final AIVoiceSessionService _sessionService = AIVoiceSessionService();
+  final AuthService _authService = AuthService();
   final stt.SpeechToText _speech = stt.SpeechToText();
   final AudioPlayer _audioPlayer = AudioPlayer();
   final ScrollController _scrollController = ScrollController();
@@ -41,6 +45,23 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
   bool? _serverConfigured; // null = checking, true = connected, false = not connected
   String _selectedVoice = 'heart'; // Default voice
   
+  // Session tracking
+  String? _currentSessionId;
+  DateTime? _sessionStartTime;
+  Timer? _sessionTimer;
+  int _sessionDurationSeconds = 0;
+  int _maxSessionDurationSeconds = 900; // Will be updated from settings
+  int _maxSessionsPerDay = 2; // Will be updated from settings
+  Map<String, dynamic> _sessionStats = {
+    'sessions_today': 0,
+    'remaining_sessions': 2,
+    'has_active_session': false,
+  };
+  Map<String, dynamic> _sessionSettings = {
+    'max_voice_sessions_per_day': 2,
+    'voice_session_duration_minutes': 15,
+  };
+  
   // Inactivity timer for AI follow-ups
   Timer? _inactivityTimer;
   DateTime? _lastUserInteraction;
@@ -56,11 +77,18 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
     _initSpeech();
     _setupAudioPlayer();
     _checkServerHealth();
+    _loadSessionSettings();
+    _loadSessionStats();
   }
 
   @override
   void dispose() {
     _inactivityTimer?.cancel();
+    _sessionTimer?.cancel();
+    // Cancel session if still active (fire and forget - can't await in dispose)
+    if (_currentSessionId != null && _isActive) {
+      _sessionService.cancelSession(_currentSessionId!, durationSeconds: _sessionDurationSeconds);
+    }
     _animationController.dispose();
     _audioPlayer.dispose();
     _speech.stop();
@@ -99,6 +127,181 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
       setState(() => _serverConfigured = false);
       _showError('Cannot connect to AI server. Please check if it\'s running.');
     }
+  }
+
+  Future<void> _loadSessionSettings() async {
+    try {
+      final settings = await _sessionService.getSessionSettings();
+      setState(() {
+        _sessionSettings = settings;
+        _maxSessionsPerDay = settings['max_voice_sessions_per_day'] ?? 2;
+        _maxSessionDurationSeconds = (settings['voice_session_duration_minutes'] ?? 15) * 60;
+      });
+    } catch (e) {
+      print('Error loading session settings: $e');
+    }
+  }
+
+  Future<void> _loadSessionStats() async {
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return;
+
+      final stats = await _sessionService.getSessionStats(user.id);
+      setState(() {
+        _sessionStats = stats;
+      });
+    } catch (e) {
+      print('Error loading session stats: $e');
+    }
+  }
+
+  Future<void> _startSession() async {
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return;
+
+      // Start new session (checks limits internally)
+      final response = await _sessionService.startSession(user.id);
+      
+      if (response == null) {
+        _showError('Failed to start session. Please try again.');
+        return;
+      }
+      
+      // Check if session start was blocked
+      if (response['can_start'] == false || response['success'] == false) {
+        final message = response['message'] ?? 'Cannot start session';
+        _showError(message);
+        return;
+      }
+
+      // Session started successfully
+      final sessionId = response['session_id'] as String?;
+      final settings = response['settings'] as Map<String, dynamic>?;
+      
+      if (sessionId != null) {
+        // Update settings if returned from start session
+        if (settings != null) {
+          setState(() {
+            _sessionSettings = settings;
+            _maxSessionsPerDay = settings['max_voice_sessions_per_day'] ?? 2;
+            _maxSessionDurationSeconds = (settings['voice_session_duration_minutes'] ?? 15) * 60;
+          });
+        }
+        
+        setState(() {
+          _currentSessionId = sessionId;
+          _sessionStartTime = DateTime.now();
+          _sessionDurationSeconds = 0;
+        });
+        
+        // Start session timer
+        _startSessionTimer();
+        
+        // Reload stats to update UI
+        await _loadSessionStats();
+      }
+    } catch (e) {
+      print('Error starting session: $e');
+      _showError('Failed to start session. Please try again.');
+    }
+  }
+
+  Future<void> _completeSession() async {
+    if (_currentSessionId == null) return;
+
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return;
+      
+      _sessionTimer?.cancel();
+      
+      final duration = _sessionDurationSeconds;
+      final result = await _sessionService.completeSession(
+        _currentSessionId!, 
+        user.id,
+        durationSeconds: duration
+      );
+      
+      if (result != null && result['success'] == true) {
+        final pointsAwarded = result['points_awarded'] as int? ?? 0;
+        
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Session completed! You earned $pointsAwarded points 🎉'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        
+        // Reload session stats
+        await _loadSessionStats();
+      }
+      
+      setState(() {
+        _currentSessionId = null;
+        _sessionStartTime = null;
+        _sessionDurationSeconds = 0;
+      });
+    } catch (e) {
+      print('Error completing session: $e');
+    }
+  }
+
+  Future<void> _cancelSession() async {
+    if (_currentSessionId == null) return;
+
+    try {
+      _sessionTimer?.cancel();
+      
+      final duration = _sessionDurationSeconds;
+      await _sessionService.cancelSession(_currentSessionId!, durationSeconds: duration);
+      
+      setState(() {
+        _currentSessionId = null;
+        _sessionStartTime = null;
+        _sessionDurationSeconds = 0;
+      });
+      
+      // Reload session stats
+      await _loadSessionStats();
+    } catch (e) {
+      print('Error cancelling session: $e');
+    }
+  }
+
+  void _startSessionTimer() {
+    _sessionTimer?.cancel();
+    _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_sessionStartTime != null) {
+        final duration = DateTime.now().difference(_sessionStartTime!).inSeconds;
+        setState(() {
+          _sessionDurationSeconds = duration;
+        });
+
+        // Auto-stop at max duration
+        if (duration >= _maxSessionDurationSeconds) {
+          timer.cancel();
+          if (mounted) {
+            final minutes = _maxSessionDurationSeconds ~/ 60;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Session time limit reached ($minutes minutes). Session ended.'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+          _stopAgent();
+        }
+      } else {
+        timer.cancel();
+      }
+    });
   }
 
   void _setupAudioPlayer() {
@@ -182,11 +385,19 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
     }
   }
 
-  void _startAgent() {
+  Future<void> _startAgent() async {
     // Only block if server is explicitly not configured (false)
     // Allow if still checking (null) or configured (true)
     if (_serverConfigured == false) {
       _showError('Server not configured. Please check the AI server.');
+      return;
+    }
+
+    // Check session limits and start session
+    await _startSession();
+    
+    // If session start failed, don't proceed
+    if (_currentSessionId == null) {
       return;
     }
 
@@ -199,8 +410,13 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
     _startInactivityTimer(); // Start timer monitoring
   }
 
-  void _stopAgent() {
+  Future<void> _stopAgent() async {
     _inactivityTimer?.cancel();
+    _sessionTimer?.cancel();
+    
+    // Complete the session and award points
+    await _completeSession();
+    
     setState(() {
       _isActive = false;
       _isListening = false;
@@ -569,6 +785,12 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
     });
   }
 
+  String _formatDuration(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
   Widget _buildBody() {
     return Column(
       children: [
@@ -588,6 +810,75 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                       style: TextStyle(color: Colors.red.shade700, fontSize: 13),
                     ),
                   ),
+                ],
+              ),
+            ),
+
+          // Session limit info
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: _sessionStats['remaining_sessions'] == 0 
+                ? Colors.orange.shade50 
+                : Colors.blue.shade50,
+            child: Row(
+              children: [
+                FaIcon(
+                  _sessionStats['remaining_sessions'] == 0 
+                      ? FontAwesomeIcons.circleExclamation 
+                      : FontAwesomeIcons.clock,
+                  color: _sessionStats['remaining_sessions'] == 0 
+                      ? Colors.orange.shade700 
+                      : Colors.blue.shade700,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _sessionStats['remaining_sessions'] == 0
+                        ? 'Daily limit reached ($_maxSessionsPerDay/$_maxSessionsPerDay sessions). Try again tomorrow!'
+                        : 'Sessions today: ${_sessionStats['sessions_today']}/$_maxSessionsPerDay • Remaining: ${_sessionStats['remaining_sessions']}',
+                    style: TextStyle(
+                      color: _sessionStats['remaining_sessions'] == 0 
+                          ? Colors.orange.shade700 
+                          : Colors.blue.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Session timer (when active)
+          if (_isActive && _sessionStartTime != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.green.shade50,
+              child: Row(
+                children: [
+                  FaIcon(FontAwesomeIcons.hourglassHalf, color: Colors.green.shade700, size: 14),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Session: ${_formatDuration(_sessionDurationSeconds)} / ${_formatDuration(_maxSessionDurationSeconds)}',
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_sessionDurationSeconds >= _maxSessionDurationSeconds - 60)
+                    Text(
+                      'Ending soon...',
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -696,7 +987,10 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ElevatedButton.icon(
-                      onPressed: _serverConfigured != false ? _toggleAgent : null,
+                      onPressed: (_serverConfigured != false && 
+                                  (_isActive || _sessionStats['remaining_sessions'] > 0)) 
+                          ? _toggleAgent 
+                          : null,
                       icon: FaIcon(_isActive ? FontAwesomeIcons.stop : FontAwesomeIcons.microphone, size: 18),
                       label: Text(_isActive ? 'Stop' : 'Start Voice'),
                       style: ElevatedButton.styleFrom(
@@ -726,10 +1020,11 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                width: 100,
-                                height: 100,
+                                width: 80,
+                                height: 80,
                                 decoration: BoxDecoration(
                                   color: AppColors.grey.withOpacity(0.1),
                                   shape: BoxShape.circle,
@@ -737,26 +1032,26 @@ class _AiVoiceAssistantScreenState extends State<AiVoiceAssistantScreen>
                                 child: Center(
                                   child: FaIcon(
                                     FontAwesomeIcons.microphone,
-                                    size: 40,
+                                    size: 32,
                                     color: AppColors.grey.withOpacity(0.3),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 16),
                               Text(
                                 'Start speaking with your AI tutor',
                                 style: TextStyle(
                                   color: AppColors.textSecondary.withOpacity(0.6),
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
                                 'Tap "Start Voice" to begin',
                                 style: TextStyle(
                                   color: AppColors.textSecondary.withOpacity(0.5),
-                                  fontSize: 14,
+                                  fontSize: 13,
                                 ),
                               ),
                             ],
