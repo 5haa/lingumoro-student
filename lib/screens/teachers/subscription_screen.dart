@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/package_service.dart';
 import 'package:student/services/timeslot_service.dart';
-import 'package:student/screens/payment/payment_submission_screen.dart';
+import 'package:student/screens/vouchers/course_voucher_redemption_screen.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/config/app_colors.dart';
@@ -178,7 +178,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     });
   }
 
-  void _proceedToPayment() {
+  void _proceedToVoucherRedemption() {
     if (_selectedPackage == null || 
         _selectedStartTime == null || 
         _selectedEndTime == null) {
@@ -188,7 +188,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PaymentSubmissionScreen(
+        builder: (context) => CourseVoucherRedemptionScreen(
           teacherId: widget.teacherId,
           teacherName: widget.teacherName,
           packageId: _selectedPackage!['id'],
@@ -197,8 +197,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           languageName: widget.languageName,
           amount: (_selectedPackage!['price_monthly'] ?? 0).toDouble(),
           selectedDays: _selectedDays,
-          selectedStartTime: _selectedStartTime,
-          selectedEndTime: _selectedEndTime,
+          selectedStartTime: _selectedStartTime!,
+          selectedEndTime: _selectedEndTime!,
         ),
       ),
     );
@@ -859,8 +859,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: CustomButton(
-        text: 'PROCEED TO PAYMENT',
-        onPressed: _proceedToPayment,
+        text: 'REDEEM VOUCHER',
+        onPressed: _proceedToVoucherRedemption,
       ),
     );
   }

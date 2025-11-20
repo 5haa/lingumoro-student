@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:student/services/timeslot_service.dart';
-import 'package:student/screens/payment/payment_submission_screen.dart';
+import 'package:student/screens/vouchers/course_voucher_redemption_screen.dart';
 
 class DayTimeSelectionScreen extends StatefulWidget {
   final String teacherId;
@@ -119,7 +119,7 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
     });
   }
 
-  void _proceedToPayment() {
+  void _proceedToVoucherRedemption() {
     if (_selectedStartTime == null || _selectedEndTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -133,7 +133,7 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PaymentSubmissionScreen(
+        builder: (context) => CourseVoucherRedemptionScreen(
           teacherId: widget.teacherId,
           teacherName: widget.teacherName,
           packageId: widget.packageId,
@@ -142,8 +142,8 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
           languageName: widget.languageName,
           amount: widget.amount,
           selectedDays: _selectedDays.toList(),
-          selectedStartTime: _selectedStartTime,
-          selectedEndTime: _selectedEndTime,
+          selectedStartTime: _selectedStartTime!,
+          selectedEndTime: _selectedEndTime!,
         ),
       ),
     );
@@ -677,7 +677,7 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _selectedStartTime != null ? _proceedToPayment : null,
+                  onPressed: _selectedStartTime != null ? _proceedToVoucherRedemption : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
@@ -688,7 +688,7 @@ class _DayTimeSelectionScreenState extends State<DayTimeSelectionScreen> {
                     elevation: 4,
                   ),
                   child: const Text(
-                    'Proceed to Payment',
+                    'Redeem Voucher',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
