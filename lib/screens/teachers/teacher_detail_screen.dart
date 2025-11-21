@@ -610,7 +610,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
           ),
         ),
         
-        const SizedBox(height: 15),
+        const SizedBox(height: 12),
         
         _schedules.isEmpty
             ? Padding(
@@ -716,7 +716,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                 children: [
                   // Calendar Grid Header
                   Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
                     decoration: BoxDecoration(
                       gradient: AppColors.redGradient,
                       borderRadius: const BorderRadius.only(
@@ -733,7 +733,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                             child: Text(
                               day['name'].toString().substring(0, 3).toUpperCase(),
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                                 letterSpacing: 0.5,
@@ -747,7 +747,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                   
                   // Calendar Grid Body
                   Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: calendarDays.map((day) {
@@ -756,13 +756,13 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                         
                         return Container(
                           width: 90,
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.all(8),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: hasSchedule 
                                 ? AppColors.primary.withOpacity(0.05)
                                 : AppColors.lightGrey.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             border: hasSchedule
                                 ? Border.all(
                                     color: AppColors.primary.withOpacity(0.3),
@@ -775,46 +775,34 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                           ),
                           child: Column(
                             children: [
-                              // Day indicator dot
-                              Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: hasSchedule 
-                                      ? AppColors.primary 
-                                      : Colors.transparent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
                               // Times - Show all times
                               if (hasSchedule)
                                 Column(
                                   children: times.map((time) {
                                     return Container(
-                                      margin: const EdgeInsets.only(bottom: 6),
+                                      margin: const EdgeInsets.only(bottom: 4),
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 6,
+                                        horizontal: 6,
+                                        vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
                                         gradient: AppColors.redGradient,
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(6),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppColors.primary.withOpacity(0.3),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
+                                            color: AppColors.primary.withOpacity(0.2),
+                                            blurRadius: 2,
+                                            offset: const Offset(0, 1),
                                           ),
                                         ],
                                       ),
                                       child: Text(
                                         time,
                                         style: const TextStyle(
-                                          fontSize: 10,
+                                          fontSize: 9,
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
-                                          height: 1.3,
+                                          height: 1.2,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -823,11 +811,11 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                                 ),
                               if (!hasSchedule)
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
                                   child: Text(
                                     '-',
                                     style: TextStyle(
-                                      fontSize: 24,
+                                      fontSize: 20,
                                       color: AppColors.grey.withOpacity(0.3),
                                       fontWeight: FontWeight.w300,
                                     ),

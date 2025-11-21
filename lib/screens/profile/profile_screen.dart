@@ -6,6 +6,7 @@ import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/photo_service.dart';
 import 'package:student/screens/auth/auth_screen.dart';
+import 'package:student/screens/auth/change_password_screen.dart';
 import 'package:student/screens/profile/edit_profile_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
@@ -201,11 +202,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             title: AppLocalizations.of(context).changePassword,
                             subtitle: AppLocalizations.of(context).updatePassword,
                             onTap: () {
-                              // TODO: Navigate to change password screen
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${AppLocalizations.of(context).changePassword} feature coming soon'),
-                                  backgroundColor: AppColors.primary,
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ChangePasswordScreen(),
                                 ),
                               );
                             },

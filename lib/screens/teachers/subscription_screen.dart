@@ -145,6 +145,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _loadAvailableTimeslots();
   }
 
+  void _goToStep(int step) {
+    setState(() {
+      if (step == 0) {
+        // Go back to package selection - reset everything
+        _selectedPackageIndex = -1;
+        _selectedPackage = null;
+        _selectedDays = [];
+        _selectedStartTime = null;
+        _selectedEndTime = null;
+        _commonTimeslots = [];
+        _availableTimeslots = {};
+      } else if (step == 1 && _selectedPackageIndex >= 0) {
+        // Go back to day selection - reset days and time
+        _selectedDays = [];
+        _selectedStartTime = null;
+        _selectedEndTime = null;
+        _commonTimeslots = [];
+      }
+    });
+  }
+
   void _handleDaySelection(int day) {
     if (_selectedPackage == null) return;
     
@@ -176,6 +197,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _selectedStartTime = startTime;
       _selectedEndTime = endTime;
     });
+    
+    // Auto-scroll to bottom to show the redeem voucher button
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
   }
 
   void _proceedToVoucherRedemption() {
@@ -204,16 +236,34 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Determine current step
+    int currentStep = 0;
+    if (_selectedPackageIndex >= 0) {
+      currentStep = 1;
+      final sessionsPerWeek = _selectedPackage!['sessions_per_week'] as int? ?? 3;
+      if (_selectedDays.length == sessionsPerWeek) {
+        currentStep = 2;
+      }
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // Header with Back Button and Title
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
+              padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
                   const CustomBackButton(),
@@ -228,54 +278,72 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     ),
                   ),
                   const Spacer(),
-                  const SizedBox(width: 40), // Balance the back button
+                  const SizedBox(width: 40),
                 ],
               ),
             ),
 
-            // Content
+            // Teacher Info Banner (Full Width)
+            _buildTeacherInfoBanner(),
+
+            const SizedBox(height: 20),
+
+            // Step Indicator
+            _buildStepIndicator(currentStep),
+
+            const SizedBox(height: 20),
+
+            // Content based on current step
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollController,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 10),
+                    // Show selected package summary on later steps
+                    if (currentStep > 0 && _selectedPackage != null) ...[
+                      _buildSelectedPackageSummary(),
+                      const SizedBox(height: 20),
+                    ],
 
-                    // Teacher Info
-                    _buildTeacherInfo(),
-                    
+                    // Show selected days summary on step 3
+                    if (currentStep == 2 && _selectedDays.isNotEmpty) ...[
+                      _buildSelectedDaysSummary(),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // Step 1: Package Selection
+                    if (currentStep == 0) _buildPackagesSection(),
+
+                    // Step 2: Day Selection
+                    if (currentStep == 1) ...[
+                      if (_isLoadingTimeslots)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else
+                        _buildDaySelection(),
+                    ],
+
+                    // Step 3: Time Selection
+                    if (currentStep == 2) ...[
+                      if (_isLoadingCommonSlots)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else
+                        _buildTimeSelection(),
+                    ],
+
                     const SizedBox(height: 20),
 
-                    // Packages Section
-                    _buildPackagesSection(),
-
-                    const SizedBox(height: 30),
-
-                    // Day Selection (only if package selected)
-                    if (_selectedPackageIndex >= 0 && !_isLoadingTimeslots) ...[
-                      _buildDaySelection(),
-                      const SizedBox(height: 30),
-                    ],
-
-                    // Loading indicator for timeslots
-                    if (_isLoadingTimeslots)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-
-                    // Time Selection (only if required days selected)
-                    if (_selectedPackage != null &&
-                        _selectedDays.length == (_selectedPackage!['sessions_per_week'] as int? ?? 3) &&
-                        !_isLoadingTimeslots) ...[
-                      _buildTimeSelection(),
-                      const SizedBox(height: 30),
-                    ],
-
-                    // Confirm Button (only if time selected)
-                    if (_selectedStartTime != null && _selectedEndTime != null) ...[
+                    // Confirm Button (only show at final step with time selected)
+                    if (currentStep == 2 && _selectedStartTime != null && _selectedEndTime != null) ...[
                       _buildConfirmButton(),
                       const SizedBox(height: 30),
                     ],
@@ -289,61 +357,182 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  Widget _buildTeacherInfo() {
+  Widget _buildTeacherInfoBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: AppColors.redGradient,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Subscribing to',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.teacherName,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              widget.languageName,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepIndicator(int currentStep) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: AppColors.redGradient,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          _buildStepItem(0, currentStep, 'Package'),
+          _buildStepLine(currentStep >= 1),
+          _buildStepItem(1, currentStep, 'Days'),
+          _buildStepLine(currentStep >= 2),
+          _buildStepItem(2, currentStep, 'Time'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepItem(int step, int currentStep, String label) {
+    final isActive = currentStep >= step;
+    final isCurrent = currentStep == step;
+    final canNavigate = step < currentStep;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: canNavigate ? () => _goToStep(step) : null,
+        child: Column(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                gradient: isActive ? AppColors.redGradient : null,
+                color: isActive ? null : AppColors.lightGrey,
+                shape: BoxShape.circle,
+                border: isCurrent
+                    ? Border.all(
+                        color: AppColors.primary,
+                        width: 3,
+                      )
+                    : null,
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: canNavigate
+                    ? const Icon(
+                        Icons.check,
+                        size: 18,
+                        color: Colors.white,
+                      )
+                    : Text(
+                        '${step + 1}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isActive ? Colors.white : AppColors.textSecondary,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                color: isActive ? AppColors.primary : AppColors.textSecondary,
+              ),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Subscribe to',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.teacherName,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                widget.languageName,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+      ),
+    );
+  }
+
+  Widget _buildStepLine(bool isActive) {
+    return Expanded(
+      child: Container(
+        height: 2,
+        margin: const EdgeInsets.only(bottom: 24),
+        decoration: BoxDecoration(
+          gradient: isActive ? AppColors.redGradient : null,
+          color: isActive ? null : AppColors.lightGrey,
         ),
       ),
     );
@@ -384,37 +573,34 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'CHOOSE PACKAGE',
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Choose a Package',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _packages.length,
+            itemBuilder: (context, index) {
+              final package = _packages[index];
+              final isSelected = _selectedPackageIndex == index;
+              final isFeatured = package['is_featured'] ?? false;
 
-        const SizedBox(height: 15),
-
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _packages.length,
-          itemBuilder: (context, index) {
-            final package = _packages[index];
-            final isSelected = _selectedPackageIndex == index;
-            final isFeatured = package['is_featured'] ?? false;
-
-            return _buildPackageCard(package, index, isSelected, isFeatured);
-          },
-        ),
-      ],
+              return _buildPackageCard(package, index, isSelected, isFeatured);
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -424,154 +610,125 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     bool isSelected,
     bool isFeatured,
   ) {
-    final features = package['features'] != null
-        ? (package['features'] is List
-            ? List<String>.from(package['features'])
-            : List<String>.from(json.decode(package['features'])))
-        : <String>[];
-
     return GestureDetector(
       onTap: () => _handlePackageSelection(index),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.primary : (isFeatured ? Colors.amber : Colors.transparent),
-            width: isSelected ? 2 : (isFeatured ? 2 : 0),
+            color: isSelected ? AppColors.primary : (isFeatured ? Colors.amber : Colors.grey.shade200),
+            width: isSelected ? 2.5 : (isFeatured ? 2 : 1),
           ),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
+            if (isSelected)
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                // Radio Button
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : Colors.grey,
-                      width: 2,
-                    ),
-                  ),
-                  child: isSelected
-                      ? Center(
-                          child: Container(
-                            width: 12,
-                            height: 12,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: AppColors.redGradient,
-                            ),
-                          ),
-                        )
-                      : null,
+            // Radio Button
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : Colors.grey,
+                  width: 2,
                 ),
-
-                const SizedBox(width: 15),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              package['name'] ?? 'Package',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          if (isFeatured)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.star, size: 12, color: Colors.white),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'POPULAR',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
+              ),
+              child: isSelected
+                  ? Center(
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: AppColors.redGradient,
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      if (package['description'] != null)
-                        Text(
-                          package['description'],
+                    )
+                  : null,
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          package['name'] ?? 'Package',
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (isFeatured)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.amber,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star, size: 10, color: Colors.white),
+                              SizedBox(width: 3),
+                              Text(
+                                'POPULAR',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _buildCompactChip(Icons.access_time, '${package['duration_minutes']}m'),
+                      const SizedBox(width: 6),
+                      _buildCompactChip(Icons.calendar_today, '${package['sessions_per_week']}x/wk'),
+                      const SizedBox(width: 6),
+                      _buildCompactChip(Icons.date_range, '${package['total_weeks']}wks'),
+                    ],
+                  ),
+                ],
+              ),
             ),
 
-            const SizedBox(height: 12),
-
-            // Package Details
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildDetailChip(
-                  Icons.access_time,
-                  '${package['duration_minutes']} min',
-                ),
-                _buildDetailChip(
-                  Icons.calendar_today,
-                  '${package['sessions_per_week']}x/week',
-                ),
-                _buildDetailChip(
-                  Icons.date_range,
-                  '${package['total_weeks']} weeks',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
+            const SizedBox(width: 12),
 
             // Price
             if (package['price_monthly'] != null)
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '\$${package['price_monthly'].toStringAsFixed(2)}',
+                    '\$${package['price_monthly'].toStringAsFixed(0)}',
                     style: const TextStyle(
-                      fontSize: 24,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
                     ),
@@ -579,61 +736,34 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   const Text(
                     '/month',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 10,
                       color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
-
-            // Features
-            if (features.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ...features.take(3).map((feature) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            feature,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailChip(IconData icon, String label) {
+  Widget _buildCompactChip(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: AppColors.primary),
-          const SizedBox(width: 4),
+          Icon(icon, size: 10, color: AppColors.primary),
+          const SizedBox(width: 3),
           Text(
             label,
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
               color: AppColors.primary,
             ),
@@ -651,7 +781,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.orange.shade50,
             borderRadius: BorderRadius.circular(12),
@@ -659,13 +789,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.warning_amber, color: Colors.orange.shade700),
+              Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 22),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Teacher needs at least $sessionsPerWeek days available for this package.',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: Colors.orange.shade900,
                   ),
                 ),
@@ -676,87 +806,95 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'SELECT DAYS (${_selectedDays.length}/$sessionsPerWeek)',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Select Days',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: AppColors.redGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_selectedDays.length}/$sessionsPerWeek',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
 
-        const SizedBox(height: 15),
+          const SizedBox(height: 12),
 
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: availableDays.map((day) {
               final isSelected = _selectedDays.contains(day);
 
               return GestureDetector(
                 onTap: () => _handleDaySelection(day),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     gradient: isSelected ? AppColors.redGradient : null,
                     color: isSelected ? null : AppColors.white,
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isSelected ? Colors.transparent : Colors.grey.shade300,
-                      width: 1,
+                      width: 1.5,
                     ),
                     boxShadow: [
                       if (isSelected)
                         BoxShadow(
                           color: AppColors.primary.withOpacity(0.3),
-                          blurRadius: 8,
+                          blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
                     ],
                   ),
-                  child: Text(
-                    _dayNames[day].substring(0, 3),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? AppColors.white : AppColors.textPrimary,
+                  child: Center(
+                    child: Text(
+                      _dayNames[day].substring(0, 3).toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? AppColors.white : AppColors.textPrimary,
+                      ),
                     ),
                   ),
                 ),
               );
             }).toList(),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildTimeSelection() {
-    if (_isLoadingCommonSlots) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
     if (_commonTimeslots.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.orange.shade50,
             borderRadius: BorderRadius.circular(12),
@@ -764,13 +902,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.warning_amber, color: Colors.orange.shade700),
+              Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 22),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'No common time slots available for the selected days. Please select different days.',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: Colors.orange.shade900,
                   ),
                 ),
@@ -781,33 +919,30 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'SELECT TIME',
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Select Time',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
           ),
-        ),
 
-        const SizedBox(height: 15),
+          const SizedBox(height: 12),
 
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: GridView.builder(
+          GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              childAspectRatio: 2.2,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+              childAspectRatio: 2.0,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
             ),
             itemCount: _commonTimeslots.length,
             itemBuilder: (context, index) {
@@ -822,16 +957,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   decoration: BoxDecoration(
                     gradient: isSelected ? AppColors.redGradient : null,
                     color: isSelected ? null : AppColors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isSelected ? Colors.transparent : Colors.grey.shade300,
-                      width: 1,
+                      width: 1.5,
                     ),
                     boxShadow: [
                       if (isSelected)
                         BoxShadow(
                           color: AppColors.primary.withOpacity(0.3),
-                          blurRadius: 8,
+                          blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
                     ],
@@ -840,8 +975,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     child: Text(
                       _formatTime(startTime),
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
                         color: isSelected ? AppColors.white : AppColors.textPrimary,
                       ),
                     ),
@@ -850,8 +985,170 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedPackageSummary() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primary.withOpacity(0.3),
+            width: 1,
+          ),
         ),
-      ],
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: AppColors.redGradient,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.check,
+                size: 16,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Selected Package',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _selectedPackage!['name'] ?? 'Package',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () => _goToStep(0),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Change',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedDaysSummary() {
+    final sessionsPerWeek = _selectedPackage!['sessions_per_week'] as int? ?? 3;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primary.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: AppColors.redGradient,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.check,
+                size: 16,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Selected Days ($sessionsPerWeek days)',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 4,
+                    children: _selectedDays.map((day) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.redGradient,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _dayNames[day].substring(0, 3).toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () => _goToStep(1),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Change',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

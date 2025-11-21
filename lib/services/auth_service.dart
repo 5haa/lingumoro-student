@@ -227,5 +227,15 @@ class AuthService {
       UserAttributes(password: newPassword),
     );
   }
+
+  /// Request OTP for changing password (when logged in)
+  Future<void> requestChangePasswordOTP() async {
+    if (currentUser == null) {
+      throw Exception('No user logged in');
+    }
+
+    // Send OTP to the current user's email
+    await _supabase.auth.resetPasswordForEmail(currentUser!.email!);
+  }
 }
 
