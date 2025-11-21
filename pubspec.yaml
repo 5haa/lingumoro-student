@@ -85,20 +85,20 @@ dependencies:
   
   # Path provider for file handling
   path_provider: ^2.1.1
-  
-  # AI Speech capabilities
-  speech_to_text: ^7.0.0
-  just_audio: ^0.9.40
-  permission_handler: ^11.3.1
-  
-  # Audio recording for voice messages
-  record: ^6.1.2
-  audio_session: ^0.1.21
 
   # Firebase for push notifications
   firebase_core: ^3.1.0
   firebase_messaging: ^15.0.0
   flutter_local_notifications: ^17.0.0
+
+  # Voice AI features
+  web_socket_channel: ^3.0.0
+  audioplayers: ^6.0.0
+  record: ^5.1.0
+  permission_handler: ^11.3.0
+
+  # Audio player for chat voice messages
+  just_audio: ^0.9.46
 
 dev_dependencies:
   flutter_test:
@@ -110,6 +110,11 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+
+# Fix for record_linux compatibility
+dependency_overrides:
+  record_linux:
+    path: third_party/record_linux
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

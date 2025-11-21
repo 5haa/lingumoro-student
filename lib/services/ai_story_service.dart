@@ -2,14 +2,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/level_service.dart';
-import 'package:student/services/ai_speech_service.dart';
 
 class AIStoryService {
   final _supabase = Supabase.instance.client;
   final _levelService = LevelService();
   
-  // Use AI server URL from AiSpeechService
-  String get _serverUrl => AiSpeechService.serverUrl;
+  // AI server URL configuration
+  static const String _serverUrl = 'https://lingumoroai-production.up.railway.app';
 
   /// Get AI settings from Supabase
   Future<Map<String, String>> getAISettings() async {

@@ -8,7 +8,7 @@ import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/ai_story_service.dart';
 import 'package:student/screens/practice/reading_screen.dart';
 import 'package:student/screens/practice/quiz_practice_screen.dart';
-import 'package:student/screens/ai_voice/ai_voice_assistant_screen.dart';
+import 'package:student/screens/practice/ai_voice_screen.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../widgets/custom_back_button.dart';
@@ -191,6 +191,19 @@ class _PracticeScreenState extends State<PracticeScreen> {
                               children: [
                                 // Practice Cards Grid
                         _buildPracticeCard(
+                          title: 'AI Voice Practice',
+                          icon: FontAwesomeIcons.microphone,
+                          color: Colors.teal.shade400,
+                          stat1Label: 'Real-time',
+                          stat1Value: 'Chat',
+                          stat2Label: 'Status',
+                          stat2Value: 'Ready',
+                          onTap: () => _navigateToVoiceAI(),
+                          isLocked: !_hasProSubscription,
+                        ),
+                        const SizedBox(height: 15),
+
+                        _buildPracticeCard(
                           title: 'Video Practice',
                           icon: FontAwesomeIcons.play,
                           color: Colors.red.shade400,
@@ -228,19 +241,6 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           stat2Value: '${(_quizStats['accuracy'] ?? 0.0).toInt()}%',
                           onTap: () => _navigateToQuiz(),
                           isLocked: !_hasProSubscription,
-                        ),
-                        const SizedBox(height: 15),
-
-                        _buildPracticeCard(
-                          title: 'AI Voice Tutor',
-                          icon: FontAwesomeIcons.microphone,
-                          color: Colors.orange.shade400,
-                          stat1Label: 'Practice',
-                          stat1Value: 'Anytime',
-                          stat2Label: 'Status',
-                          stat2Value: 'Active',
-                          onTap: () => _navigateToAIVoice(),
-                          isLocked: false,
                         ),
                                 const SizedBox(height: 20),
                               ],
@@ -446,6 +446,15 @@ class _PracticeScreenState extends State<PracticeScreen> {
     );
   }
 
+  void _navigateToVoiceAI() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AIVoicePracticeScreen(),
+      ),
+    ).then((_) => _loadAllData());
+  }
+
   void _navigateToVideoPractice() {
     Navigator.push(
       context,
@@ -471,15 +480,6 @@ class _PracticeScreenState extends State<PracticeScreen> {
         builder: (context) => const QuizPracticeScreen(),
       ),
     ).then((_) => _loadAllData());
-  }
-
-  void _navigateToAIVoice() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AiVoiceAssistantScreen(),
-      ),
-    );
   }
 
   void _showProRequiredDialog() {
