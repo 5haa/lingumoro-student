@@ -145,29 +145,37 @@ class _CourseVoucherRedemptionScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'Redeem Voucher',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: AppColors.background,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CustomBackButton(
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
+      body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 10),
+            // Header with Back Button and Title (matching subscription screen)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  const CustomBackButton(),
+                  const Spacer(),
+                  const Text(
+                    'REDEEM VOUCHER',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const Spacer(),
+                  const SizedBox(width: 40),
+                ],
+              ),
+            ),
+
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
             // Header section with gradient
             Container(
               width: double.infinity,
@@ -370,6 +378,10 @@ class _CourseVoucherRedemptionScreenState
                         color: AppColors.textPrimary,
                       ),
                       textAlign: TextAlign.center,
+                      keyboardType: TextInputType.text,
+                      textCapitalization: TextCapitalization.characters,
+                      enableSuggestions: false,
+                      autocorrect: false,
                       decoration: InputDecoration(
                         hintText: 'XXXXXXXXXXXXXXXX',
                         hintStyle: const TextStyle(
@@ -400,11 +412,10 @@ class _CourseVoucherRedemptionScreenState
                           borderSide: const BorderSide(color: Colors.red),
                         ),
                       ),
-                      textCapitalization: TextCapitalization.characters,
                       inputFormatters: [
+                        UpperCaseTextFormatter(),
                         FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9]')),
                         LengthLimitingTextInputFormatter(16),
-                        UpperCaseTextFormatter(),
                       ],
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -469,6 +480,10 @@ class _CourseVoucherRedemptionScreenState
             ),
 
             const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),

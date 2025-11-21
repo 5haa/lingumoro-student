@@ -203,36 +203,44 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
                 topLeft: Radius.circular(16),
                 bottomLeft: Radius.circular(16),
               ),
-              child: Container(
+              child: SizedBox(
                 width: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.lightGrey,
-                ),
                 child: teacher['avatar_url'] != null
                     ? CachedNetworkImage(
                         imageUrl: teacher['avatar_url'],
                         fit: BoxFit.cover,
+                        width: 80,
+                        height: double.infinity,
                         placeholder: (context, url) => Container(
                           color: AppColors.lightGrey,
-                          child: const Icon(
-                            Icons.person,
-                            size: 30,
-                            color: AppColors.grey,
+                          child: const Center(
+                            child: Icon(
+                              Icons.person,
+                              size: 30,
+                              color: AppColors.grey,
+                            ),
                           ),
                         ),
                         errorWidget: (context, url, error) => Container(
                           color: AppColors.lightGrey,
-                          child: const Icon(
+                          child: const Center(
+                            child: Icon(
+                              Icons.person,
+                              size: 30,
+                              color: AppColors.grey,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: AppColors.lightGrey,
+                        child: const Center(
+                          child: Icon(
                             Icons.person,
                             size: 30,
                             color: AppColors.grey,
                           ),
                         ),
-                      )
-                    : const Icon(
-                        Icons.person,
-                        size: 30,
-                        color: AppColors.grey,
                       ),
               ),
             ),

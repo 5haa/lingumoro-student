@@ -44,6 +44,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   bool _hasSubscription = false;
   bool _isCheckingSubscription = true;
   YoutubePlayerController? _youtubeController;
+  bool _isExitingScreen = false;
 
   final List<String> _dayNames = [
     'Sunday',
@@ -142,8 +143,36 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
 
   @override
   void dispose() {
-    _youtubeController?.dispose();
+    _disposeYoutubeController();
     super.dispose();
+  }
+
+  void _disposeYoutubeController() {
+    if (_youtubeController != null) {
+      try {
+        _youtubeController!.pause();
+      } catch (_) {}
+      _youtubeController!.dispose();
+      _youtubeController = null;
+    }
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_isExitingScreen) {
+      setState(() {
+        _isExitingScreen = true;
+      });
+      _disposeYoutubeController();
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
+    return true;
+  }
+
+  Future<void> _handleBackNavigation() async {
+    final shouldPop = await _onWillPop();
+    if (shouldPop && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _checkSubscription() async {
@@ -351,45 +380,48 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
 
     final averageRating = (_ratingStats?['average_rating'] as num?)?.toDouble() ?? 0.0;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            _buildHeader(),
-            
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Teacher Info Section
-                    _buildTeacherInfo(averageRating),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Video Section (Single Video)
-                    if (_youtubeController != null) ...[
-                      _buildVideoSection(),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              _buildHeader(),
+              
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Teacher Info Section
+                      _buildTeacherInfo(averageRating),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Video Section (Single Video)
+                      if (_youtubeController != null && !_isExitingScreen) ...[
+                        _buildVideoSection(),
+                        const SizedBox(height: 30),
+                      ],
+                      
+                      // Available Schedules Section
+                      _buildSchedulesSection(),
+                      
+                      const SizedBox(height: 30),
+                      
+                      // Subscribe Button
+                      _buildSubscribeButton(),
+                      
                       const SizedBox(height: 30),
                     ],
-                    
-                    // Available Schedules Section
-                    _buildSchedulesSection(),
-                    
-                    const SizedBox(height: 30),
-                    
-                    // Subscribe Button
-                    _buildSubscribeButton(),
-                    
-                    const SizedBox(height: 30),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -400,7 +432,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          const CustomBackButton(),
+          CustomBackButton(onPressed: _handleBackNavigation),
           const Spacer(),
           IconButton(
             icon: const FaIcon(FontAwesomeIcons.message, size: 20),

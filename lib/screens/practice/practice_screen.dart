@@ -1222,6 +1222,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   final _practiceService = PracticeService();
   final _levelService = LevelService();
   bool _hasMarkedAsWatched = false;
+  bool _isExitingScreen = false;
+  bool _controllerDisposed = false;
 
   @override
   void initState() {
@@ -1257,6 +1259,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           _markVideoAsWatched();
         }
       }
+    }
+  }
+
+  void _pauseAndDisposeController() {
+    if (_controllerDisposed) return;
+    try {
+      _controller.pause();
+    } catch (_) {}
+    _controller.dispose();
+    _controllerDisposed = true;
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_isExitingScreen) {
+      setState(() {
+        _isExitingScreen = true;
+      });
+      _pauseAndDisposeController();
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
+    return true;
+  }
+
+  Future<void> _handleBackButton() async {
+    final shouldPop = await _onWillPop();
+    if (shouldPop && mounted) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -1421,133 +1450,159 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _pauseAndDisposeController();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar
-            _buildTopBar(),
-            
-            // Video Player
-            YoutubePlayer(
-            controller: _controller,
-            showVideoProgressIndicator: true,
-            progressIndicatorColor: AppColors.primary,
-            progressColors: ProgressBarColors(
-              playedColor: AppColors.primary,
-              handleColor: Colors.red.shade600,
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.video['title'] ?? 'Untitled',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  if (widget.video['level'] != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.star,
-                            size: 16,
-                            color: Colors.blue.shade700,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Level ${widget.video['level']}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.blue.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (widget.video['description'] != null) ...[
-                    const SizedBox(height: 20),
-                    const Divider(color: AppColors.border),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Description',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.video['description'],
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: AppColors.textSecondary,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.amber.shade200,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.amber.shade700,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Top Bar
+              _buildTopBar(),
+              
+              // Video Player
+              _buildVideoPlayerSection(),
+              
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.video['title'] ?? 'Untitled',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
                         ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Watch the entire video to unlock the next one!',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
-                            ),
+                      ),
+                      const SizedBox(height: 15),
+                      if (widget.video['level'] != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star,
+                                size: 16,
+                                color: Colors.blue.shade700,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Level ${widget.video['level']}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (widget.video['description'] != null) ...[
+                        const SizedBox(height: 20),
+                        const Divider(color: AppColors.border),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Description',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.video['description'],
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: AppColors.textSecondary,
+                            height: 1.5,
                           ),
                         ),
                       ],
-                    ),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.amber.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.amber.shade700,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Watch the entire video to unlock the next one!',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildVideoPlayerSection() {
+    if (_controllerDisposed || _isExitingScreen) {
+      return Container(
+        height: 220,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.black12,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.play_circle_fill,
+            color: AppColors.grey,
+            size: 48,
+          ),
+        ),
+      );
+    }
+
+    return YoutubePlayer(
+      controller: _controller,
+      showVideoProgressIndicator: true,
+      progressIndicatorColor: AppColors.primary,
+      progressColors: ProgressBarColors(
+        playedColor: AppColors.primary,
+        handleColor: Colors.red.shade600,
       ),
     );
   }
@@ -1558,7 +1613,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       child: Row(
         children: [
           // Back Icon
-          const CustomBackButton(),
+          CustomBackButton(onPressed: _handleBackButton),
           
           Expanded(
             child: Center(
