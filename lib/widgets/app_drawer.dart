@@ -5,12 +5,18 @@ import '../config/app_colors.dart';
 import '../screens/settings/about_us_screen.dart';
 import '../screens/settings/privacy_policy_screen.dart';
 import '../screens/settings/terms_conditions_screen.dart';
+import '../l10n/app_localizations.dart';
+import '../providers/locale_provider.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final localeService = LocaleProvider.of(context);
+    final isRTL = localeService.isRTL();
+    
     return Drawer(
       backgroundColor: AppColors.white,
       child: SafeArea(
@@ -38,9 +44,9 @@ class AppDrawer extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 15),
-                  const Text(
-                    'SETTINGS',
-                    style: TextStyle(
+                  Text(
+                    l10n.settings,
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -56,7 +62,7 @@ class AppDrawer extends StatelessWidget {
               _buildMenuItem(
                 context,
                 icon: FontAwesomeIcons.phone,
-                title: 'CONTACT US',
+                title: l10n.contactUs,
                 onTap: () {
                   Navigator.pop(context);
                   _showContactUs(context);
@@ -66,7 +72,7 @@ class AppDrawer extends StatelessWidget {
               _buildMenuItem(
                 context,
                 icon: FontAwesomeIcons.circleInfo,
-                title: 'ABOUT US',
+                title: l10n.aboutUs,
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -81,7 +87,7 @@ class AppDrawer extends StatelessWidget {
               _buildMenuItem(
                 context,
                 icon: FontAwesomeIcons.shieldHalved,
-                title: 'PRIVACY POLICY',
+                title: l10n.privacyPolicy,
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -96,7 +102,7 @@ class AppDrawer extends StatelessWidget {
               _buildMenuItem(
                 context,
                 icon: FontAwesomeIcons.fileLines,
-                title: 'TERMS & CONDITIONS',
+                title: l10n.termsConditions,
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -111,7 +117,7 @@ class AppDrawer extends StatelessWidget {
               _buildMenuItem(
                 context,
                 icon: FontAwesomeIcons.flag,
-                title: 'CHANGE LANGUAGE',
+                title: l10n.changeLanguage,
                 onTap: () {
                   Navigator.pop(context);
                   _showLanguageSelector(context);
@@ -121,10 +127,10 @@ class AppDrawer extends StatelessWidget {
               const Spacer(),
 
               // App Version
-              const Center(
+              Center(
                 child: Text(
-                  'Version 1.0.0',
-                  style: TextStyle(
+                  l10n.version,
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
@@ -182,6 +188,7 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _showContactUs(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final Uri whatsappUrl = Uri.parse('https://wa.me/9641234567890');
     
     try {
@@ -190,8 +197,8 @@ class AppDrawer extends StatelessWidget {
       } else {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open WhatsApp'),
+            SnackBar(
+              content: Text(l10n.couldNotOpenWhatsApp),
               backgroundColor: AppColors.primary,
             ),
           );
@@ -200,8 +207,8 @@ class AppDrawer extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error opening WhatsApp'),
+          SnackBar(
+            content: Text(l10n.errorOpeningWhatsApp),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -210,6 +217,10 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _showLanguageSelector(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final localeService = LocaleProvider.of(context);
+    final currentLocale = localeService.locale.languageCode;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.white,
@@ -231,18 +242,18 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 25),
-            const Text(
-              'Select Language',
-              style: TextStyle(
+            Text(
+              l10n.selectLanguage,
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 30),
-            _buildLanguageOption(context, 'English', 'en', true),
-            _buildLanguageOption(context, 'العربية', 'ar', false),
-            _buildLanguageOption(context, 'Spanish', 'es', false),
+            _buildLanguageOption(context, 'English', 'en', currentLocale == 'en'),
+            _buildLanguageOption(context, 'العربية', 'ar', currentLocale == 'ar'),
+            _buildLanguageOption(context, 'Español', 'es', currentLocale == 'es'),
             const SizedBox(height: 20),
           ],
         ),
@@ -257,15 +268,22 @@ class AppDrawer extends StatelessWidget {
     bool isSelected,
   ) {
     return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Language changed to $language'),
-            backgroundColor: AppColors.primary,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+      onTap: () async {
+        final localeService = LocaleProvider.of(context);
+        await localeService.setLocaleFromLanguageCode(code);
+        
+        if (context.mounted) {
+          Navigator.pop(context);
+          
+          final l10n = AppLocalizations.of(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.languageChanged),
+              backgroundColor: AppColors.primary,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

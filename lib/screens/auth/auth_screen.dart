@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:student/config/app_colors.dart';
+import 'package:student/l10n/app_localizations.dart';
 import 'sign_in_screen.dart';
 import 'sign_up_screen.dart';
 
@@ -26,7 +27,7 @@ class _AuthScreenState extends State<AuthScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildTabButton('SIGN IN', _isSignIn, () {
+                  _buildTabButton(AppLocalizations.of(context).login.toUpperCase(), _isSignIn, () {
                     setState(() {
                       _isSignIn = true;
                     });
@@ -37,7 +38,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     color: AppColors.border,
                     margin: const EdgeInsets.symmetric(horizontal: 20),
                   ),
-                  _buildTabButton('SIGN UP', !_isSignIn, () {
+                  _buildTabButton(AppLocalizations.of(context).signup.toUpperCase(), !_isSignIn, () {
                     setState(() {
                       _isSignIn = false;
                     });

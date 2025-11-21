@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/widgets/app_drawer.dart';
+import 'package:student/l10n/app_localizations.dart';
 import 'home/home_screen.dart';
 import 'classes/classes_screen.dart';
 import 'practice/practice_screen.dart';
@@ -32,28 +33,31 @@ class _MainNavigationState extends State<MainNavigation> {
     ];
   }
   
-  final List<Map<String, dynamic>> _navItems = [
-    {
-      'icon': FontAwesomeIcons.house,
-      'label': 'Home',
-    },
-    {
-      'icon': FontAwesomeIcons.graduationCap,
-      'label': 'Classes',
-    },
-    {
-      'icon': FontAwesomeIcons.clipboardList,
-      'label': 'Practice',
-    },
-    {
-      'icon': FontAwesomeIcons.message,
-      'label': 'Chat',
-    },
-    {
-      'icon': FontAwesomeIcons.user,
-      'label': 'Profile',
-    },
-  ];
+  List<Map<String, dynamic>> _getNavItems(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return [
+      {
+        'icon': FontAwesomeIcons.house,
+        'label': l10n.navHome,
+      },
+      {
+        'icon': FontAwesomeIcons.graduationCap,
+        'label': l10n.navClasses,
+      },
+      {
+        'icon': FontAwesomeIcons.clipboardList,
+        'label': l10n.navPractice,
+      },
+      {
+        'icon': FontAwesomeIcons.message,
+        'label': l10n.navChat,
+      },
+      {
+        'icon': FontAwesomeIcons.user,
+        'label': l10n.navProfile,
+      },
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,10 +83,11 @@ class _MainNavigationState extends State<MainNavigation> {
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(_navItems.length, (index) {
+              children: List.generate(_getNavItems(context).length, (index) {
+                final navItems = _getNavItems(context);
                 return _buildNavItem(
-                  _navItems[index]['icon'],
-                  _navItems[index]['label'],
+                  navItems[index]['icon'],
+                  navItems[index]['label'],
                   index,
                   _currentIndex == index,
                 );

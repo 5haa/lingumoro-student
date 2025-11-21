@@ -7,6 +7,7 @@ import 'dart:async';
 import '../../config/app_colors.dart';
 import '../../services/language_service.dart';
 import '../../services/carousel_service.dart';
+import '../../l10n/app_localizations.dart';
 import '../teachers/teachers_list_screen.dart';
 import '../students/students_list_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -105,10 +106,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   void _navigateToTeachers() {
+    final l10n = AppLocalizations.of(context);
     if (_languages.isEmpty || _selectedLanguageIndex >= _languages.length) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a language first'),
+        SnackBar(
+          content: Text(l10n.selectLanguageFirst),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -165,9 +167,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'CHOOSE YOUR CLASS',
-                            style: TextStyle(
+                          Text(
+                            AppLocalizations.of(context).chooseYourClass,
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
@@ -186,12 +188,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 )
                               : _languages.isEmpty
-                                  ? const Center(
+                                  ? Center(
                                       child: Padding(
-                                        padding: EdgeInsets.all(32.0),
+                                        padding: const EdgeInsets.all(32.0),
                                         child: Text(
-                                          'No languages available',
-                                          style: TextStyle(
+                                          AppLocalizations.of(context).noLanguagesAvailable,
+                                          style: const TextStyle(
                                             color: AppColors.textSecondary,
                                           ),
                                         ),
@@ -219,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Expanded(
                                 child: _buildRoleCard(
-                                  'Students',
+                                  AppLocalizations.of(context).students,
                                   Colors.red.shade400,
                                   'assets/images/student.jpg',
                                   imageOnRight: false,
@@ -229,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               const SizedBox(width: 15),
                               Expanded(
                                 child: _buildRoleCard(
-                                  'Teachers',
+                                  AppLocalizations.of(context).teachers,
                                   Colors.blue.shade400,
                                   'assets/images/teacher.jpg',
                                   imageOnRight: true,
@@ -286,11 +288,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
-                'LINGUMORO',
-                style: TextStyle(
+                AppLocalizations.of(context).appName.toUpperCase(),
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,

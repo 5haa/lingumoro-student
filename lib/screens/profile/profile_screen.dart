@@ -10,6 +10,7 @@ import 'package:student/screens/profile/edit_profile_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -65,27 +66,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  String _getLevelStatus(int level) {
+  String _getLevelStatus(BuildContext context, int level) {
+    final l10n = AppLocalizations.of(context);
     if (level >= 1 && level <= 10) {
-      return 'Beginner';
+      return l10n.levelBeginner;
     } else if (level >= 11 && level <= 20) {
-      return 'Intermediate';
+      return l10n.levelIntermediate;
     } else if (level >= 21 && level <= 30) {
-      return 'Advanced';
+      return l10n.levelAdvanced;
     } else if (level >= 31 && level <= 40) {
-      return 'Expert';
+      return l10n.levelExpert;
     } else if (level >= 41 && level <= 50) {
-      return 'Master';
+      return l10n.levelMaster;
     } else if (level >= 51 && level <= 60) {
-      return 'Grand Master';
+      return l10n.levelGrandMaster;
     } else if (level >= 61 && level <= 70) {
-      return 'Legend';
+      return l10n.levelLegend;
     } else if (level >= 71 && level <= 80) {
-      return 'Mythic';
+      return l10n.levelMythic;
     } else if (level >= 81 && level <= 90) {
-      return 'Transcendent';
+      return l10n.levelTranscendent;
     } else {
-      return 'Supreme';
+      return l10n.levelSupreme;
     }
   }
 
@@ -127,11 +129,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'PROFILE',
-                        style: TextStyle(
+                        AppLocalizations.of(context).profile,
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -170,11 +172,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 25),
                           
                           // Personal Information Section
-                          _buildSectionTitle('Personal Information'),
+                          _buildSectionTitle(AppLocalizations.of(context).personalInformation),
                           const SizedBox(height: 12),
                           _buildInfoCard(
                             icon: FontAwesomeIcons.envelope,
-                            title: 'Email',
+                            title: AppLocalizations.of(context).email,
                             value: _profile?['email'] ?? 'N/A',
                             onTap: () {
                               Navigator.push(
@@ -192,17 +194,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 25),
                           
                           // Security Section
-                          _buildSectionTitle('Security'),
+                          _buildSectionTitle(AppLocalizations.of(context).security),
                           const SizedBox(height: 12),
                           _buildActionCard(
                             icon: FontAwesomeIcons.lock,
-                            title: 'Change Password',
-                            subtitle: 'Update your password',
+                            title: AppLocalizations.of(context).changePassword,
+                            subtitle: AppLocalizations.of(context).updatePassword,
                             onTap: () {
                               // TODO: Navigate to change password screen
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Change password feature coming soon'),
+                                SnackBar(
+                                  content: Text('${AppLocalizations.of(context).changePassword} feature coming soon'),
                                   backgroundColor: AppColors.primary,
                                 ),
                               );
@@ -212,7 +214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           
                           // Logout Button
                           CustomButton(
-                            text: 'LOGOUT',
+                            text: AppLocalizations.of(context).logout.toUpperCase(),
                             onPressed: () => _showLogoutDialog(context),
                           ),
                           const SizedBox(height: 20),
@@ -358,7 +360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 else
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.school,
                         size: 16,
                         color: AppColors.textSecondary,
@@ -366,8 +368,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(width: 5),
                       Expanded(
                         child: Text(
-                          'Language Learner',
-                          style: TextStyle(
+                          AppLocalizations.of(context).languageLearner,
+                          style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.textSecondary,
                           ),
@@ -425,13 +427,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildUserLevelCard() {
+    final l10n = AppLocalizations.of(context);
     final level = _levelProgress!['level'] as int;
     final points = _levelProgress!['points'] as int;
     final isMaxLevel = _levelProgress!['isMaxLevel'] as bool;
     final progressPercent = _levelProgress!['progressPercent'] as double;
     final nextLevel = _levelProgress!['nextLevel'] as int?;
     final pointsToNext = _levelProgress!['pointsToNext'] as int;
-    final status = _getLevelStatus(level);
+    final status = _getLevelStatus(context, level);
     
     // Calculate XP for current level
     final pointsForCurrentLevel = (level - 1) * LevelService.pointsPerLevel;
@@ -460,9 +463,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Current Level',
-                    style: TextStyle(
+                  Text(
+                    l10n.currentLevel,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -479,7 +482,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Level $level',
+                    '${l10n.currentLevel} $level',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.9),
                       fontSize: 16,
@@ -526,7 +529,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '$points XP',
+                '$points ${l10n.xpPoints}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -535,7 +538,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               if (!isMaxLevel)
                 Text(
-                  '$pointsToNext XP to Level $nextLevel',
+                  '$pointsToNext ${l10n.xpToNextLevel} $nextLevel',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -543,9 +546,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 )
               else
-                const Text(
-                  'Max Level Reached!',
-                  style: TextStyle(
+                Text(
+                  l10n.maxLevelReached,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -559,6 +562,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildSubscriptionCard(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isPro = _proSubscription != null;
     String? expiryText;
     
@@ -608,7 +612,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isPro ? 'PRO Member' : 'Free Member',
+                  isPro ? l10n.proMember : l10n.freeMember,
                   style: TextStyle(
                     color: isPro ? Colors.white : AppColors.textPrimary,
                     fontSize: 18,
@@ -619,9 +623,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   isPro 
                     ? (expiryText != null 
-                        ? 'Expires: $expiryText'
-                        : 'Unlimited access to all features')
-                    : 'Limited features available',
+                        ? '${l10n.expiresPro}: $expiryText'
+                        : l10n.unlimitedFeatures)
+                    : l10n.limitedFeatures,
                   style: TextStyle(
                     color: isPro ? Colors.white.withOpacity(0.9) : AppColors.textSecondary,
                     fontSize: 12,
@@ -639,9 +643,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   gradient: AppColors.redGradient,
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: const Text(
-                  'Upgrade',
-                  style: TextStyle(
+                child: Text(
+                  l10n.upgrade,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -810,6 +814,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 
   void _showLogoutDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // Capture the navigator context before showing dialog
     final navigatorContext = Navigator.of(context).context;
     
@@ -822,26 +827,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Row(
+          title: Row(
             children: [
-              FaIcon(
+              const FaIcon(
                 FontAwesomeIcons.rightFromBracket,
                 color: AppColors.primary,
                 size: 24,
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Text(
-                'Logout',
-                style: TextStyle(
+                l10n.logoutConfirm,
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
               ),
             ],
           ),
-          content: const Text(
-            'Are you sure you want to logout?',
-            style: TextStyle(
+          content: Text(
+            l10n.areYouSureLogout,
+            style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 16,
             ),
@@ -851,9 +856,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
+              child: Text(
+                l10n.cancel,
+                style: const TextStyle(
                   color: AppColors.grey,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -882,7 +887,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Logout failed: $e'),
+                        content: Text('${l10n.logoutConfirm} failed: $e'),
                         backgroundColor: AppColors.primary,
                       ),
                     );
@@ -895,9 +900,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   gradient: AppColors.redGradient,
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: const Text(
-                  'Logout',
-                  style: TextStyle(
+                child: Text(
+                  l10n.logout,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

@@ -6,6 +6,7 @@ import 'package:student/screens/teachers/teacher_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class TeachersListScreen extends StatefulWidget {
   final String languageId;
@@ -75,9 +76,9 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
                 children: [
                   const CustomBackButton(),
                   const Spacer(),
-                  const Text(
-                    'TEACHERS',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context).teachersList,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -112,8 +113,8 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'No Teachers Available',
-                                style: TextStyle(
+                                AppLocalizations.of(context).noTeachersAvailable,
+                                style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.textSecondary,
@@ -121,8 +122,8 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'No teachers found for ${widget.languageName}',
-                                style: TextStyle(
+                                '${AppLocalizations.of(context).noTeachersForLanguage} ${widget.languageName}',
+                                style: const TextStyle(
                                   fontSize: 14,
                                   color: AppColors.textSecondary,
                                 ),

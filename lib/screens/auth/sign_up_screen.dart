@@ -3,6 +3,7 @@ import 'package:student/config/app_colors.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_text_field.dart';
+import 'package:student/l10n/app_localizations.dart';
 import 'otp_verification_screen.dart';
 
 class SignUpContent extends StatefulWidget {
@@ -75,13 +76,14 @@ class _SignUpContentState extends State<SignUpContent> {
   }
   
   Future<void> _handleSignUp() async {
+    final l10n = AppLocalizations.of(context);
     if (_nameController.text.isEmpty || 
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty ||
         _confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all required fields'),
+        SnackBar(
+          content: Text(l10n.fillAllFields),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -90,8 +92,8 @@ class _SignUpContentState extends State<SignUpContent> {
     
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Passwords do not match'),
+        SnackBar(
+          content: Text(l10n.passwordMismatch),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -100,8 +102,8 @@ class _SignUpContentState extends State<SignUpContent> {
     
     if (_selectedProvinceId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select your province'),
+        SnackBar(
+          content: Text(l10n.pleaseSelectProvince),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -135,7 +137,7 @@ class _SignUpContentState extends State<SignUpContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Signup failed: ${e.toString()}'),
+            content: Text('${AppLocalizations.of(context).signupFailed}: ${e.toString()}'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -149,12 +151,13 @@ class _SignUpContentState extends State<SignUpContent> {
   
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
         // Full Name field
         CustomTextField(
           controller: _nameController,
-          hintText: 'Full Name',
+          hintText: l10n.fullName,
           keyboardType: TextInputType.name,
         ),
         
@@ -163,7 +166,7 @@ class _SignUpContentState extends State<SignUpContent> {
         // Email field
         CustomTextField(
           controller: _emailController,
-          hintText: 'E-Mail',
+          hintText: l10n.email,
           keyboardType: TextInputType.emailAddress,
         ),
         
@@ -197,7 +200,7 @@ class _SignUpContentState extends State<SignUpContent> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    _selectedProvinceName ?? 'Choose City',
+                    _selectedProvinceName ?? l10n.chooseCity,
                     style: TextStyle(
                       fontSize: 16,
                       color: _selectedProvinceId != null 
@@ -224,7 +227,7 @@ class _SignUpContentState extends State<SignUpContent> {
         // Password field
         CustomTextField(
           controller: _passwordController,
-          hintText: 'Password',
+          hintText: l10n.password,
           obscureText: true,
         ),
         
@@ -233,7 +236,7 @@ class _SignUpContentState extends State<SignUpContent> {
         // Confirm Password field
         CustomTextField(
           controller: _confirmPasswordController,
-          hintText: 'Confirm Password',
+          hintText: l10n.confirmPassword,
           obscureText: true,
         ),
         
@@ -241,7 +244,7 @@ class _SignUpContentState extends State<SignUpContent> {
         
         // Confirm Account button
         CustomButton(
-          text: 'CONFIRM ACCOUNT',
+          text: l10n.confirmAccount,
           onPressed: _handleSignUp,
           isLoading: _isLoading,
         ),
@@ -336,9 +339,9 @@ class _ProvinceBottomSheetState extends State<_ProvinceBottomSheet> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Select Province',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context).selectProvince,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
@@ -359,7 +362,7 @@ class _ProvinceBottomSheetState extends State<_ProvinceBottomSheet> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search province...',
+                  hintText: AppLocalizations.of(context).searchProvince,
                   hintStyle: const TextStyle(
                     color: AppColors.textHint,
                     fontSize: 16,

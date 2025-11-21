@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:student/config/app_colors.dart';
@@ -7,6 +8,9 @@ import 'package:student/screens/splash_screen.dart';
 import 'package:student/screens/teachers/teachers_list_screen.dart';
 import 'package:student/screens/students/students_list_screen.dart';
 import 'package:student/services/presence_service.dart';
+import 'package:student/services/locale_service.dart';
+import 'package:student/l10n/app_localizations.dart';
+import 'package:student/providers/locale_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,12 +35,16 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _presenceService = PresenceService();
+  final _localeService = LocaleService();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializePresence();
+    _localeService.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
@@ -44,6 +52,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _presenceService.stopTracking();
     _presenceService.dispose();
+    _localeService.dispose();
     super.dispose();
   }
 
@@ -81,25 +90,62 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     return MaterialApp(
       title: 'Lingumoro Student',
       debugShowCheckedModeBanner: false,
+      
+      // Localization
+      locale: _localeService.locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeResolutionCallback: (locale, supportedLocales) {
+        if (locale != null) {
+          for (var supportedLocale in supportedLocales) {
+            if (supportedLocale.languageCode == locale.languageCode) {
+              return supportedLocale;
+            }
+          }
+        }
+        return supportedLocales.first;
+      },
+      
+      // Builder for RTL support and LocaleProvider
+      builder: (context, child) {
+        return LocaleProvider(
+          localeService: _localeService,
+          child: Directionality(
+            textDirection: _localeService.getTextDirection(),
+            child: child!,
+          ),
+        );
+      },
+      
       theme: ThemeData(
         primaryColor: AppColors.primary,
         scaffoldBackgroundColor: AppColors.background,
+        fontFamily: _localeService.locale.languageCode == 'ar' ? 'Arabic' : null,
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primary,
           primary: AppColors.primary,
           secondary: AppColors.accent,
         ),
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           backgroundColor: AppColors.white,
           elevation: 0,
-          iconTheme: IconThemeData(color: AppColors.textPrimary),
+          iconTheme: const IconThemeData(color: AppColors.textPrimary),
           titleTextStyle: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 20,
             fontWeight: FontWeight.bold,
+            fontFamily: _localeService.locale.languageCode == 'ar' ? 'Arabic' : null,
           ),
           centerTitle: true,
         ),
+        textTheme: _localeService.locale.languageCode == 'ar' 
+          ? ThemeData.light().textTheme.apply(fontFamily: 'Arabic')
+          : null,
         useMaterial3: true,
       ),
       home: const SplashScreen(),

@@ -11,6 +11,8 @@ class CustomBackButton extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    final isRTL = Directionality.of(context) == TextDirection.rtl;
+    
     return Container(
       width: 40,
       height: 40,
@@ -28,7 +30,7 @@ class CustomBackButton extends StatelessWidget {
       child: IconButton(
         padding: EdgeInsets.zero,
         iconSize: 16,
-        icon: const Icon(Icons.arrow_back_ios_new),
+        icon: Icon(isRTL ? Icons.arrow_forward_ios : Icons.arrow_back_ios_new),
         onPressed: onPressed ?? () => Navigator.of(context).pop(),
       ),
     );
