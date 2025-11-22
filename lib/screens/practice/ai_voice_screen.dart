@@ -347,17 +347,23 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     _stopSessionTimer();
 
     // End session and award points
-    if (_currentSessionId != null && _sessionDurationSeconds > 0) {
-      final result = await _sessionService.endSession(
-        _currentSessionId!,
-        _sessionDurationSeconds,
-      );
-
-      if (result['success'] == true && result['pointsAwarded'] > 0) {
-        _showSessionCompletedDialog(
-          result['pointsAwarded'],
-          result['durationMinutes'],
+    if (_currentSessionId != null) {
+      if (_sessionDurationSeconds > 0) {
+        // Session had activity - end it and award points
+        final result = await _sessionService.endSession(
+          _currentSessionId!,
+          _sessionDurationSeconds,
         );
+
+        if (result['success'] == true && result['pointsAwarded'] > 0) {
+          _showSessionCompletedDialog(
+            result['pointsAwarded'],
+            result['durationMinutes'],
+          );
+        }
+      } else {
+        // Session was started but stopped immediately - cancel it
+        await _sessionService.cancelSession(_currentSessionId!);
       }
 
       _currentSessionId = null;
