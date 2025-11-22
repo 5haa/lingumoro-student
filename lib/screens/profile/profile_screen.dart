@@ -8,6 +8,7 @@ import 'package:student/services/photo_service.dart';
 import 'package:student/screens/auth/auth_screen.dart';
 import 'package:student/screens/auth/change_password_screen.dart';
 import 'package:student/screens/profile/edit_profile_screen.dart';
+import 'package:student/screens/profile/blocked_users_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_button.dart';
@@ -206,6 +207,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => const ChangePasswordScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildActionCard(
+                            icon: FontAwesomeIcons.userSlash,
+                            title: 'Blocked Users',
+                            subtitle: 'Manage your blocked users',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const BlockedUsersScreen(),
                                 ),
                               );
                             },

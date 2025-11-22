@@ -83,7 +83,6 @@ class _CourseVoucherRedemptionScreenState
         studentId: studentId,
         voucherCode: _voucherController.text.trim(),
         teacherId: widget.teacherId,
-        packageId: widget.packageId,
         languageId: widget.languageId,
         selectedDays: widget.selectedDays,
         startTime: widget.selectedStartTime,

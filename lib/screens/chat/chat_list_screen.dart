@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/services/presence_service.dart';
+import 'package:student/services/session_update_service.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -18,6 +19,7 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   final _chatService = ChatService();
   final _presenceService = PresenceService();
+  final _sessionUpdateService = SessionUpdateService();
   final _searchController = TextEditingController();
   
   List<Map<String, dynamic>> _conversations = [];
@@ -42,6 +44,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
       _loadData();
     });
     
+    // Listen for subscription updates (when student subscribes to a course)
+    _sessionUpdateService.addListener(_handleSubscriptionUpdate);
+    
     // Search listener
     _searchController.addListener(_filterConversations);
     
@@ -55,9 +60,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void dispose() {
     _statusRefreshTimer?.cancel();
     _searchController.dispose();
+    _sessionUpdateService.removeListener(_handleSubscriptionUpdate);
     _chatService.dispose();
     _presenceService.dispose();
     super.dispose();
+  }
+
+  void _handleSubscriptionUpdate() {
+    // Reload chat list when subscriptions change
+    _loadData();
   }
 
   void _filterConversations() {

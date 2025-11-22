@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:student/widgets/student_avatar_widget.dart';
 import 'package:student/services/photo_service.dart';
 import 'package:student/services/blocking_service.dart';
+import 'package:student/widgets/custom_back_button.dart';
+import '../../config/app_colors.dart';
 
 class StudentPublicProfileScreen extends StatefulWidget {
   final String studentId;
@@ -72,22 +74,32 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(shouldBlock ? 'Block User?' : 'Unblock User?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          shouldBlock ? 'Block User?' : 'Unblock User?',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
         content: Text(
           shouldBlock
               ? 'Blocking this user will hide their profile and prevent them from contacting you.'
               : 'This user will be able to see your profile and contact you again.',
+          style: const TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.grey)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: shouldBlock ? Colors.red : Colors.green,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
             ),
             child: Text(shouldBlock ? 'Block' : 'Unblock'),
           ),
@@ -113,7 +125,6 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
           );
           
           if (shouldBlock) {
-            // Go back after blocking
             Navigator.pop(context);
           }
         } else {
@@ -142,344 +153,395 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     final languages = widget.studentData['languages'] as List<Map<String, dynamic>>? ?? [];
     final province = widget.studentData['province'] as Map<String, dynamic>?;
     final bio = widget.studentData['bio'] as String?;
+    final fullName = widget.studentData['full_name'] ?? 'Unknown';
+    final email = widget.studentData['email'] ?? '';
+    final level = languages.isNotEmpty ? languages.length : 1;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          if (!_isCheckingBlock)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) {
-                if (value == 'block') {
-                  _toggleBlock();
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'block',
-                  child: Row(
-                    children: [
-                      Icon(
-                        _isBlocked ? Icons.check_circle : Icons.block,
-                        color: _isBlocked ? Colors.green : Colors.red,
-                        size: 20,
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header with back button and menu
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  const CustomBackButton(),
+                  const Spacer(),
+                  if (!_isCheckingBlock)
+                    Container(
+                      width: 45,
+                      height: 45,
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Text(_isBlocked ? 'Unblock User' : 'Block User'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-      extendBodyBehindAppBar: true,
-      body: CustomScrollView(
-        slivers: [
-          // App bar with student header
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            backgroundColor: Colors.teal,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.teal.shade400,
-                      Colors.teal.shade700,
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 40),
-                      // Profile picture carousel
-                      _buildPhotoCarousel(),
-                      const SizedBox(height: 16),
-                      // Name
-                      Text(
-                        widget.studentData['full_name'] ?? 'Unknown',
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      child: PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
+                        icon: const FaIcon(
+                          FontAwesomeIcons.ellipsisVertical,
+                          size: 16,
+                          color: AppColors.textPrimary,
                         ),
-                        textAlign: TextAlign.center,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        onSelected: (value) {
+                          if (value == 'block') {
+                            _toggleBlock();
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'block',
+                            child: Row(
+                              children: [
+                                FaIcon(
+                                  _isBlocked ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.ban,
+                                  color: _isBlocked ? Colors.green : Colors.red,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(_isBlocked ? 'Unblock User' : 'Block User'),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      // Province
-                      if (province != null)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.location_on,
-                              color: Colors.white70,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${province['name']} (${province['name_ar']})',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
+                    ),
+                ],
               ),
             ),
-          ),
 
-          // Content
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Contact Information Card
-                  _buildSectionCard(
-                    title: 'Contact Information',
-                    icon: Icons.email,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildInfoRow(
-                          Icons.email_outlined,
-                          'Email',
-                          widget.studentData['email'] ?? 'Not provided',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Bio Section
-                  if (bio != null && bio.isNotEmpty)
-                    _buildSectionCard(
-                      title: 'About',
-                      icon: Icons.person,
-                      child: Text(
-                        bio,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.grey[700],
-                          height: 1.5,
-                        ),
+            // Scrollable content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    
+                    // Profile Card
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.redGradient,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
                       ),
-                    ),
-                  if (bio != null && bio.isNotEmpty) const SizedBox(height: 16),
-
-                  // Languages Section
-                  if (languages.isNotEmpty)
-                    _buildSectionCard(
-                      title: 'Learning Languages',
-                      icon: Icons.language,
-                      child: Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: languages.map((language) {
-                          return Container(
+                      child: Column(
+                        children: [
+                          // Photo carousel
+                          _buildPhotoCarousel(),
+                          const SizedBox(height: 20),
+                          
+                          // Name
+                          Text(
+                            fullName,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          
+                          // Email
+                          Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 10,
+                              vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.teal.shade50,
-                                  Colors.teal.shade100,
-                                ],
-                              ),
+                              color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.teal.shade300,
-                                width: 1.5,
-                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (language['flag_url'] != null)
-                                  Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
-                                          blurRadius: 3,
-                                        ),
-                                      ],
-                                    ),
-                                    child: ClipOval(
-                                      child: CachedNetworkImage(
-                                        imageUrl: language['flag_url'],
-                                        fit: BoxFit.cover,
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(
-                                          Icons.language,
-                                          size: 20,
-                                          color: Colors.teal,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  const Icon(
-                                    Icons.language,
-                                    size: 20,
-                                    color: Colors.teal,
-                                  ),
+                                const FaIcon(
+                                  FontAwesomeIcons.envelope,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  language['name'] ?? '',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.teal.shade900,
+                                  email,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
                             ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-
-                  const SizedBox(height: 32),
-
-                  // Note about connecting
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.blue.shade200,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.blue.shade700,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'You can connect with this student because you\'re both learning the same language!',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.blue.shade900,
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Province
+                          if (province != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const FaIcon(
+                                    FontAwesomeIcons.locationDot,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${province['name']} (${province['name_ar']})',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 16),
+                          
+                          // Level badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const FaIcon(
+                                  FontAwesomeIcons.trophy,
+                                  size: 16,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Level $level',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 24),
+
+                    // Bio Section
+                    if (bio != null && bio.isNotEmpty)
+                      _buildInfoCard(
+                        icon: FontAwesomeIcons.circleInfo,
+                        title: 'About',
+                        child: Text(
+                          bio,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: AppColors.textSecondary,
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+                    if (bio != null && bio.isNotEmpty) const SizedBox(height: 16),
+
+                    // Languages Section
+                    if (languages.isNotEmpty)
+                      _buildInfoCard(
+                        icon: FontAwesomeIcons.language,
+                        title: 'Learning Languages',
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: languages.map((language) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: AppColors.primary.withOpacity(0.3),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (language['flag_url'] != null)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: CachedNetworkImage(
+                                        imageUrl: language['flag_url'],
+                                        width: 24,
+                                        height: 16,
+                                        fit: BoxFit.cover,
+                                        errorWidget: (context, url, error) =>
+                                            const FaIcon(
+                                          FontAwesomeIcons.flag,
+                                          size: 14,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    const FaIcon(
+                                      FontAwesomeIcons.flag,
+                                      size: 14,
+                                      color: AppColors.primary,
+                                    ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    language['name'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+
+                    const SizedBox(height: 24),
+
+                    // Info note
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.blue.shade100,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade100,
+                              shape: BoxShape.circle,
+                            ),
+                            child: FaIcon(
+                              FontAwesomeIcons.circleInfo,
+                              color: Colors.blue.shade700,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              'You can connect with this student because you\'re both learning the same language!',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.blue.shade900,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionCard({
-    required String title,
-    required IconData icon,
-    required Widget child,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: Colors.teal.shade700,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            child,
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: Colors.grey[600],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: AppColors.redGradient,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: FaIcon(
+                  icon,
+                  color: Colors.white,
+                  size: 16,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
+          child,
         ],
       ),
     );
@@ -491,7 +553,10 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
         : '?';
 
     return Container(
-      color: Colors.teal.shade600,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        shape: BoxShape.circle,
+      ),
       child: Center(
         child: Text(
           initial,
@@ -508,8 +573,8 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
   Widget _buildPhotoCarousel() {
     if (_isLoadingPhotos) {
       return Container(
-        width: 120,
-        height: 120,
+        width: 130,
+        height: 130,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white.withOpacity(0.2),
@@ -523,10 +588,9 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     }
 
     if (_photos.isEmpty) {
-      // Show default avatar if no photos
       return Container(
-        width: 120,
-        height: 120,
+        width: 130,
+        height: 130,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
@@ -535,102 +599,112 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: ClipOval(
-          child: _buildDefaultAvatar(),
-        ),
+        child: ClipOval(child: _buildDefaultAvatar()),
       );
     }
 
     return Column(
       children: [
-        // Photo viewer with gestures
         GestureDetector(
           onTap: () => _showFullScreenPhoto(),
           onHorizontalDragEnd: (details) {
             if (details.primaryVelocity! > 0) {
-              // Swiped right - previous photo
               _previousPhoto();
             } else if (details.primaryVelocity! < 0) {
-              // Swiped left - next photo
               _nextPhoto();
             }
           },
-          child: Hero(
-            tag: 'student_${widget.studentData['id']}_photo_$_currentPhotoIndex',
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 4,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
+          child: Container(
+            width: 130,
+            height: 130,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white,
+                width: 4,
               ),
-              child: ClipOval(
-                child: CachedNetworkImage(
-                  imageUrl: _photos[_currentPhotoIndex]['photo_url'],
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.white.withOpacity(0.2),
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: _photos[_currentPhotoIndex]['photo_url'],
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: Colors.white.withOpacity(0.2),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   ),
-                  errorWidget: (context, url, error) => _buildDefaultAvatar(),
                 ),
+                errorWidget: (context, url, error) => _buildDefaultAvatar(),
               ),
             ),
           ),
         ),
         
-        // Photo counter and navigation
         if (_photos.length > 1) ...[
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Previous button
               IconButton(
                 onPressed: _previousPhoto,
-                icon: const Icon(Icons.chevron_left, color: Colors.white),
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const FaIcon(
+                    FontAwesomeIcons.chevronLeft,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                ),
                 iconSize: 28,
               ),
               
-              // Photo indicators
               ...List.generate(_photos.length, (index) {
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: _currentPhotoIndex == index ? 10 : 6,
-                  height: _currentPhotoIndex == index ? 10 : 6,
+                  width: _currentPhotoIndex == index ? 10 : 7,
+                  height: _currentPhotoIndex == index ? 10 : 7,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _currentPhotoIndex == index
                         ? Colors.white
-                        : Colors.white.withOpacity(0.4),
+                        : Colors.white.withOpacity(0.5),
                   ),
                 );
               }),
               
-              // Next button
               IconButton(
                 onPressed: _nextPhoto,
-                icon: const Icon(Icons.chevron_right, color: Colors.white),
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const FaIcon(
+                    FontAwesomeIcons.chevronRight,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                ),
                 iconSize: 28,
               ),
             ],
@@ -663,7 +737,6 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
           photos: _photos,
           initialIndex: _currentPhotoIndex,
           studentName: widget.studentData['full_name'] ?? 'Student',
-          studentId: widget.studentData['id'],
         ),
       ),
     );
@@ -675,13 +748,11 @@ class _FullScreenPhotoViewer extends StatefulWidget {
   final List<Map<String, dynamic>> photos;
   final int initialIndex;
   final String studentName;
-  final String studentId;
 
   const _FullScreenPhotoViewer({
     required this.photos,
     required this.initialIndex,
     required this.studentName,
-    required this.studentId,
   });
 
   @override
@@ -717,7 +788,6 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
       ),
       body: Column(
         children: [
-          // Photo viewer
           Expanded(
             child: PageView.builder(
               controller: _pageController,
@@ -728,25 +798,22 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
                 });
               },
               itemBuilder: (context, index) {
-                return Hero(
-                  tag: 'student_${widget.studentId}_photo_$index',
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: Center(
-                      child: CachedNetworkImage(
-                        imageUrl: widget.photos[index]['photo_url'],
-                        fit: BoxFit.contain,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
+                return InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(
+                    child: CachedNetworkImage(
+                      imageUrl: widget.photos[index]['photo_url'],
+                      fit: BoxFit.contain,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
-                        errorWidget: (context, url, error) => const Icon(
-                          Icons.error,
-                          color: Colors.white,
-                          size: 64,
-                        ),
+                      ),
+                      errorWidget: (context, url, error) => const FaIcon(
+                        FontAwesomeIcons.circleExclamation,
+                        color: Colors.white,
+                        size: 64,
                       ),
                     ),
                   ),
@@ -755,21 +822,15 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
             ),
           ),
           
-          // Photo counter
           Container(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '${_currentIndex + 1} / ${widget.photos.length}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: Text(
+              '${_currentIndex + 1} / ${widget.photos.length}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -777,4 +838,3 @@ class _FullScreenPhotoViewerState extends State<_FullScreenPhotoViewer> {
     );
   }
 }
-

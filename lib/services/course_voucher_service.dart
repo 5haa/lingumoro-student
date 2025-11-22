@@ -4,27 +4,27 @@ class CourseVoucherService {
   final _supabase = Supabase.instance.client;
 
   /// Redeem a course voucher code
-  /// This validates the voucher matches the selected package and creates a subscription
+  /// This validates the voucher and creates a subscription with automatic session generation
+  /// Sessions are generated from today onwards - no backend required!
   Future<Map<String, dynamic>> redeemCourseVoucher({
     required String studentId,
     required String voucherCode,
     required String teacherId,
-    required String packageId,
     required String languageId,
     required List<int> selectedDays,
     required String startTime,
     required String endTime,
   }) async {
     try {
-      final response = await _supabase.rpc('redeem_course_voucher', params: {
+      // Call the new database function that handles everything automatically
+      final response = await _supabase.rpc('redeem_course_voucher_v2', params: {
         'p_student_id': studentId,
         'p_voucher_code': voucherCode.toUpperCase(),
         'p_teacher_id': teacherId,
-        'p_package_id': packageId,
         'p_language_id': languageId,
         'p_selected_days': selectedDays,
-        'p_start_time': startTime,
-        'p_end_time': endTime,
+        'p_selected_start_time': startTime,
+        'p_selected_end_time': endTime,
       });
 
       if (response is Map<String, dynamic>) {

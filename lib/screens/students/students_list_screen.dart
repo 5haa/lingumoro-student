@@ -4,6 +4,7 @@ import 'package:student/services/student_service.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/session_update_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/screens/students/student_public_profile_screen.dart';
 import 'package:student/screens/chat/chat_requests_screen.dart';
@@ -23,6 +24,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   final _chatService = ChatService();
   final _proService = ProSubscriptionService();
   final _authService = AuthService();
+  final _sessionUpdateService = SessionUpdateService();
   List<Map<String, dynamic>> _students = [];
   List<String> _myLanguages = [];
   List<Map<String, dynamic>> _sentRequests = [];
@@ -36,6 +38,19 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   @override
   void initState() {
     super.initState();
+    _loadStudents();
+    // Listen for subscription updates (when student subscribes to a course)
+    _sessionUpdateService.addListener(_handleSubscriptionUpdate);
+  }
+
+  @override
+  void dispose() {
+    _sessionUpdateService.removeListener(_handleSubscriptionUpdate);
+    super.dispose();
+  }
+
+  void _handleSubscriptionUpdate() {
+    // Reload students list when subscriptions change
     _loadStudents();
   }
 
