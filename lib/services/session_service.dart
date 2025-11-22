@@ -14,7 +14,7 @@ class SessionService {
           .from('sessions')
           .select('''
             *,
-            teacher:teachers(id, full_name, email),
+            teacher:teachers(id, full_name, email, avatar_url, is_online),
             language:language_courses(id, name, flag_url),
             subscription:student_subscriptions(id, points_remaining, status)
           ''')

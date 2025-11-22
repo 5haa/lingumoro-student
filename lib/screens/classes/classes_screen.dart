@@ -6,6 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../services/session_service.dart';
 import '../../services/session_update_service.dart';
+import '../../services/chat_service.dart';
+import '../chat/chat_conversation_screen.dart';
 
 class ClassesScreen extends StatefulWidget {
   const ClassesScreen({Key? key}) : super(key: key);
@@ -19,6 +21,7 @@ class _ClassesScreenState extends State<ClassesScreen>
   late TabController _tabController;
   final SessionService _sessionService = SessionService();
   final SessionUpdateService _sessionUpdateService = SessionUpdateService();
+  final ChatService _chatService = ChatService();
   
   List<Map<String, dynamic>> _upcomingSessions = [];
   List<Map<String, dynamic>> _finishedSessions = [];
@@ -123,6 +126,60 @@ class _ClassesScreenState extends State<ClassesScreen>
             content: Text('Error joining session: ${e.toString()}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openChatWithTeacher(Map<String, dynamic> session) async {
+    try {
+      final teacher = session['teacher'];
+      if (teacher == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Teacher information not available'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final teacherId = teacher['id'];
+      final teacherName = teacher['full_name'] ?? 'Teacher';
+      final teacherAvatar = teacher['avatar_url'];
+
+      // Get or create conversation
+      final conversation = await _chatService.getOrCreateConversation(teacherId);
+      
+      if (conversation != null && mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatConversationScreen(
+              conversationId: conversation['id'],
+              recipientId: teacherId,
+              recipientName: teacherName,
+              recipientAvatar: teacherAvatar,
+            ),
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to start chat. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening chat: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -524,15 +581,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                     size: 14,
                     color: AppColors.primary,
                   ),
-                  onPressed: () {
-                    // TODO: Open chat with teacher
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Chat feature coming soon!'),
-                        backgroundColor: AppColors.primary,
-                      ),
-                    );
-                  },
+                  onPressed: () => _openChatWithTeacher(session),
                 ),
               ),
             ],
