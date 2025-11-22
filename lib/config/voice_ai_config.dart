@@ -6,8 +6,8 @@ class VoiceAIConfig {
   
   // Available voice options
   static const List<String> availableVoices = [
-    "sarah",
     "heart",
+    "sarah",
     "rachel",
     "alice",
     "george",
@@ -19,7 +19,7 @@ class VoiceAIConfig {
   ];
   
   // Default settings
-  static const String defaultVoice = "sarah";
+  static const String defaultVoice = "heart";
   static const double defaultSpeechSpeed = 1.0;
   static const double minSpeechSpeed = 0.5;
   static const double maxSpeechSpeed = 2.0;

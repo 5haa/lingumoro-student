@@ -8,6 +8,7 @@ import '../../services/session_service.dart';
 import '../../services/session_update_service.dart';
 import '../../services/chat_service.dart';
 import '../chat/chat_conversation_screen.dart';
+import '../teachers/teacher_detail_screen.dart';
 
 class ClassesScreen extends StatefulWidget {
   const ClassesScreen({Key? key}) : super(key: key);
@@ -411,8 +412,8 @@ class _ClassesScreenState extends State<ClassesScreen>
     FlagsCode? flagCode = _getFlagCodeFromLanguage(language['name'] ?? '');
 
     final isInProgress = session['status'] == 'in_progress';
-
-    return Container(
+    
+    final cardWidget = Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -848,8 +849,74 @@ class _ClassesScreenState extends State<ClassesScreen>
                 ),
               ),
             ],
+          ] else ...[
+            // For finished sessions, add a button to rate the teacher
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: AppColors.redGradient,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.star, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tap to view teacher & rate',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
+      ),
+    );
+    
+    // Wrap finished sessions in GestureDetector to navigate to teacher details
+    if (!isUpcoming && session['status'] == 'completed') {
+      return GestureDetector(
+        onTap: () => _navigateToTeacherDetail(session),
+        child: cardWidget,
+      );
+    }
+    
+    return cardWidget;
+  }
+  
+  void _navigateToTeacherDetail(Map<String, dynamic> session) {
+    final teacher = session['teacher'] ?? {};
+    final language = session['language'] ?? {};
+    
+    final teacherId = teacher['id'];
+    final languageId = language['id'];
+    final languageName = language['name'];
+    
+    if (teacherId == null || languageId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to load teacher details'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TeacherDetailScreen(
+          teacherId: teacherId,
+          languageId: languageId,
+          languageName: languageName ?? 'Language',
+        ),
       ),
     );
   }

@@ -5,8 +5,8 @@ import 'package:student/services/auth_service.dart';
 import 'package:student/services/rating_service.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/screens/teachers/subscription_screen.dart';
+import 'package:student/screens/teachers/teacher_ratings_screen.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
-import 'package:student/widgets/rating_widget.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -222,69 +222,20 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     );
   }
 
-  Future<void> _handleRatingSubmit(int rating, String? comment) async {
-    final currentUser = _authService.currentUser;
-    if (currentUser == null) return;
-
-    final success = await _ratingService.submitRating(
-      studentId: currentUser.id,
-      teacherId: widget.teacherId,
-      rating: rating,
-      comment: comment,
-    );
-
-    if (mounted) {
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Rating submitted successfully!'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // Reload teacher data to show updated rating
-        _loadTeacherData();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to submit rating. Please try again.'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showRatingDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: RatingInput(
-            initialRating: _myRating?['rating'] as int?,
-            initialComment: _myRating?['comment'] as String?,
-            onSubmit: (rating, comment) async {
-              Navigator.pop(context);
-              await _handleRatingSubmit(rating, comment);
-            },
-          ),
+  void _navigateToRatingsScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TeacherRatingsScreen(
+          teacherId: widget.teacherId,
+          teacherName: _teacher?['full_name'] ?? 'Teacher',
+          teacherAvatar: _teacher?['avatar_url'],
         ),
       ),
-    );
+    ).then((_) {
+      // Reload data when returning from ratings screen
+      _loadTeacherData();
+    });
   }
 
   Future<void> _openChat() async {
@@ -414,6 +365,11 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                       
                       // Subscribe Button
                       _buildSubscribeButton(),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Ratings & Reviews Section (clickable)
+                      _buildRatingsSection(averageRating),
                       
                       const SizedBox(height: 30),
                     ],
@@ -883,6 +839,154 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     } catch (e) {
       return time;
     }
+  }
+
+  Widget _buildRatingsSection(double averageRating) {
+    final totalRatings = _ratingStats?['total_ratings'] as int? ?? 0;
+    final hasRatings = totalRatings > 0;
+
+    return GestureDetector(
+      onTap: _navigateToRatingsScreen,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: InkWell(
+          onTap: _navigateToRatingsScreen,
+          borderRadius: BorderRadius.circular(16),
+          child: Row(
+            children: [
+              // Left side - Icon
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: AppColors.redGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.rate_review,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              
+              const SizedBox(width: 14),
+              
+              // Middle - Text and rating
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Ratings & Reviews',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (hasRatings)
+                      Row(
+                        children: [
+                          Text(
+                            averageRating.toStringAsFixed(1),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          ...List.generate(5, (index) {
+                            if (index < averageRating.floor()) {
+                              return const Icon(Icons.star, color: Colors.amber, size: 14);
+                            } else if (index < averageRating) {
+                              return const Icon(Icons.star_half, color: Colors.amber, size: 14);
+                            } else {
+                              return Icon(Icons.star_border, color: Colors.grey.shade300, size: 14);
+                            }
+                          }),
+                          const SizedBox(width: 6),
+                          Text(
+                            '($totalRatings)',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      const Text(
+                        'No reviews yet',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    if (_canRate) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star,
+                              color: AppColors.primary,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _myRating != null ? 'Update' : 'Rate',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              
+              // Right side - Arrow
+              Icon(
+                Icons.arrow_forward_ios,
+                color: AppColors.textSecondary.withOpacity(0.5),
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
