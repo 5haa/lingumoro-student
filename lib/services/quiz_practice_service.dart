@@ -90,6 +90,137 @@ class QuizPracticeService {
     }
   }
 
+  /// Generate a new quiz session with 10 questions
+  Future<List<Map<String, dynamic>>?> generateQuizSession({
+    required int level,
+    String language = 'English',
+  }) async {
+    return generateQuestions(level: level, count: 10, language: language);
+  }
+
+  /// Save a complete quiz session with all results
+  Future<String?> saveQuizSession({
+    required String studentId,
+    required int level,
+    required List<Map<String, dynamic>> questions,
+    required List<String?> studentAnswers,
+    required int durationSeconds,
+  }) async {
+    try {
+      // Calculate results
+      int correctCount = 0;
+      int totalPoints = 0;
+
+      for (int i = 0; i < questions.length; i++) {
+        final question = questions[i];
+        final studentAnswer = studentAnswers[i];
+        final correctAnswer = question['correct_answer'];
+        final isCorrect = studentAnswer != null && studentAnswer == correctAnswer;
+
+        if (isCorrect) {
+          correctCount++;
+          // Award more points for higher levels
+          final pointsForQuestion = 5 + (level ~/ 10);
+          totalPoints += pointsForQuestion;
+        }
+      }
+
+      final scorePercentage = (correctCount / questions.length * 100).toStringAsFixed(2);
+
+      // Create quiz session
+      final sessionResponse = await _supabase
+          .from('quiz_sessions')
+          .insert({
+            'student_id': studentId,
+            'total_questions': questions.length,
+            'correct_answers': correctCount,
+            'score_percentage': double.parse(scorePercentage),
+            'points_earned': totalPoints,
+            'duration_seconds': durationSeconds,
+          })
+          .select()
+          .single();
+
+      final sessionId = sessionResponse['id'] as String;
+
+      // Save individual question results
+      final results = <Map<String, dynamic>>[];
+      for (int i = 0; i < questions.length; i++) {
+        final question = questions[i];
+        final studentAnswer = studentAnswers[i];
+        final correctAnswer = question['correct_answer'];
+        final isCorrect = studentAnswer != null && studentAnswer == correctAnswer;
+        final pointsForQuestion = isCorrect ? (5 + (level ~/ 10)) : 0;
+
+        results.add({
+          'session_id': sessionId,
+          'student_id': studentId,
+          'level': level,
+          'question': question['question'],
+          'options': jsonEncode(question['options']),
+          'correct_answer': correctAnswer,
+          'student_answer': studentAnswer ?? '',
+          'is_correct': isCorrect,
+          'points_awarded': pointsForQuestion,
+        });
+      }
+
+      await _supabase.from('quiz_practice_results').insert(results);
+
+      // Award total points to student
+      if (totalPoints > 0) {
+        await _levelService.awardPoints(studentId, totalPoints);
+      }
+
+      return sessionId;
+    } catch (e) {
+      print('Error saving quiz session: $e');
+      return null;
+    }
+  }
+
+  /// Get quiz session history
+  Future<List<Map<String, dynamic>>> getQuizSessionHistory(String studentId) async {
+    try {
+      final sessions = await _supabase
+          .from('quiz_sessions')
+          .select()
+          .eq('student_id', studentId)
+          .order('completed_at', ascending: false)
+          .limit(20);
+
+      return List<Map<String, dynamic>>.from(sessions);
+    } catch (e) {
+      print('Error getting quiz session history: $e');
+      return [];
+    }
+  }
+
+  /// Get quiz session with all questions
+  Future<Map<String, dynamic>?> getQuizSession(String sessionId) async {
+    try {
+      final session = await _supabase
+          .from('quiz_sessions')
+          .select()
+          .eq('id', sessionId)
+          .single();
+
+      final results = await _supabase
+          .from('quiz_practice_results')
+          .select()
+          .eq('session_id', sessionId)
+          .order('created_at', ascending: true);
+
+      return {
+        ...session,
+        'questions': List<Map<String, dynamic>>.from(results),
+      };
+    } catch (e) {
+      print('Error getting quiz session: $e');
+      return null;
+    }
+  }
+
   /// Save a quiz practice result
   Future<bool> saveResult({
     required String studentId,
@@ -131,54 +262,74 @@ class QuizPracticeService {
     }
   }
 
-  /// Get student's quiz practice statistics
+  /// Get student's quiz practice statistics (based on sessions)
   Future<Map<String, dynamic>> getStatistics(String studentId) async {
     try {
-      final results = await _supabase
-          .from('quiz_practice_results')
+      // Get all quiz sessions
+      final sessions = await _supabase
+          .from('quiz_sessions')
           .select()
           .eq('student_id', studentId)
           .order('completed_at', ascending: false);
 
-      final resultList = List<Map<String, dynamic>>.from(results);
+      final sessionList = List<Map<String, dynamic>>.from(sessions);
       
-      if (resultList.isEmpty) {
+      if (sessionList.isEmpty) {
         return {
+          'total_sessions': 0,
           'total_questions': 0,
           'correct_answers': 0,
           'incorrect_answers': 0,
           'accuracy': 0.0,
           'total_points_earned': 0,
-          'recent_results': [],
+          'average_score': 0.0,
+          'recent_sessions': [],
         };
       }
 
-      final totalQuestions = resultList.length;
-      final correctAnswers = resultList.where((r) => r['is_correct'] == true).length;
-      final incorrectAnswers = totalQuestions - correctAnswers;
-      final accuracy = (correctAnswers / totalQuestions * 100).toStringAsFixed(1);
-      final totalPointsEarned = resultList.fold<int>(
+      final totalSessions = sessionList.length;
+      final totalQuestions = sessionList.fold<int>(
         0,
-        (sum, r) => sum + ((r['points_awarded'] as int?) ?? 0),
+        (sum, s) => sum + ((s['total_questions'] as int?) ?? 0),
       );
+      final correctAnswers = sessionList.fold<int>(
+        0,
+        (sum, s) => sum + ((s['correct_answers'] as int?) ?? 0),
+      );
+      final incorrectAnswers = totalQuestions - correctAnswers;
+      final accuracy = totalQuestions > 0 
+          ? (correctAnswers / totalQuestions * 100).toStringAsFixed(1)
+          : '0.0';
+      final totalPointsEarned = sessionList.fold<int>(
+        0,
+        (sum, s) => sum + ((s['points_earned'] as int?) ?? 0),
+      );
+      final averageScore = sessionList.fold<double>(
+        0.0,
+        (sum, s) => sum + ((s['score_percentage'] as num?)?.toDouble() ?? 0.0),
+      ) / totalSessions;
 
       return {
+        'total_sessions': totalSessions,
         'total_questions': totalQuestions,
         'correct_answers': correctAnswers,
         'incorrect_answers': incorrectAnswers,
         'accuracy': double.parse(accuracy),
         'total_points_earned': totalPointsEarned,
-        'recent_results': resultList.take(10).toList(),
+        'average_score': averageScore,
+        'recent_sessions': sessionList.take(10).toList(),
       };
     } catch (e) {
       print('Error getting quiz statistics: $e');
       return {
+        'total_sessions': 0,
         'total_questions': 0,
         'correct_answers': 0,
         'incorrect_answers': 0,
         'accuracy': 0.0,
         'total_points_earned': 0,
-        'recent_results': [],
+        'average_score': 0.0,
+        'recent_sessions': [],
       };
     }
   }

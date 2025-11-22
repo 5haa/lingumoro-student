@@ -36,6 +36,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   
   // Statistics for cards
   Map<String, dynamic> _quizStats = {
+    'total_sessions': 0,
     'total_questions': 0,
     'accuracy': 0.0,
   };
@@ -185,64 +186,81 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           color: AppColors.primary,
                           child: SingleChildScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(16),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 // Practice Cards Grid
                         _buildPracticeCard(
-                          title: 'AI Voice Practice',
-                          icon: FontAwesomeIcons.microphone,
-                          color: Colors.teal.shade400,
-                          stat1Label: 'Real-time',
-                          stat1Value: 'Chat',
-                          stat2Label: 'Status',
-                          stat2Value: 'Ready',
-                          onTap: () => _navigateToVoiceAI(),
+                          title: 'Language Quiz',
+                          icon: FontAwesomeIcons.penToSquare,
+                          emoji: '✏️',
+                          color: Colors.orange.shade600,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFFFF9966), Color(0xFFFF6B6B)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          stat2Label: '${_quizStats['total_sessions'] ?? 0} quizzes',
+                          onTap: () => _navigateToQuiz(),
                           isLocked: !_hasProSubscription,
+                          showProgress: false,
                         ),
-                        const SizedBox(height: 15),
+                        const SizedBox(height: 12),
 
                         _buildPracticeCard(
-                          title: 'Video Practice',
-                          icon: FontAwesomeIcons.play,
-                          color: Colors.red.shade400,
-                          stat1Label: 'Completed',
-                          stat1Value: '${_watchedVideos.values.where((w) => w).length}/${_videos.length}',
-                          stat2Label: 'Progress',
-                          stat2Value: _videos.isNotEmpty
-                              ? '${((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt()}%'
-                              : '0%',
-                          onTap: () => _navigateToVideoPractice(),
+                          title: 'AI Voice Practice',
+                          icon: FontAwesomeIcons.microphone,
+                          emoji: '🎙️',
+                          color: Colors.green.shade600,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          stat2Label: 'Real-time chat',
+                          onTap: () => _navigateToVoiceAI(),
                           isLocked: !_hasProSubscription,
+                          showProgress: false,
                         ),
-                        const SizedBox(height: 15),
+                        const SizedBox(height: 12),
 
                         _buildPracticeCard(
                           title: 'Reading Stories',
                           icon: FontAwesomeIcons.book,
-                          color: Colors.blue.shade400,
-                          stat1Label: 'Total Stories',
-                          stat1Value: '$_storiesGenerated',
-                          stat2Label: 'Remaining',
-                          stat2Value: '$_remainingStories',
+                          emoji: '📖',
+                          color: Colors.blue.shade600,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          stat2Label: '$_storiesGenerated stories',
                           onTap: () => _navigateToReading(),
                           isLocked: !_hasProSubscription,
+                          showProgress: false,
                         ),
-                        const SizedBox(height: 15),
+                        const SizedBox(height: 12),
 
                         _buildPracticeCard(
-                          title: 'Language Quiz',
-                          icon: FontAwesomeIcons.penToSquare,
-                          color: Colors.purple.shade400,
-                          stat1Label: 'Questions',
-                          stat1Value: '${_quizStats['total_questions'] ?? 0}',
-                          stat2Label: 'Accuracy',
-                          stat2Value: '${(_quizStats['accuracy'] ?? 0.0).toInt()}%',
-                          onTap: () => _navigateToQuiz(),
+                          title: 'Video Practice',
+                          icon: FontAwesomeIcons.play,
+                          emoji: '📹',
+                          color: Colors.red.shade600,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFFED4264), Color(0xFFFFEDBC)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          stat2Label: '${_videos.length} videos',
+                          onTap: () => _navigateToVideoPractice(),
                           isLocked: !_hasProSubscription,
+                          showProgress: true,
+                          progressValue: _videos.isNotEmpty
+                              ? ((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt()
+                              : 0,
                         ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 16),
                               ],
                             ),
                           ),
@@ -312,137 +330,136 @@ class _PracticeScreenState extends State<PracticeScreen> {
     required String title,
     required IconData icon,
     required Color color,
-    required String stat1Label,
-    required String stat1Value,
     required String stat2Label,
-    required String stat2Value,
     required VoidCallback onTap,
     bool isLocked = false,
+    String emoji = '📚',
+    required LinearGradient gradient,
+    bool showProgress = false,
+    int? progressValue,
   }) {
     return GestureDetector(
       onTap: isLocked ? _showProRequiredDialog : onTap,
       child: Container(
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(15),
+          gradient: isLocked 
+              ? LinearGradient(
+                  colors: [Colors.grey.shade400, Colors.grey.shade500],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : gradient,
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
+              color: color.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                // Icon container
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isLocked ? Colors.grey.shade300 : color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                        child: FaIcon(
-                          isLocked ? FontAwesomeIcons.lock : icon,
-                          size: 30,
-                          color: isLocked ? Colors.grey.shade600 : color,
-                        ),
-                ),
-                const SizedBox(width: 15),
-                // Title
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isLocked ? AppColors.textSecondary : AppColors.textPrimary,
-                        ),
-                      ),
-                      if (isLocked) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            FaIcon(FontAwesomeIcons.crown, size: 14, color: Colors.amber.shade600),
-                            const SizedBox(width: 4),
-                            Text(
-                              'PRO Required',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.amber.shade600,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                FaIcon(
-                  FontAwesomeIcons.chevronRight,
-                  size: 16,
-                  color: AppColors.textSecondary,
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            // Stats
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: AppColors.lightGrey,
-                borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Emoji
+              Text(
+                isLocked ? '🔒' : emoji,
+                style: const TextStyle(fontSize: 42),
               ),
-              child: Row(
+              
+              const SizedBox(height: 12),
+              
+              // Title
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              // Badges row
+              Wrap(
+                spacing: 6,
                 children: [
-                  Expanded(
-                    child: _buildStatColumn(stat1Label, stat1Value, color),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: AppColors.border,
-                  ),
-                  Expanded(
-                    child: _buildStatColumn(stat2Label, stat2Value, color),
-                  ),
+                  _buildBadge(stat2Label, color),
+                  if (isLocked)
+                    _buildBadge('PRO Only', Colors.amber.shade700),
                 ],
               ),
-            ),
-          ],
+              
+              // Progress bar (only for video card)
+              if (showProgress) ...[
+                const SizedBox(height: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Lesson',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          isLocked ? '0%' : '${progressValue ?? 0}% Completed',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white.withOpacity(0.9),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: isLocked ? 0 : (progressValue ?? 0) / 100,
+                        backgroundColor: Colors.white.withOpacity(0.3),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        minHeight: 5,
+                      ),
+                    ),
+                  ],
+                ),
+              ] else
+                const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStatColumn(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+  Widget _buildBadge(String text, Color bgColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 10,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 
