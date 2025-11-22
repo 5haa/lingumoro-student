@@ -5,20 +5,47 @@ class TimeslotService {
 
   /// Get available timeslots for a teacher on specific days
   /// Returns only slots that are available (enabled by teacher) and not occupied
+  /// Also respects the teacher's general schedule (teacher_schedules)
   Future<Map<int, List<Map<String, dynamic>>>> getAvailableTimeslots({
     required String teacherId,
     List<int>? specificDays,
   }) async {
     try {
+      // First, get the teacher's general schedule to know which days are available
+      final scheduleResponse = await _supabase
+          .from('teacher_schedules')
+          .select('day_of_week')
+          .eq('teacher_id', teacherId)
+          .eq('is_available', true);
+      
+      final scheduleData = List<Map<String, dynamic>>.from(scheduleResponse);
+      final availableDaysInSchedule = scheduleData
+          .map((s) => s['day_of_week'] as int)
+          .toSet();
+      
+      // If no days are available in general schedule, return empty
+      if (availableDaysInSchedule.isEmpty) {
+        return {};
+      }
+      
+      // Now get timeslots, but only for days that are in the general schedule
       var query = _supabase
           .from('teacher_timeslots')
           .select()
           .eq('teacher_id', teacherId)
           .eq('is_available', true)
-          .eq('is_occupied', false);
+          .eq('is_occupied', false)
+          .inFilter('day_of_week', availableDaysInSchedule.toList());
 
       if (specificDays != null && specificDays.isNotEmpty) {
-        query = query.inFilter('day_of_week', specificDays);
+        // Further filter by specific days if provided
+        final filteredDays = specificDays
+            .where((day) => availableDaysInSchedule.contains(day))
+            .toList();
+        if (filteredDays.isEmpty) {
+          return {};
+        }
+        query = query.inFilter('day_of_week', filteredDays);
       }
       
       final response = await query.order('day_of_week').order('start_time');
@@ -106,14 +133,33 @@ class TimeslotService {
   }
 
   /// Get days that have available timeslots for a teacher
+  /// Only returns days that are marked as available in teacher's general schedule
   Future<List<int>> getDaysWithAvailableSlots(String teacherId) async {
     try {
+      // First check teacher's general schedule
+      final scheduleResponse = await _supabase
+          .from('teacher_schedules')
+          .select('day_of_week')
+          .eq('teacher_id', teacherId)
+          .eq('is_available', true);
+      
+      final scheduleData = List<Map<String, dynamic>>.from(scheduleResponse);
+      final availableDaysInSchedule = scheduleData
+          .map((s) => s['day_of_week'] as int)
+          .toSet();
+      
+      if (availableDaysInSchedule.isEmpty) {
+        return [];
+      }
+      
+      // Then get timeslots only for those days
       final response = await _supabase
           .from('teacher_timeslots')
           .select('day_of_week')
           .eq('teacher_id', teacherId)
           .eq('is_available', true)
-          .eq('is_occupied', false);
+          .eq('is_occupied', false)
+          .inFilter('day_of_week', availableDaysInSchedule.toList());
 
       final slots = List<Map<String, dynamic>>.from(response);
       final days = slots.map((s) => s['day_of_week'] as int).toSet().toList();

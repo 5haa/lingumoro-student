@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../services/session_service.dart';
+import '../../services/session_update_service.dart';
 
 class ClassesScreen extends StatefulWidget {
   const ClassesScreen({Key? key}) : super(key: key);
@@ -17,6 +18,7 @@ class _ClassesScreenState extends State<ClassesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final SessionService _sessionService = SessionService();
+  final SessionUpdateService _sessionUpdateService = SessionUpdateService();
   
   List<Map<String, dynamic>> _upcomingSessions = [];
   List<Map<String, dynamic>> _finishedSessions = [];
@@ -27,12 +29,20 @@ class _ClassesScreenState extends State<ClassesScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadSessions();
+    
+    // Listen for session updates
+    _sessionUpdateService.addListener(_handleSessionUpdate);
   }
 
   @override
   void dispose() {
+    _sessionUpdateService.removeListener(_handleSessionUpdate);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handleSessionUpdate() {
+    _loadSessions();
   }
 
   Future<void> _loadSessions() async {
@@ -207,18 +217,22 @@ class _ClassesScreenState extends State<ClassesScreen>
                   ? const Center(child: CircularProgressIndicator(
                       color: AppColors.primary,
                     ))
-                  : RefreshIndicator(
-                      onRefresh: _loadSessions,
-                      color: AppColors.primary,
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          // Upcoming Classes
-                          _buildClassesList(_upcomingSessions, isUpcoming: true),
-                          // Finished Classes
-                          _buildClassesList(_finishedSessions, isUpcoming: false),
-                        ],
-                      ),
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        // Upcoming Classes
+                        RefreshIndicator(
+                          onRefresh: _loadSessions,
+                          color: AppColors.primary,
+                          child: _buildClassesList(_upcomingSessions, isUpcoming: true),
+                        ),
+                        // Finished Classes
+                        RefreshIndicator(
+                          onRefresh: _loadSessions,
+                          color: AppColors.primary,
+                          child: _buildClassesList(_finishedSessions, isUpcoming: false),
+                        ),
+                      ],
                     ),
             ),
           ],
@@ -230,40 +244,64 @@ class _ClassesScreenState extends State<ClassesScreen>
   Widget _buildClassesList(List<Map<String, dynamic>> classes,
       {required bool isUpcoming}) {
     if (classes.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FaIcon(
-              FontAwesomeIcons.calendarXmark,
-              size: 60,
-              color: AppColors.textSecondary.withOpacity(0.3),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              isUpcoming ? 'No upcoming classes' : 'No finished classes',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.textSecondary.withOpacity(0.6),
+      // Wrap in ListView to enable pull-to-refresh even when empty
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FaIcon(
+                    FontAwesomeIcons.calendarXmark,
+                    size: 60,
+                    color: AppColors.textSecondary.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    isUpcoming ? 'No upcoming classes' : 'No finished classes',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textSecondary.withOpacity(0.6),
+                    ),
+                  ),
+                  if (isUpcoming) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Subscribe to a teacher to see your classes here',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary.withOpacity(0.5),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    Icon(
+                      Icons.arrow_downward,
+                      color: AppColors.textSecondary.withOpacity(0.3),
+                      size: 24,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Pull down to refresh',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary.withOpacity(0.4),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            if (isUpcoming) ...[
-              const SizedBox(height: 10),
-              Text(
-                'Subscribe to a teacher to see your classes here',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary.withOpacity(0.5),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       itemCount: classes.length,
       itemBuilder: (context, index) {

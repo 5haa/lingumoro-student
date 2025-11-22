@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:student/services/course_voucher_service.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/session_update_service.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:student/widgets/custom_button.dart';
@@ -92,6 +93,9 @@ class _CourseVoucherRedemptionScreenState
       if (!mounted) return;
 
       if (result['success'] == true) {
+        // Notify listeners that sessions have been updated
+        SessionUpdateService().notifySessionsUpdated();
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
