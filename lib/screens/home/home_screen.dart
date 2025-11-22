@@ -27,6 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final PageController _pageController = PageController(viewportFraction: 0.85);
   Timer? _timer;
   
+  // Static image providers to prevent reloading
+  static const _studentImageProvider = AssetImage('assets/images/student.jpg');
+  static const _teacherImageProvider = AssetImage('assets/images/teacher.jpg');
+  
   List<Map<String, dynamic>> _languages = [];
   List<Map<String, dynamic>> _carouselSlides = [];
   int _selectedLanguageIndex = 0;
@@ -578,32 +582,38 @@ class _HomeScreenState extends State<HomeScreen> {
               
               return Stack(
                 children: [
-                  // Background image covering the whole card
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: Image.asset(
-                      imagePath,
-                      width: double.infinity,
-                      height: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: double.infinity,
-                          height: double.infinity,
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.2),
-                          ),
-                          child: Center(
-                            child: FaIcon(
-                              imageOnRight 
-                                ? FontAwesomeIcons.chalkboardUser
-                                : FontAwesomeIcons.graduationCap,
-                              color: color,
-                              size: iconSize * 2,
+                  // Background image covering the whole card - wrapped in RepaintBoundary
+                  RepaintBoundary(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image(
+                        image: imagePath == 'assets/images/student.jpg' 
+                            ? _studentImageProvider 
+                            : _teacherImageProvider,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                        filterQuality: FilterQuality.medium,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: double.infinity,
+                            height: double.infinity,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.2),
                             ),
-                          ),
-                        );
-                      },
+                            child: Center(
+                              child: FaIcon(
+                                imageOnRight 
+                                  ? FontAwesomeIcons.chalkboardUser
+                                  : FontAwesomeIcons.graduationCap,
+                                color: color,
+                                size: iconSize * 2,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                   // Title text
