@@ -51,10 +51,17 @@ class _ClassesScreenState extends State<ClassesScreen>
   Future<void> _loadSessions() async {
     setState(() => _isLoading = true);
     try {
-      final sessions = await _sessionService.getUpcomingSessions();
+      // Load both upcoming and finished sessions in parallel
+      final results = await Future.wait([
+        _sessionService.getUpcomingSessions(),
+        _sessionService.getPastSessions(),
+      ]);
       
-      // Sort sessions by date and time - closest to start at the top
-      sessions.sort((a, b) {
+      final upcomingSessions = results[0];
+      final finishedSessions = results[1];
+      
+      // Sort upcoming sessions by date and time - closest to start at the top
+      upcomingSessions.sort((a, b) {
         try {
           final dateA = DateTime.parse(a['scheduled_date']);
           final dateB = DateTime.parse(b['scheduled_date']);
@@ -72,8 +79,8 @@ class _ClassesScreenState extends State<ClassesScreen>
       });
       
       setState(() {
-        _upcomingSessions = sessions;
-        _finishedSessions = []; // TODO: Load finished sessions from service
+        _upcomingSessions = upcomingSessions;
+        _finishedSessions = finishedSessions;
       });
     } catch (e) {
       if (mounted) {
@@ -403,15 +410,22 @@ class _ClassesScreenState extends State<ClassesScreen>
     // Get flag code from language name
     FlagsCode? flagCode = _getFlagCodeFromLanguage(language['name'] ?? '');
 
+    final isInProgress = session['status'] == 'in_progress';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(20),
+        border: isInProgress 
+            ? Border.all(color: Colors.green.shade400, width: 2.5)
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: isInProgress 
+                ? Colors.green.withOpacity(0.15)
+                : Colors.black.withOpacity(0.06),
             blurRadius: 15,
             offset: const Offset(0, 3),
           ),
@@ -419,6 +433,41 @@ class _ClassesScreenState extends State<ClassesScreen>
       ),
       child: Column(
         children: [
+          // Live indicator for in-progress sessions
+          if (isInProgress) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade600,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'LIVE NOW',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           // Language and Flag
           Row(
             children: [

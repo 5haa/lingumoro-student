@@ -20,7 +20,7 @@ class SessionService {
           ''')
           .eq('student_id', user.id)
           .gte('scheduled_date', today)
-          .inFilter('status', ['scheduled', 'ready'])
+          .inFilter('status', ['scheduled', 'ready', 'in_progress'])
           .order('scheduled_date')
           .order('scheduled_start_time');
 
@@ -36,18 +36,18 @@ class SessionService {
       final user = _supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
-      final today = DateTime.now().toIso8601String().split('T')[0];
-
       final response = await _supabase
           .from('sessions')
           .select('''
             *,
-            teacher:teachers(id, full_name),
-            language:language_courses(id, name)
+            teacher:teachers(id, full_name, email, avatar_url, is_online),
+            language:language_courses(id, name, flag_url),
+            subscription:student_subscriptions(id, points_remaining, status)
           ''')
           .eq('student_id', user.id)
-          .or('status.eq.completed,status.eq.cancelled,status.eq.missed')
-          .order('scheduled_date', ascending: false);
+          .inFilter('status', ['completed', 'cancelled', 'missed'])
+          .order('scheduled_date', ascending: false)
+          .order('scheduled_start_time', ascending: false);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
@@ -89,6 +89,13 @@ class SessionService {
         return false;
       }
 
+      final status = session['status'];
+      
+      // Can always join if session is in progress
+      if (status == 'in_progress') {
+        return true;
+      }
+
       // Check if it's the right time to join (within 15 minutes before start time)
       final now = DateTime.now();
       final scheduledDate = DateTime.parse(session['scheduled_date']);
@@ -122,6 +129,13 @@ class SessionService {
 
   String getSessionStatus(Map<String, dynamic> session) {
     try {
+      final status = session['status'];
+      
+      // If session is in_progress, always show that
+      if (status == 'in_progress') {
+        return 'in_progress';
+      }
+      
       final now = DateTime.now();
       final scheduledDate = DateTime.parse(session['scheduled_date']);
       final scheduledTime = _parseTime(session['scheduled_start_time']);
