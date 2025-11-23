@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/services/presence_service.dart';
 import 'package:student/services/session_update_service.dart';
+import 'package:student/services/preload_service.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -16,17 +17,18 @@ class ChatListScreen extends StatefulWidget {
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> {
+class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAliveClientMixin {
   final _chatService = ChatService();
   final _presenceService = PresenceService();
   final _sessionUpdateService = SessionUpdateService();
+  final _preloadService = PreloadService();
   final _searchController = TextEditingController();
   
   List<Map<String, dynamic>> _conversations = [];
   List<Map<String, dynamic>> _filteredConversations = [];
   List<Map<String, dynamic>> _availableTeachers = [];
   List<Map<String, dynamic>> _pendingRequests = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _showAvailable = false;
   Timer? _statusRefreshTimer;
   
@@ -34,14 +36,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final Map<String, bool> _onlineStatus = {};
 
   @override
+  bool get wantKeepAlive => true; // Keep state alive when switching tabs
+
+  @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadDataFromCache();
     _chatService.subscribeToConversations();
     
     // Listen to conversation updates
     _chatService.onConversationUpdate.listen((update) {
-      _loadData();
+      _preloadService.invalidateChat();
+      _loadData(forceRefresh: true); // Force refresh on real-time updates
     });
     
     // Listen for subscription updates (when student subscribes to a course)
@@ -67,8 +73,71 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _handleSubscriptionUpdate() {
-    // Reload chat list when subscriptions change
-    _loadData();
+    // Invalidate and reload chat when subscriptions change
+    _preloadService.invalidateChat();
+    _loadData(forceRefresh: true);
+  }
+
+  void _loadDataFromCache() {
+    // Try to load from cache first
+    final cached = _preloadService.chatData;
+    if (cached != null) {
+      setState(() {
+        _conversations = cached.conversations;
+        _filteredConversations = cached.conversations;
+        _availableTeachers = cached.teachers;
+        _pendingRequests = cached.requests;
+        _isLoading = false;
+      });
+      print('✅ Loaded chat data from cache');
+      _subscribeToStatuses();
+      return;
+    }
+    
+    // No cache, load from API
+    _loadData(forceRefresh: false);
+  }
+
+  void _subscribeToStatuses() {
+    // Subscribe to online status for all conversation participants
+    for (var conversation in _conversations) {
+      final conversationType = conversation['conversation_type'] ?? 'teacher_student';
+      String? otherPartyId;
+      String otherPartyType;
+      
+      if (conversationType == 'teacher_student') {
+        otherPartyId = conversation['teacher_id'];
+        otherPartyType = 'teacher';
+      } else {
+        final currentUserId = _chatService.supabase.auth.currentUser?.id;
+        if (conversation['student_id'] == currentUserId) {
+          otherPartyId = conversation['participant2_id'];
+        } else {
+          otherPartyId = conversation['student_id'];
+        }
+        otherPartyType = 'student';
+      }
+      
+      if (otherPartyId != null) {
+        _subscribeToUserStatus(otherPartyId, otherPartyType);
+      }
+    }
+    
+    // Subscribe to online status for available teachers
+    for (var teacher in _availableTeachers) {
+      final teacherId = teacher['id'];
+      if (teacherId != null) {
+        _subscribeToUserStatus(teacherId, 'teacher');
+      }
+    }
+    
+    // Subscribe to online status for pending requests
+    for (var request in _pendingRequests) {
+      final requester = request['requester'] as Map<String, dynamic>?;
+      if (requester != null && requester['id'] != null) {
+        _subscribeToUserStatus(requester['id'], 'student');
+      }
+    }
   }
 
   void _filterConversations() {
@@ -103,14 +172,28 @@ class _ChatListScreenState extends State<ChatListScreen> {
     });
   }
 
-  Future<void> _loadData() async {
-    if (mounted) {
+  Future<void> _loadData({bool forceRefresh = false}) async {
+    if (forceRefresh && mounted) {
       setState(() => _isLoading = true);
     }
     
-    final conversations = await _chatService.getConversations();
-    final teachers = await _chatService.getAvailableTeachers();
-    final pendingRequests = await _chatService.getPendingChatRequests();
+    // OPTIMIZATION: Parallelize queries
+    final results = await Future.wait([
+      _chatService.getConversations(),
+      _chatService.getAvailableTeachers(),
+      _chatService.getPendingChatRequests(),
+    ]);
+    
+    final conversations = results[0] as List<Map<String, dynamic>>;
+    final teachers = results[1] as List<Map<String, dynamic>>;
+    final pendingRequests = results[2] as List<Map<String, dynamic>>;
+    
+    // Cache the data
+    _preloadService.cacheChat(
+      conversations: conversations,
+      teachers: teachers,
+      requests: pendingRequests,
+    );
     
     if (mounted) {
       setState(() {
@@ -121,45 +204,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         _isLoading = false;
       });
       
-      // Subscribe to online status for all conversation participants
-      for (var conversation in conversations) {
-        final conversationType = conversation['conversation_type'] ?? 'teacher_student';
-        String? otherPartyId;
-        String otherPartyType;
-        
-        if (conversationType == 'teacher_student') {
-          otherPartyId = conversation['teacher_id'];
-          otherPartyType = 'teacher';
-        } else {
-          final currentUserId = _chatService.supabase.auth.currentUser?.id;
-          if (conversation['student_id'] == currentUserId) {
-            otherPartyId = conversation['participant2_id'];
-          } else {
-            otherPartyId = conversation['student_id'];
-          }
-          otherPartyType = 'student';
-        }
-        
-        if (otherPartyId != null) {
-          _subscribeToUserStatus(otherPartyId, otherPartyType);
-        }
-      }
-      
-      // Subscribe to online status for available teachers
-      for (var teacher in teachers) {
-        final teacherId = teacher['id'];
-        if (teacherId != null) {
-          _subscribeToUserStatus(teacherId, 'teacher');
-        }
-      }
-      
-      // Subscribe to online status for pending requests
-      for (var request in pendingRequests) {
-        final requester = request['requester'] as Map<String, dynamic>?;
-        if (requester != null && requester['id'] != null) {
-          _subscribeToUserStatus(requester['id'], 'student');
-        }
-      }
+      _subscribeToStatuses();
     }
   }
   
@@ -212,8 +257,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         );
         
-        // Reload data to refresh the list
-        await _loadData();
+        // Invalidate cache for fresh data
+        _preloadService.invalidateChat();
+        await _loadData(forceRefresh: true);
         
         // Open the chat immediately
         final conversation = await _chatService.getOrCreateStudentConversation(studentId);
@@ -252,7 +298,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             backgroundColor: Colors.orange,
           ),
         );
-        _loadData(); // Refresh the list
+        _preloadService.invalidateChat();
+        _loadData(forceRefresh: true); // Refresh the list
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -338,6 +385,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -493,12 +541,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                           children: [
                                             ClipOval(
                                               child: user['image'] != null && user['image'].toString().isNotEmpty
-                                                  ? Image.network(
-                                                      user['image'],
+                                                  ? CachedNetworkImage(
+                                                      imageUrl: user['image'],
                                                       width: 60,
                                                       height: 60,
                                                       fit: BoxFit.cover,
-                                                      errorBuilder: (_, __, ___) => Container(
+                                                      fadeInDuration: Duration.zero,
+                                                      fadeOutDuration: Duration.zero,
+                                                      placeholderFadeInDuration: Duration.zero,
+                                                      memCacheWidth: 180,
+                                                      errorWidget: (context, url, error) => Container(
                                                         width: 60,
                                                         height: 60,
                                                         color: AppColors.primary.withOpacity(0.1),
@@ -717,7 +769,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     shape: BoxShape.circle,
                     image: requesterAvatar != null
                         ? DecorationImage(
-                            image: NetworkImage(requesterAvatar),
+                            image: CachedNetworkImageProvider(requesterAvatar),
                             fit: BoxFit.cover,
                           )
                         : null,
@@ -816,7 +868,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     shape: BoxShape.circle,
                     image: requesterAvatar != null && requesterAvatar.toString().isNotEmpty
                         ? DecorationImage(
-                            image: NetworkImage(requesterAvatar),
+                            image: CachedNetworkImageProvider(requesterAvatar),
                             fit: BoxFit.cover,
                           )
                         : null,
@@ -1001,7 +1053,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
           ),
         );
-        _loadData(); // Refresh after returning
+        // Cache is still valid - real-time listener handles updates
+        // No need to reload
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -1029,10 +1082,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         : Colors.teal.withOpacity(0.1),
                   ),
                   child: ClipOval(
-                    child: avatarUrl != null && avatarUrl.toString().isNotEmpty
+                            child: avatarUrl != null && avatarUrl.toString().isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: avatarUrl,
                             fit: BoxFit.cover,
+                            fadeInDuration: Duration.zero,
+                            fadeOutDuration: Duration.zero,
+                            placeholderFadeInDuration: Duration.zero,
+                            memCacheWidth: 165, // 3x of 55px
                             placeholder: (context, url) => Center(
                               child: Text(
                                 name[0].toUpperCase(),
@@ -1239,7 +1296,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
               setState(() {
                 _showAvailable = false;
               });
-              _loadData();
+              // Invalidate cache since new conversation created
+              _preloadService.invalidateChat();
+              _loadData(forceRefresh: true);
             } else if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -1266,16 +1325,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 Stack(
                   children: [
                     Container(
-                      width: 55,
-                      height: 55,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: avatarUrl != null && avatarUrl.toString().isNotEmpty
-                            ? DecorationImage(
-                                image: NetworkImage(avatarUrl),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
+                    width: 55,
+                    height: 55,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      image: avatarUrl != null && avatarUrl.toString().isNotEmpty
+                          ? DecorationImage(
+                              image: CachedNetworkImageProvider(avatarUrl),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                         color: AppColors.primary.withOpacity(0.1),
                       ),
                       child: avatarUrl == null || avatarUrl.toString().isEmpty

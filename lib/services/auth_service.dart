@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/firebase_notification_service.dart';
+import 'package:student/services/preload_service.dart';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -159,6 +160,8 @@ class AuthService {
   /// Sign out
   Future<void> signOut() async {
     await _supabase.auth.signOut();
+    // Clear preloaded cache on logout
+    PreloadService().clearCache();
   }
 
   /// Get student profile

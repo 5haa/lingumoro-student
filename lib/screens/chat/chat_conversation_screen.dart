@@ -5,8 +5,11 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/services/presence_service.dart';
 import 'package:student/services/blocking_service.dart';
+import 'package:student/services/preload_service.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:dio/dio.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -34,11 +37,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _chatService = ChatService();
   final _presenceService = PresenceService();
   final _blockingService = BlockingService();
+  final _preloadService = PreloadService();
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   
   List<Map<String, dynamic>> _messages = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _isSending = false;
   bool _isTyping = false;
   bool _isOnline = false;
@@ -64,10 +68,27 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     _messageController.addListener(() {
       setState(() {}); // Rebuild to show/hide mic button
     });
-    _loadMessages();
+    _loadMessagesFromCache();
     _setupRealtimeSubscriptions();
     _markMessagesAsRead();
     _subscribeToOnlineStatus();
+  }
+
+  void _loadMessagesFromCache() {
+    // Try to load from cache first
+    final cached = _preloadService.getMessages(widget.conversationId);
+    if (cached != null) {
+      setState(() {
+        _messages = cached;
+        _isLoading = false;
+      });
+      print('✅ Loaded ${cached.length} messages from cache');
+      // No need to scroll - reverse: true handles it naturally
+      return;
+    }
+    
+    // No cache, load from API
+    _loadMessages();
   }
 
   void _subscribeToOnlineStatus() {
@@ -123,7 +144,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           setState(() {
             _messages.add(message);
           });
-          _scrollToBottom();
+          // Update cache with new message
+          _preloadService.addMessageToCache(widget.conversationId, message);
+          _scrollToBottom(animate: true); // Smooth scroll for new messages
           _markMessagesAsRead();
         }
       }
@@ -147,13 +170,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     
     final messages = await _chatService.getMessages(widget.conversationId);
     
+    // Cache the messages
+    _preloadService.cacheMessages(widget.conversationId, messages);
+    
     if (mounted) {
       setState(() {
         _messages = messages;
         _isLoading = false;
       });
       
-      _scrollToBottom();
+      // No need to scroll - reverse: true handles it naturally
     }
   }
 
@@ -161,14 +187,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     await _chatService.markMessagesAsRead(widget.conversationId);
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animate = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        if (animate) {
+          _scrollController.animateTo(
+            0, // Scroll to 0 because list is reversed
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        } else {
+          _scrollController.jumpTo(0); // Instant scroll to bottom (0 in reversed list)
+        }
       }
     });
   }
@@ -182,11 +212,151 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     });
   }
 
+  Future<void> _downloadAndOpenFile(String fileUrl, String fileName) async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 16),
+              Text('Downloading $fileName...'),
+            ],
+          ),
+        ),
+      );
+
+      // Get application documents directory
+      final appDir = await getApplicationDocumentsDirectory();
+      final downloadsDir = Directory('${appDir.path}/downloads');
+      
+      // Create downloads directory if it doesn't exist
+      if (!await downloadsDir.exists()) {
+        await downloadsDir.create(recursive: true);
+      }
+
+      final filePath = '${downloadsDir.path}/$fileName';
+
+      // Download file
+      await Dio().download(
+        fileUrl,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            print('Download progress: ${(received / total * 100).toStringAsFixed(0)}%');
+          }
+        },
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      // Open the downloaded file
+      final result = await OpenFile.open(filePath);
+      
+      if (result.type != ResultType.done) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Downloaded to: $filePath\nUnable to open file: ${result.message}'),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog if still showing
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _retryMessage(String tempId, String messageText) async {
+    // Mark as sending again
+    setState(() {
+      final index = _messages.indexWhere((m) => m['id'] == tempId);
+      if (index != -1) {
+        _messages[index]['is_failed'] = false;
+        _messages[index]['is_sending'] = true;
+      }
+    });
+
+    try {
+      final message = await _chatService.sendMessage(
+        conversationId: widget.conversationId,
+        messageText: messageText,
+      );
+
+      if (message != null) {
+        final realMessage = message; // Capture non-null value
+        setState(() {
+          final index = _messages.indexWhere((m) => m['id'] == tempId);
+          if (index != -1) {
+            _messages[index] = realMessage;
+          }
+        });
+        _preloadService.addMessageToCache(widget.conversationId, realMessage);
+      } else {
+        setState(() {
+          final index = _messages.indexWhere((m) => m['id'] == tempId);
+          if (index != -1) {
+            _messages[index]['is_sending'] = false;
+            _messages[index]['is_failed'] = true;
+          }
+        });
+      }
+    } catch (e) {
+      setState(() {
+        final index = _messages.indexWhere((m) => m['id'] == tempId);
+        if (index != -1) {
+          _messages[index]['is_sending'] = false;
+          _messages[index]['is_failed'] = true;
+        }
+      });
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty && _selectedFile == null) return;
 
-    setState(() => _isSending = true);
+    // Create temporary message for optimistic UI
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    final tempMessage = {
+      'id': tempId,
+      'conversation_id': widget.conversationId,
+      'sender_id': _currentUserId,
+      'sender_type': 'student',
+      'message_text': text,
+      'has_attachment': _selectedFile != null,
+      'is_read': false,
+      'created_at': DateTime.now().toIso8601String(),
+      'is_sending': true, // Custom flag for optimistic UI
+      'is_temp': true, // Mark as temporary
+    };
+
+    // Add to UI immediately
+    setState(() {
+      _messages.add(tempMessage);
+      _isSending = true;
+    });
+    _scrollToBottom(animate: true);
+
     _messageController.clear();
     _chatService.updateTypingIndicator(widget.conversationId, false);
 
@@ -208,11 +378,36 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       }
 
       if (message != null) {
-        _scrollToBottom();
+        // Replace temporary message with real message
+        final realMessage = message; // Capture non-null value
+        setState(() {
+          final index = _messages.indexWhere((m) => m['id'] == tempId);
+          if (index != -1) {
+            _messages[index] = realMessage;
+          }
+        });
+        // Cache updated message
+        _preloadService.addMessageToCache(widget.conversationId, realMessage);
       } else {
+        // Mark as failed
+        setState(() {
+          final index = _messages.indexWhere((m) => m['id'] == tempId);
+          if (index != -1) {
+            _messages[index]['is_sending'] = false;
+            _messages[index]['is_failed'] = true;
+          }
+        });
         _showError('Failed to send message');
       }
     } catch (e) {
+      // Mark as failed
+      setState(() {
+        final index = _messages.indexWhere((m) => m['id'] == tempId);
+        if (index != -1) {
+          _messages[index]['is_sending'] = false;
+          _messages[index]['is_failed'] = true;
+        }
+      });
       _showError('Error sending message: $e');
     } finally {
       setState(() => _isSending = false);
@@ -276,7 +471,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         );
 
         if (message != null) {
-          _scrollToBottom();
+          _scrollToBottom(animate: true);
         } else {
           _showError('Failed to send voice message');
         }
@@ -578,13 +773,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           ),
                         )
                       : ListView.builder(
+                          reverse: true, // Latest messages at bottom
                           controller: _scrollController,
                           padding: const EdgeInsets.all(16),
                           itemCount: _messages.length,
                           itemBuilder: (context, index) {
-                            final message = _messages[index];
+                            // Reverse index since list is reversed
+                            final reversedIndex = _messages.length - 1 - index;
+                            final message = _messages[reversedIndex];
                             final isMe = message['sender_id'] == _currentUserId;
-                            final showDateSeparator = _shouldShowDateSeparator(index);
+                            final showDateSeparator = _shouldShowDateSeparator(reversedIndex);
 
                             return Column(
                               children: [
@@ -711,15 +909,57 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    _formatMessageTime(message['created_at']),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF999999),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Failed message - show retry button
+                    if (isMe && message['is_failed'] == true) ...[
+                      InkWell(
+                        onTap: () => _retryMessage(message['id'], message['message_text']),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.error_outline, size: 12, color: Colors.red),
+                              SizedBox(width: 4),
+                              Text('Tap to retry', style: TextStyle(fontSize: 10, color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatMessageTime(message['created_at']),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF999999),
+                            ),
+                          ),
+                          // Status indicators for sent messages
+                          if (isMe && message['is_failed'] != true) ...[
+                            const SizedBox(width: 4),
+                            if (message['is_sending'] == true)
+                              const Icon(Icons.access_time, size: 12, color: Color(0xFF999999))
+                            else if (message['is_read'] == true)
+                              const Icon(Icons.done_all, size: 14, color: Colors.blue)
+                            else
+                              const Icon(Icons.done, size: 14, color: Color(0xFF999999)),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -757,23 +997,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              fileUrl,
+            child: CachedNetworkImage(
+              imageUrl: fileUrl,
               fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
+              placeholderFadeInDuration: Duration.zero,
+              placeholder: (context, url) => Container(
                   height: 150,
                   alignment: Alignment.center,
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                        : null,
+                  child: const CircularProgressIndicator(
                     color: AppColors.primary,
                   ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
+                ),
+              errorWidget: (context, url, error) {
                 return Container(
                   height: 150,
                   alignment: Alignment.center,
@@ -795,14 +1032,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
     // Regular file attachment
     return GestureDetector(
-      onTap: () async {
-        if (fileUrl.isNotEmpty) {
-          final uri = Uri.parse(fileUrl);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
-        }
-      },
+      onTap: () => _downloadAndOpenFile(fileUrl, fileName),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(10),
@@ -849,7 +1079,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           children: [
             Center(
               child: InteractiveViewer(
-                child: Image.network(imageUrl),
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  placeholderFadeInDuration: Duration.zero,
+                  placeholder: (context, url) => const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                  errorWidget: (context, url, error) => const Icon(
+                    Icons.broken_image,
+                    color: Colors.white,
+                    size: 64,
+                  ),
+                ),
               ),
             ),
             Positioned(

@@ -56,6 +56,34 @@ class PracticeService {
     }
   }
 
+  /// BATCH: Get watched status for multiple videos at once
+  Future<Map<String, bool>> getWatchedStatusBatch(String studentId, List<String> videoIds) async {
+    try {
+      if (videoIds.isEmpty) return {};
+      
+      final response = await _supabase
+          .from('student_video_progress')
+          .select('video_id, watched')
+          .eq('student_id', studentId)
+          .inFilter('video_id', videoIds);
+
+      final watchedMap = <String, bool>{};
+      for (var item in response) {
+        watchedMap[item['video_id'] as String] = item['watched'] == true;
+      }
+      
+      // Fill in missing videos as not watched
+      for (var videoId in videoIds) {
+        watchedMap.putIfAbsent(videoId, () => false);
+      }
+      
+      return watchedMap;
+    } catch (e) {
+      print('Error fetching batch watched status: $e');
+      return {};
+    }
+  }
+
   /// Mark video as watched
   Future<void> markVideoAsWatched(String studentId, String videoId) async {
     try {

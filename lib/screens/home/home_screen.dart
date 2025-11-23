@@ -7,6 +7,7 @@ import 'dart:async';
 import '../../config/app_colors.dart';
 import '../../services/language_service.dart';
 import '../../services/carousel_service.dart';
+import '../../services/preload_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../teachers/teachers_list_screen.dart';
 import '../students/students_list_screen.dart';
@@ -19,9 +20,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   final _languageService = LanguageService();
   final _carouselService = CarouselService();
+  final _preloadService = PreloadService();
+
+  @override
+  bool get wantKeepAlive => true; // Keep state alive when switching tabs
   
   int _currentCarouselPage = 0;
   final PageController _pageController = PageController(viewportFraction: 0.85);
@@ -34,8 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _languages = [];
   List<Map<String, dynamic>> _carouselSlides = [];
   int _selectedLanguageIndex = 0;
-  bool _isLoadingLanguages = true;
-  bool _isLoadingCarousel = true;
+  bool _isLoadingLanguages = false;
+  bool _isLoadingCarousel = false;
   
   // Map language names to flag codes
   final Map<String, FlagsCode> _languageFlagMap = {
@@ -52,9 +57,36 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLanguages();
-    _loadCarousel();
+    _loadDataFromCache();
     _startCarouselTimer();
+  }
+
+  void _loadDataFromCache() {
+    // Try to load from preloaded cache first
+    if (_preloadService.hasLanguages && _preloadService.languages != null) {
+      _languages = _preloadService.languages!;
+      _isLoadingLanguages = false;
+      print('✅ Loaded ${_languages.length} languages from cache');
+    } else {
+      // Fallback to API call if cache is empty
+      _isLoadingLanguages = true;
+      _loadLanguages();
+    }
+
+    if (_preloadService.hasCarousel && _preloadService.carouselSlides != null) {
+      _carouselSlides = _preloadService.carouselSlides!;
+      _isLoadingCarousel = false;
+      print('✅ Loaded ${_carouselSlides.length} carousel slides from cache');
+    } else {
+      // Fallback to API call if cache is empty
+      _isLoadingCarousel = true;
+      _loadCarousel();
+    }
+
+    // Force rebuild to show cached data
+    if (mounted) {
+      setState(() {});
+    }
   }
   
   @override
@@ -143,6 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppColors.background,
       extendBody: true,
@@ -401,6 +434,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: double.infinity,
                         height: double.infinity,
                         fit: BoxFit.cover,
+                        fadeInDuration: Duration.zero, // No fade animation for cached images
+                        fadeOutDuration: Duration.zero,
+                        placeholderFadeInDuration: Duration.zero,
                         errorWidget: (context, url, error) => Container(
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
@@ -473,6 +509,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             width: flagSize,
                             height: flagSize,
                             fit: BoxFit.cover,
+                            fadeInDuration: Duration.zero, // No fade animation for cached images
+                            fadeOutDuration: Duration.zero,
+                            placeholderFadeInDuration: Duration.zero,
                             placeholder: (context, url) => Container(
                               width: flagSize,
                               height: flagSize,

@@ -33,18 +33,34 @@ class StudentService {
   }
 
   /// Get students learning the same languages as the current student
-  Future<List<Map<String, dynamic>>> getStudentsInSameLanguages() async {
+  Future<List<Map<String, dynamic>>> getStudentsInSameLanguages({
+    List<String>? knownLanguages,
+    Set<String>? knownBlockedIds,
+  }) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
-      // Get blocked user IDs to filter them out
-      final blockedIds = await _blockingService.getBlockedUserIds();
-      final blockerIds = await _blockingService.getUsersWhoBlockedMe();
-      final allBlockedIds = {...blockedIds, ...blockerIds};
-
-      // First, get the languages the current student is learning
-      final studentLanguages = await getStudentLanguages();
+      // OPTIMIZATION: Use cached/known data if available, otherwise fetch in parallel
+      final futures = await Future.wait([
+        if (knownBlockedIds == null) _blockingService.getBlockedUserIds() else Future.value(<String>{}),
+        if (knownBlockedIds == null) _blockingService.getUsersWhoBlockedMe() else Future.value(<String>{}),
+        // Only fetch languages if not provided
+        if (knownLanguages == null) getStudentLanguages() else Future.value(knownLanguages),
+      ]);
+      
+      final Set<String> allBlockedIds;
+      if (knownBlockedIds != null) {
+        allBlockedIds = knownBlockedIds;
+      } else {
+        final blockedIds = futures[0] as Set<String>;
+        final blockerIds = futures[1] as Set<String>;
+        allBlockedIds = {...blockedIds, ...blockerIds};
+      }
+      
+      final studentLanguages = (knownLanguages != null) 
+          ? knownLanguages 
+          : futures[knownLanguages != null ? 0 : 2] as List<String>; // Adjust index based on whether blocks were skipped
 
       // If student hasn't taken any courses, return empty list
       if (studentLanguages.isEmpty) {

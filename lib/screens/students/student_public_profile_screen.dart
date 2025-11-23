@@ -411,6 +411,9 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                                         width: 24,
                                         height: 16,
                                         fit: BoxFit.cover,
+                                        fadeInDuration: Duration.zero,
+                                        fadeOutDuration: Duration.zero,
+                                        placeholderFadeInDuration: Duration.zero,
                                         errorWidget: (context, url, error) =>
                                             const FaIcon(
                                           FontAwesomeIcons.flag,
@@ -641,6 +644,10 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
               child: CachedNetworkImage(
                 imageUrl: _photos[_currentPhotoIndex]['photo_url'],
                 fit: BoxFit.cover,
+                fadeInDuration: Duration.zero,
+                fadeOutDuration: Duration.zero,
+                placeholderFadeInDuration: Duration.zero,
+                memCacheWidth: 400, // Optimize for larger display
                 placeholder: (context, url) => Container(
                   color: Colors.white.withOpacity(0.2),
                   child: const Center(

@@ -104,6 +104,10 @@ dependencies:
   # Audio player for chat voice messages
   just_audio: ^0.9.46
 
+  # File download and handling
+  dio: ^5.4.0
+  open_file: ^3.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

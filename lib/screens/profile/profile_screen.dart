@@ -5,6 +5,7 @@ import 'package:student/services/auth_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/photo_service.dart';
+import 'package:student/services/preload_service.dart';
 import 'package:student/screens/auth/auth_screen.dart';
 import 'package:student/screens/auth/change_password_screen.dart';
 import 'package:student/screens/profile/edit_profile_screen.dart';
@@ -21,24 +22,51 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
   final _authService = AuthService();
   final _levelService = LevelService();
   final _proService = ProSubscriptionService();
   final _photoService = PhotoService();
+  final _preloadService = PreloadService();
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _levelProgress;
   Map<String, dynamic>? _proSubscription;
   Map<String, dynamic>? _mainPhoto;
-  bool _isLoading = true;
+  bool _isLoading = false;
+
+  @override
+  bool get wantKeepAlive => true; // Keep state alive when switching tabs
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _loadProfileFromCache();
+  }
+
+  void _loadProfileFromCache() {
+    // Try to load from preloaded cache first
+    if (_preloadService.hasUserData) {
+      _profile = _preloadService.profile;
+      _levelProgress = _preloadService.levelProgress;
+      _proSubscription = _preloadService.proSubscription;
+      _mainPhoto = _preloadService.mainPhoto;
+      _isLoading = false;
+      print('✅ Loaded profile data from cache');
+      
+      // Force rebuild to show cached data
+      if (mounted) {
+        setState(() {});
+      }
+    } else {
+      // Fallback to API call if cache is empty
+      _isLoading = true;
+      _loadProfile();
+    }
   }
 
   Future<void> _loadProfile() async {
+    setState(() => _isLoading = true);
+    
     try {
       final profile = await _authService.getStudentProfile();
       final studentId = _authService.currentUser?.id;
@@ -95,6 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -186,8 +215,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 MaterialPageRoute(
                                   builder: (context) => EditProfileScreen(profile: _profile ?? {}),
                                 ),
-                              ).then((result) {
+                              ).then((result) async {
                                 if (result == true) {
+                                  await _preloadService.refreshUserData();
                                   _loadProfile();
                                 }
                               });
@@ -279,6 +309,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: CachedNetworkImage(
                           imageUrl: _mainPhoto?['photo_url'] ?? _profile!['avatar_url'],
                           fit: BoxFit.cover,
+                          fadeInDuration: Duration.zero, // No fade animation for cached images
+                          fadeOutDuration: Duration.zero,
+                          placeholderFadeInDuration: Duration.zero,
                           placeholder: (context, url) => Center(
                             child: Text(
                               initials,
@@ -322,8 +355,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       MaterialPageRoute(
                         builder: (context) => EditProfileScreen(profile: _profile ?? {}),
                       ),
-                    ).then((result) {
+                    ).then((result) async {
                       if (result == true) {
+                        await _preloadService.refreshUserData();
                         _loadProfile();
                       }
                     });
@@ -400,8 +434,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       MaterialPageRoute(
                         builder: (context) => EditProfileScreen(profile: _profile ?? {}),
                       ),
-                    ).then((result) {
+                    ).then((result) async {
                       if (result == true) {
+                        await _preloadService.refreshUserData();
                         _loadProfile();
                       }
                     });
@@ -1268,6 +1303,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               backgroundColor: Colors.green,
             ),
           );
+          // Refresh both local state and preload cache
+          await _preloadService.refreshUserData();
           _loadProfile();
         }
       } else {

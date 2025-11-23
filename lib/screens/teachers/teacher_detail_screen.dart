@@ -66,34 +66,45 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final teacherData = await _teacherService.getTeacherWithSchedule(widget.teacherId);
+      // Start everything in parallel
+      final teacherFuture = _teacherService.getTeacherWithSchedule(widget.teacherId);
+      final statsFuture = _ratingService.getTeacherRatingStats(widget.teacherId);
+      final reviewsFuture = _ratingService.getTeacherRatings(widget.teacherId);
+      
+      // Start subscription checks in parallel (fire and forget, they update state)
+      _checkSubscription();
+      _checkCanRate();
+      
+      final results = await Future.wait([
+        teacherFuture,
+        statsFuture,
+        reviewsFuture,
+      ]);
+      
+      final teacherData = results[0] as Map<String, dynamic>?;
+      final ratingStats = results[1] as Map<String, dynamic>?;
+      final reviews = results[2] as List<Map<String, dynamic>>;
       
       if (teacherData != null) {
         final schedules = teacherData['schedules'] as List<Map<String, dynamic>>? ?? [];
         
-        // Load rating data
-        final ratingStats = await _ratingService.getTeacherRatingStats(widget.teacherId);
-        final reviews = await _ratingService.getTeacherRatings(widget.teacherId);
-        
-        setState(() {
-          _teacher = teacherData;
-          _schedules = schedules;
-          _ratingStats = ratingStats;
-          _reviews = reviews;
-          _isLoading = false;
-        });
-        
-        // Initialize YouTube player if intro video exists
-        _initializeYouTubePlayer();
-        
-        // Check if student has subscription and can rate
-        _checkSubscription();
-        _checkCanRate();
+        if (mounted) {
+          setState(() {
+            _teacher = teacherData;
+            _schedules = schedules;
+            _ratingStats = ratingStats;
+            _reviews = reviews;
+            _isLoading = false;
+          });
+          
+          // Initialize YouTube player if intro video exists
+          _initializeYouTubePlayer();
+        }
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -436,6 +447,10 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                     ? CachedNetworkImage(
                         imageUrl: _teacher!['avatar_url'],
                         fit: BoxFit.cover,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                        placeholderFadeInDuration: Duration.zero,
+                        memCacheWidth: 300, // Optimize
                         placeholder: (context, url) => Container(
                           decoration: BoxDecoration(
                             gradient: AppColors.redGradient,

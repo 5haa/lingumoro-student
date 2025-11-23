@@ -6,6 +6,7 @@ import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/ai_story_service.dart';
+import 'package:student/services/preload_service.dart';
 import 'package:student/screens/practice/reading_screen.dart';
 import 'package:student/screens/practice/quiz_practice_screen.dart';
 import 'package:student/screens/practice/ai_voice_screen.dart';
@@ -20,16 +21,17 @@ class PracticeScreen extends StatefulWidget {
   State<PracticeScreen> createState() => _PracticeScreenState();
 }
 
-class _PracticeScreenState extends State<PracticeScreen> {
+class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAliveClientMixin {
   final _practiceService = PracticeService();
   final _authService = AuthService();
   final _proService = ProSubscriptionService();
   final _quizService = QuizPracticeService();
   final _aiStoryService = AIStoryService();
+  final _preloadService = PreloadService();
   
   List<Map<String, dynamic>> _videos = [];
   Map<String, bool> _watchedVideos = {};
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _hasProSubscription = false;
   String? _errorMessage;
   String? _studentId;
@@ -44,14 +46,58 @@ class _PracticeScreenState extends State<PracticeScreen> {
   int _remainingStories = 0;
 
   @override
+  bool get wantKeepAlive => true; // Keep state alive when switching tabs
+
+  @override
   void initState() {
     super.initState();
-    _loadAllData();
+    _loadDataFromCache();
   }
 
   @override
   void dispose() {
     super.dispose();
+  }
+
+  void _loadDataFromCache() {
+    // Get student ID first
+    final user = _authService.currentUser;
+    if (user == null) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Please log in to access practice';
+      });
+      return;
+    }
+    _studentId = user.id;
+
+    // Check PRO status from cache
+    if (_preloadService.proSubscription != null) {
+      final sub = _preloadService.proSubscription!;
+      final expiresAt = sub['expires_at'] as String?;
+      if (expiresAt != null) {
+        final expiryDate = DateTime.parse(expiresAt);
+        _hasProSubscription = expiryDate.isAfter(DateTime.now());
+      }
+    }
+
+    // Try to load from cache
+    final cached = _preloadService.practiceData;
+    if (cached != null) {
+      setState(() {
+        _videos = cached.videos;
+        _watchedVideos = cached.watchedVideos;
+        _quizStats = cached.quizStats;
+        _storiesGenerated = cached.storiesGenerated;
+        _remainingStories = cached.remainingStories;
+        _isLoading = false;
+      });
+      print('✅ Loaded practice data from cache');
+      return;
+    }
+    
+    // No cache, load from API
+    _loadAllData();
   }
 
   Future<void> _loadAllData() async {
@@ -86,6 +132,15 @@ class _PracticeScreenState extends State<PracticeScreen> {
         _loadReadingStats(),
       ]);
 
+      // Cache the practice data
+      _preloadService.cachePractice(
+        videos: _videos,
+        watchedVideos: _watchedVideos,
+        quizStats: _quizStats,
+        storiesGenerated: _storiesGenerated,
+        remainingStories: _remainingStories,
+      );
+
       setState(() {
         _isLoading = false;
       });
@@ -104,15 +159,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
       // Get all practice videos
       final videos = await _practiceService.getPracticeVideos(null);
 
-      // Get watched status for each video
-      final watchedStatus = <String, bool>{};
-      for (final video in videos) {
-        final isWatched = await _practiceService.isVideoWatched(
-          _studentId!,
-          video['id'],
-        );
-        watchedStatus[video['id']] = isWatched;
-      }
+      // OPTIMIZATION: Batch query for watched status
+      final videoIds = videos.map((v) => v['id'] as String).toList();
+      final watchedStatus = await _practiceService.getWatchedStatusBatch(_studentId!, videoIds);
 
       setState(() {
         _videos = videos;
@@ -163,6 +212,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -469,7 +519,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
       MaterialPageRoute(
         builder: (context) => const AIVoicePracticeScreen(),
       ),
-    ).then((_) => _loadAllData());
+    ).then((_) {
+      // Invalidate and reload only if activity completed
+      _preloadService.invalidatePractice();
+      _loadAllData();
+    });
   }
 
   void _navigateToVideoPractice() {
@@ -478,7 +532,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
       MaterialPageRoute(
         builder: (context) => const VideoPracticeListScreen(),
       ),
-    ).then((_) => _loadAllData());
+    ).then((_) {
+      // Invalidate and reload only if video watched
+      _preloadService.invalidatePractice();
+      _loadAllData();
+    });
   }
 
   void _navigateToReading() {
@@ -487,7 +545,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
       MaterialPageRoute(
         builder: (context) => const ReadingScreen(),
       ),
-    ).then((_) => _loadAllData());
+    ).then((_) {
+      // Invalidate and reload only if story generated
+      _preloadService.invalidatePractice();
+      _loadAllData();
+    });
   }
 
   void _navigateToQuiz() {
@@ -496,7 +558,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
       MaterialPageRoute(
         builder: (context) => const QuizPracticeScreen(),
       ),
-    ).then((_) => _loadAllData());
+    ).then((_) {
+      // Invalidate and reload only if quiz completed
+      _preloadService.invalidatePractice();
+      _loadAllData();
+    });
   }
 
   void _showProRequiredDialog() {
@@ -647,14 +713,10 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
       });
 
       final videos = await _practiceService.getPracticeVideos(null);
-      final watchedStatus = <String, bool>{};
-      for (final video in videos) {
-        final isWatched = await _practiceService.isVideoWatched(
-          _studentId!,
-          video['id'],
-        );
-        watchedStatus[video['id']] = isWatched;
-      }
+      
+      // OPTIMIZATION: Batch query for watched status
+      final videoIds = videos.map((v) => v['id'] as String).toList();
+      final watchedStatus = await _practiceService.getWatchedStatusBatch(_studentId!, videoIds);
 
       setState(() {
         _videos = videos;

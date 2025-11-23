@@ -5,6 +5,7 @@ import 'package:student/services/chat_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/session_update_service.dart';
+import 'package:student/services/preload_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/screens/students/student_public_profile_screen.dart';
 import 'package:student/screens/chat/chat_requests_screen.dart';
@@ -25,6 +26,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   final _proService = ProSubscriptionService();
   final _authService = AuthService();
   final _sessionUpdateService = SessionUpdateService();
+  final _preloadService = PreloadService();
   List<Map<String, dynamic>> _students = [];
   List<String> _myLanguages = [];
   List<Map<String, dynamic>> _sentRequests = [];
@@ -38,7 +40,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStudents();
+    _loadStudentsFromCache();
     // Listen for subscription updates (when student subscribes to a course)
     _sessionUpdateService.addListener(_handleSubscriptionUpdate);
   }
@@ -50,11 +52,85 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   }
 
   void _handleSubscriptionUpdate() {
-    // Reload students list when subscriptions change
-    _loadStudents();
+    // Invalidate cache and reload when subscriptions change
+    _preloadService.invalidateStudents();
+    _loadStudents(forceRefresh: true);
   }
 
-  Future<void> _loadStudents() async {
+  void _loadStudentsFromCache() {
+    // Try to load from cache first
+    final cached = _preloadService.students;
+    if (cached != null && cached.isNotEmpty) {
+      // Check if enrollment hasn't changed
+      final cachedEnrollment = _preloadService.enrolledLanguages;
+      if (cachedEnrollment != null) {
+        setState(() {
+          _students = cached;
+          _myLanguages = cachedEnrollment;
+          _hasProSubscription = _preloadService.proSubscription != null;
+          _isLoading = false;
+        });
+        print('✅ Loaded ${cached.length} students from cache');
+        
+        // Still fetch chat status since it's real-time
+        _loadChatStatus();
+        return;
+      }
+    }
+    
+    // No cache, load from API
+    _loadStudents(forceRefresh: false);
+  }
+
+  Future<void> _loadChatStatus() async {
+    final currentUserId = _chatService.supabase.auth.currentUser?.id;
+    if (currentUserId == null) return;
+    
+    final statusMap = <String, String>{};
+    final recipientMap = <String, bool>{};
+    final requestIdMap = <String, String>{};
+    
+    try {
+      final allRequests = await _chatService.supabase
+          .from('chat_requests')
+          .select('id, status, requester_id, recipient_id')
+          .or('requester_id.eq.$currentUserId,recipient_id.eq.$currentUserId');
+
+      for (var request in allRequests) {
+        final requesterId = request['requester_id'] as String;
+        final recipientId = request['recipient_id'] as String;
+        
+        String otherStudentId;
+        if (requesterId == currentUserId) {
+          otherStudentId = recipientId;
+        } else {
+          otherStudentId = requesterId;
+        }
+        
+        statusMap[otherStudentId] = request['status'] as String;
+        requestIdMap[otherStudentId] = request['id'] as String;
+        recipientMap[otherStudentId] = recipientId == currentUserId;
+      }
+      
+      final sentRequests = await _chatService.getSentChatRequests();
+      
+      if (mounted) {
+        setState(() {
+          _chatRequestStatus = statusMap;
+          _isRecipientOfRequest = recipientMap;
+          _chatRequestIds = requestIdMap;
+          _sentRequests = sentRequests;
+        });
+      }
+    } catch (e) {
+      print('Error loading chat status: $e');
+    }
+  }
+
+  Future<void> _loadStudents({bool forceRefresh = false}) async {
+    final stopwatch = Stopwatch()..start();
+    print('⏱️ START: Loading students (Parallel Mode)...');
+
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -63,27 +139,59 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     }
 
     try {
-      // Check PRO subscription first
       final studentId = _authService.currentUser?.id;
+      final currentUserId = _chatService.supabase.auth.currentUser?.id;
+
+      // 1. Start independent tasks in parallel
+      
+      // Task A: Check PRO (Use Cache if available)
+      Future<bool> proFuture;
       if (studentId != null) {
-        final hasPro = await _proService.hasActivePro(studentId);
-        if (!hasPro) {
-          if (mounted) {
-            setState(() {
-              _hasProSubscription = false;
-              _isLoading = false;
-              _errorMessage = 'PRO subscription required';
-            });
+        if (_preloadService.proSubscription != null) {
+          // Use cached subscription data
+          final sub = _preloadService.proSubscription!;
+          final expiresAt = sub['expires_at'] as String?;
+          bool isActive = false;
+          if (expiresAt != null) {
+            final expiryDate = DateTime.parse(expiresAt);
+            isActive = expiryDate.isAfter(DateTime.now());
           }
-          return;
+          proFuture = Future.value(isActive);
+          print('⏱️ PRO Check used CACHE');
+        } else {
+          proFuture = _proService.hasActivePro(studentId);
         }
-        setState(() {
-          _hasProSubscription = true;
-        });
+      } else {
+        proFuture = Future.value(false);
       }
 
-      // Get languages the current student is learning
-      final languages = await _studentService.getStudentLanguages();
+      // Task B: Chat Requests (Optimized Single Query)
+      // Chat requests are real-time, so we fetch fresh (but optimized)
+      Future<List<Map<String, dynamic>>> chatRequestsFuture;
+      if (currentUserId != null) {
+        chatRequestsFuture = _chatService.supabase
+            .from('chat_requests')
+            .select('id, status, requester_id, recipient_id')
+            .or('requester_id.eq.$currentUserId,recipient_id.eq.$currentUserId');
+      } else {
+        chatRequestsFuture = Future.value([]);
+      }
+
+      // Task C: Sent Requests (Legacy)
+      final sentRequestsFuture = _chatService.getSentChatRequests();
+
+      // Task D: Get Languages (Use Cache if available)
+      final langStart = stopwatch.elapsedMilliseconds;
+      Future<List<String>> languagesFuture;
+      if (_preloadService.hasEnrolledLanguages && _preloadService.enrolledLanguages != null) {
+        languagesFuture = Future.value(_preloadService.enrolledLanguages!);
+        print('⏱️ Languages used CACHE');
+      } else {
+        languagesFuture = _studentService.getStudentLanguages();
+      }
+      
+      final languages = await languagesFuture;
+      print('⏱️ Languages Fetch took: ${stopwatch.elapsedMilliseconds - langStart}ms');
       
       if (languages.isEmpty) {
         if (mounted) {
@@ -97,42 +205,83 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
         return;
       }
 
-      // Get students learning the same languages
-      final students = await _studentService.getStudentsInSameLanguages();
+      // 2. Start dependent task immediately after languages are ready
+      // Use cached blocked users if available
+      final studentsStart = stopwatch.elapsedMilliseconds;
+      final studentsFuture = _studentService.getStudentsInSameLanguages(
+        knownLanguages: languages,
+        knownBlockedIds: _preloadService.blockedUserIds,
+      );
       
-      // Get current user ID
-      final currentUserId = _chatService.supabase.auth.currentUser?.id;
-      
-      // Build status maps by checking all students
+      // 3. Wait for all tasks to complete
+      final results = await Future.wait([
+        proFuture,
+        chatRequestsFuture,
+        sentRequestsFuture,
+        studentsFuture,
+      ]);
+
+      print('⏱️ All Futures Completed at: ${stopwatch.elapsedMilliseconds}ms');
+
+      // 4. Process Results
+      final hasPro = results[0] as bool;
+      final allRequests = results[1] as List<Map<String, dynamic>>; // The raw list, not typed strongly here but castable
+      final sentRequests = results[2] as List<Map<String, dynamic>>;
+      final students = results[3] as List<Map<String, dynamic>>;
+
+      print('⏱️ Students Query (Parallel) finished. Found ${students.length} students');
+
+      if (!hasPro) {
+        if (mounted) {
+          setState(() {
+            _hasProSubscription = false;
+            _isLoading = false;
+            _errorMessage = 'PRO subscription required';
+          });
+        }
+        return;
+      }
+
+      // Build status maps in memory (CPU bound, fast)
       final statusMap = <String, String>{};
       final recipientMap = <String, bool>{};
       final requestIdMap = <String, String>{};
       
       if (currentUserId != null) {
+        for (var request in allRequests) {
+          final requesterId = request['requester_id'] as String;
+          final recipientId = request['recipient_id'] as String;
+          
+          String otherStudentId;
+          if (requesterId == currentUserId) {
+            otherStudentId = recipientId;
+          } else {
+            otherStudentId = requesterId;
+          }
+          
+          statusMap[otherStudentId] = request['status'] as String;
+          requestIdMap[otherStudentId] = request['id'] as String;
+          recipientMap[otherStudentId] = recipientId == currentUserId;
+        }
+      }
+
+      // Cache the students data
+      _preloadService.cacheStudents(students);
+      
+      // Precache student avatars for instant display in public profile
+      if (mounted) {
         for (var student in students) {
-          final studentId = student['id'] as String;
-          
-          // Check for chat request in both directions
-          final requests = await _chatService.supabase
-              .from('chat_requests')
-              .select('id, status, requester_id, recipient_id')
-              .or('and(requester_id.eq.$currentUserId,recipient_id.eq.$studentId),and(requester_id.eq.$studentId,recipient_id.eq.$currentUserId)')
-              .limit(1);
-          
-          if (requests.isNotEmpty) {
-            final request = requests.first;
-            statusMap[studentId] = request['status'] as String;
-            requestIdMap[studentId] = request['id'] as String;
-            recipientMap[studentId] = request['recipient_id'] == currentUserId;
+          final avatarUrl = student['avatar_url'] as String?;
+          if (avatarUrl != null && avatarUrl.isNotEmpty) {
+            precacheImage(CachedNetworkImageProvider(avatarUrl), context)
+              .catchError((e) => print('Failed to precache avatar: $e'));
           }
         }
       }
       
-      // Get sent chat requests for backwards compatibility
-      final sentRequests = await _chatService.getSentChatRequests();
-
       if (mounted) {
         setState(() {
+          _hasProSubscription = true;
           _myLanguages = languages;
           _students = students;
           _sentRequests = sentRequests;
@@ -142,7 +291,11 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
           _isLoading = false;
         });
       }
+      print('✅ TOTAL PARALLEL LOAD TIME: ${stopwatch.elapsedMilliseconds}ms');
+      stopwatch.stop();
+
     } catch (e) {
+      print('❌ ERROR after ${stopwatch.elapsedMilliseconds}ms: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -613,7 +766,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
               studentData: student,
             ),
           ),
-        ).then((_) => _loadStudents()); // Refresh on return
+        ); // No reload needed - data unchanged
       },
       child: Container(
         decoration: BoxDecoration(
@@ -645,6 +798,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                   ? CachedNetworkImage(
                       imageUrl: student['avatar_url'],
                       fit: BoxFit.cover,
+                      memCacheWidth: 200, // Optimize memory usage
                       placeholder: (context, url) => Container(
                         color: AppColors.lightGrey,
                         child: const Icon(

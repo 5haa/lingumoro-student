@@ -1,7 +1,9 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/language_service.dart';
 import 'package:student/services/rating_service.dart';
+import 'package:student/services/preload_service.dart';
 import 'package:student/screens/teachers/teacher_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
@@ -25,40 +27,82 @@ class TeachersListScreen extends StatefulWidget {
 class _TeachersListScreenState extends State<TeachersListScreen> {
   final _languageService = LanguageService();
   final _ratingService = RatingService();
+  final _preloadService = PreloadService();
   List<Map<String, dynamic>> _teachers = [];
   Map<String, Map<String, dynamic>> _teacherRatings = {};
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadTeachers();
+    _loadTeachersFromCache();
   }
 
-  Future<void> _loadTeachers() async {
-    setState(() => _isLoading = true);
+  void _loadTeachersFromCache() {
+    // Try to load from cache first
+    final cached = _preloadService.getTeachers(widget.languageId);
+    if (cached != null) {
+      setState(() {
+        _teachers = cached.teachers;
+        _teacherRatings = cached.ratings;
+        _isLoading = false;
+      });
+      print('✅ Loaded ${cached.teachers.length} teachers from cache for language ${widget.languageId}');
+      return;
+    }
+    
+    // No cache or stale, load from API
+    _loadTeachers(forceRefresh: false);
+  }
+
+  Future<void> _loadTeachers({bool forceRefresh = true}) async {
+    if (!forceRefresh) {
+      setState(() => _isLoading = true);
+    }
+    
     try {
       final teacherLanguages = await _languageService.getTeachersForLanguage(widget.languageId);
       
-      // Load ratings for each teacher
-      final ratings = <String, Map<String, dynamic>>{};
+      // Collect teacher IDs
+      final teacherIds = <String>[];
       for (var teacherData in teacherLanguages) {
         final teacher = teacherData['teachers'] ?? teacherData['teacher'] ?? teacherData;
         if (teacher != null && teacher['id'] != null) {
-          final ratingStats = await _ratingService.getTeacherRatingStats(teacher['id']);
-          if (ratingStats != null) {
-            ratings[teacher['id']] = ratingStats;
+          teacherIds.add(teacher['id'] as String);
+        }
+      }
+
+      // OPTIMIZATION: Fetch all rating stats in ONE query
+      final ratings = <String, Map<String, dynamic>>{};
+      if (teacherIds.isNotEmpty) {
+        try {
+          final statsResponse = await Supabase.instance.client
+              .from('teacher_rating_stats')
+              .select()
+              .inFilter('teacher_id', teacherIds);
+          
+          for (var stat in statsResponse) {
+            ratings[stat['teacher_id'] as String] = stat;
           }
+        } catch (e) {
+          print('Error fetching batch ratings: $e');
         }
       }
       
-      setState(() {
-        _teachers = teacherLanguages;
-        _teacherRatings = ratings;
-        _isLoading = false;
-      });
+      // Cache the data
+      await _preloadService.cacheTeachers(widget.languageId, teacherLanguages, ratings);
+      
+      if (mounted) {
+        setState(() {
+          _teachers = teacherLanguages;
+          _teacherRatings = ratings;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -211,6 +255,10 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
                         fit: BoxFit.cover,
                         width: 80,
                         height: double.infinity,
+                        memCacheWidth: 200, // Optimize memory
+                        fadeInDuration: Duration.zero, // No fade
+                        fadeOutDuration: Duration.zero,
+                        placeholderFadeInDuration: Duration.zero,
                         placeholder: (context, url) => Container(
                           color: AppColors.lightGrey,
                           child: const Center(

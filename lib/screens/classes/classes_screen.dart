@@ -7,6 +7,7 @@ import '../../config/app_colors.dart';
 import '../../services/session_service.dart';
 import '../../services/session_update_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/preload_service.dart';
 import '../chat/chat_conversation_screen.dart';
 import '../teachers/teacher_detail_screen.dart';
 
@@ -18,21 +19,25 @@ class ClassesScreen extends StatefulWidget {
 }
 
 class _ClassesScreenState extends State<ClassesScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
   final SessionService _sessionService = SessionService();
   final SessionUpdateService _sessionUpdateService = SessionUpdateService();
   final ChatService _chatService = ChatService();
+  final PreloadService _preloadService = PreloadService();
   
   List<Map<String, dynamic>> _upcomingSessions = [];
   List<Map<String, dynamic>> _finishedSessions = [];
   bool _isLoading = false;
 
   @override
+  bool get wantKeepAlive => true; // Keep state alive when switching tabs
+
+  @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadSessions();
+    _loadSessionsFromCache();
     
     // Listen for session updates
     _sessionUpdateService.addListener(_handleSessionUpdate);
@@ -46,6 +51,36 @@ class _ClassesScreenState extends State<ClassesScreen>
   }
 
   void _handleSessionUpdate() {
+    _preloadService.invalidateSessions();
+    _loadSessions();
+  }
+
+  void _loadSessionsFromCache() {
+    // Try to load from cache first
+    final cached = _preloadService.sessions;
+    if (cached != null) {
+      // Sort upcoming sessions
+      final upcomingSessions = List<Map<String, dynamic>>.from(cached.upcoming);
+      upcomingSessions.sort((a, b) {
+        try {
+          final fullDateTimeA = DateTime.parse('${a['scheduled_date']} ${a['scheduled_start_time'] ?? '00:00:00'}');
+          final fullDateTimeB = DateTime.parse('${b['scheduled_date']} ${b['scheduled_start_time'] ?? '00:00:00'}');
+          return fullDateTimeA.compareTo(fullDateTimeB);
+        } catch (e) {
+          return 0;
+        }
+      });
+      
+      setState(() {
+        _upcomingSessions = upcomingSessions;
+        _finishedSessions = cached.finished;
+        _isLoading = false;
+      });
+      print('✅ Loaded sessions from cache');
+      return;
+    }
+    
+    // No cache, load from API
     _loadSessions();
   }
 
@@ -78,6 +113,12 @@ class _ClassesScreenState extends State<ClassesScreen>
           return 0;
         }
       });
+      
+      // Cache the sessions
+      _preloadService.cacheSessions(
+        upcoming: upcomingSessions,
+        finished: finishedSessions,
+      );
       
       setState(() {
         _upcomingSessions = upcomingSessions;
@@ -196,6 +237,7 @@ class _ClassesScreenState extends State<ClassesScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -510,12 +552,16 @@ class _ClassesScreenState extends State<ClassesScreen>
                     ],
                   ),
                   child: ClipOval(
-                    child: Image.network(
-                      language['flag_url'],
+                    child: CachedNetworkImage(
+                      imageUrl: language['flag_url'],
                       height: 40,
                       width: 40,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
+                      placeholderFadeInDuration: Duration.zero,
+                      memCacheWidth: 120,
+                      errorWidget: (context, url, error) => const Icon(
                         Icons.language,
                         size: 30,
                         color: AppColors.primary,
@@ -571,6 +617,10 @@ class _ClassesScreenState extends State<ClassesScreen>
                           ? CachedNetworkImage(
                               imageUrl: teacher['avatar_url'],
                               fit: BoxFit.cover,
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              placeholderFadeInDuration: Duration.zero,
+                              memCacheWidth: 120,
                               placeholder: (context, url) => Container(
                                 color: Colors.grey.shade300,
                                 child: const Icon(Icons.person, color: Colors.grey, size: 20),
