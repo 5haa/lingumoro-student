@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/photo_service.dart';
@@ -72,6 +73,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  /// Clear cached images for old photos
+  Future<void> _clearOldPhotosCache() async {
+    try {
+      final cacheManager = DefaultCacheManager();
+      
+      // Clear all current photos from cache
+      for (var photo in _photos) {
+        final photoUrl = photo['photo_url'] as String?;
+        if (photoUrl != null) {
+          await cacheManager.removeFile(photoUrl);
+        }
+      }
+      print('🗑️ Cleared ${_photos.length} cached photos');
+    } catch (e) {
+      print('⚠️ Error clearing photos cache: $e');
+    }
+  }
+
   Future<void> _pickAndUploadPhoto() async {
     try {
       setState(() => _isUploadingPhoto = true);
@@ -93,6 +112,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (photo != null && mounted) {
+        // Clear image cache before reloading
+        await _clearOldPhotosCache();
         await _loadPhotos(); // Reload photos
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -123,6 +144,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final success = await _photoService.setMainPhoto(studentId, photoId);
       if (success && mounted) {
+        // Clear image cache before reloading
+        await _clearOldPhotosCache();
         await _loadPhotos();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -148,6 +171,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final studentId = _authService.currentUser?.id;
       if (studentId == null) return;
 
+      // Clear the deleted photo from cache
+      final cacheManager = DefaultCacheManager();
+      await cacheManager.removeFile(photoUrl);
+      
       final success = await _photoService.deletePhoto(studentId, photoId, photoUrl);
       if (success && mounted) {
         await _loadPhotos();
@@ -397,6 +424,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 itemBuilder: (context, index) {
                   final photo = _photos[index];
                   return CachedNetworkImage(
+                    key: ValueKey(photo['photo_url']),
                     imageUrl: photo['photo_url'],
                     fit: BoxFit.cover,
                     width: double.infinity,

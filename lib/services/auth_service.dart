@@ -18,14 +18,19 @@ class AuthService {
     String? phone,
     String? provinceId,
   }) async {
-    // Check if email already exists in auth.users table
-    final emailExistsResponse = await _supabase
-        .rpc('check_email_exists', params: {'check_email': email});
-
-    if (emailExistsResponse == true) {
-      throw Exception('This email is already registered. Please login instead.');
+    // Check if email already exists and what type of user it is
+    final userType = await _supabase.rpc('check_user_type_by_email', 
+      params: {'check_email': email}) as String?;
+    
+    if (userType == 'student') {
+      throw Exception('This email is already registered as a student. Please login instead.');
+    } else if (userType == 'teacher') {
+      throw Exception('This email is registered as a teacher. Please use the Teacher app.');
+    } else if (userType == 'duplicate' || userType == 'no_profile') {
+      throw Exception('This email has account issues. Please contact support.');
     }
-
+    
+    // If user doesn't exist, proceed with signup
     // Sign up user - this will send OTP email
     final response = await _supabase.auth.signUp(
       email: email,
@@ -98,13 +103,34 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // First, check if this email is registered as a student
+    final userType = await _supabase.rpc('check_user_type_by_email', 
+      params: {'check_email': email}) as String?;
+    
+    if (userType == 'teacher') {
+      throw Exception('This account is registered as a teacher. Please use the Teacher app to login.');
+    } else if (userType == 'not_found') {
+      throw Exception('No account found with this email. Please sign up first.');
+    } else if (userType == 'no_profile') {
+      throw Exception('Account exists but profile is incomplete. Please contact support.');
+    }
+    
     final response = await _supabase.auth.signInWithPassword(
       email: email,
       password: password,
     );
 
-    // Check if account is suspended
+    // Validate that user is actually a student (double-check after auth)
     if (response.user != null) {
+      final isValidStudent = await _supabase.rpc('validate_user_type',
+        params: {'user_id': response.user!.id, 'expected_type': 'student'}) as bool?;
+      
+      if (isValidStudent != true) {
+        // Sign out immediately if not a valid student
+        await _supabase.auth.signOut();
+        throw Exception('This account is not registered as a student. Please use the correct app for your account type.');
+      }
+      
       await _checkSuspensionStatus(response.user!.id);
       
       // Initialize Firebase notifications after successful login
@@ -117,6 +143,14 @@ class AuthService {
     }
 
     return response;
+  }
+
+  /// Validate that user is a student (not used in login flow anymore, kept for backwards compatibility)
+  @Deprecated('User validation is now done during login via validate_user_type RPC')
+  Future<void> _ensureStudentRecordExists(User user) async {
+    // This method is deprecated and should not create records automatically
+    // User type validation is now handled during login
+    print('⚠️ _ensureStudentRecordExists is deprecated');
   }
 
   /// Check if user account is suspended
