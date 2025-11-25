@@ -174,7 +174,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Clear the deleted photo from cache
       final cacheManager = DefaultCacheManager();
       await cacheManager.removeFile(photoUrl);
-      
+
       final success = await _photoService.deletePhoto(studentId, photoId, photoUrl);
       if (success && mounted) {
         await _loadPhotos();

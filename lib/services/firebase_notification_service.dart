@@ -160,6 +160,12 @@ class FirebaseNotificationService {
     print('Notification: ${message.notification?.title}');
     print('Data: ${message.data}');
 
+    // Suppress chat notifications when app is in foreground
+    if (message.data['action'] == 'open_chat') {
+      print('Suppressing chat notification in foreground');
+      return;
+    }
+
     // Show local notification
     if (message.notification != null) {
       _localNotificationService.showNotification(

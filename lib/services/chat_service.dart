@@ -21,11 +21,13 @@ class ChatService {
   
   // Stream controllers
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
+  final _messageUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   final _conversationUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   final _typingController = StreamController<Map<String, dynamic>>.broadcast();
   final _chatRequestController = StreamController<Map<String, dynamic>>.broadcast();
   
   Stream<Map<String, dynamic>> get onMessage => _messageController.stream;
+  Stream<Map<String, dynamic>> get onMessageUpdate => _messageUpdateController.stream;
   Stream<Map<String, dynamic>> get onConversationUpdate => _conversationUpdateController.stream;
   Stream<Map<String, dynamic>> get onTyping => _typingController.stream;
   Stream<Map<String, dynamic>> get onChatRequest => _chatRequestController.stream;
@@ -374,6 +376,21 @@ class ChatService {
           .eq('id', message['id'])
           .single();
 
+      // Update conversation preview
+      try {
+        final extension = path.extension(file.path).toLowerCase();
+        final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(extension);
+        final previewText = messageText.isNotEmpty ? messageText : (isImage ? '📷 Photo' : '📎 Attachment');
+        
+        await _supabase.from('chat_conversations').update({
+          'last_message': previewText,
+          'last_message_at': DateTime.now().toIso8601String(),
+          'has_attachment': true,
+        }).eq('id', conversationId);
+      } catch (e) {
+        print('Error updating conversation preview: $e');
+      }
+
       return completeMessage;
     } catch (e) {
       print('Error sending message with attachment: $e');
@@ -457,6 +474,18 @@ class ChatService {
           ''')
           .eq('id', message['id'])
           .single();
+
+      // Update conversation preview
+      try {
+        final previewText = (messageText != null && messageText.isNotEmpty) ? messageText : '🎤 Voice Message';
+        await _supabase.from('chat_conversations').update({
+          'last_message': previewText,
+          'last_message_at': DateTime.now().toIso8601String(),
+          'has_attachment': true,
+        }).eq('id', conversationId);
+      } catch (e) {
+        print('Error updating conversation preview: $e');
+      }
 
       return completeMessage;
     } catch (e) {
@@ -589,6 +618,21 @@ class ChatService {
                 .single();
             
             _messageController.add(message);
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'chat_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversation_id',
+            value: conversationId,
+          ),
+          callback: (payload) async {
+            // Just emit the new record, UI should merge it or we can fetch full if needed
+            // For read status updates, the new record is enough
+            _messageUpdateController.add(payload.newRecord);
           },
         )
         .subscribe();
@@ -962,6 +1006,7 @@ class ChatService {
   void dispose() {
     unsubscribeAll();
     _messageController.close();
+    _messageUpdateController.close();
     _conversationUpdateController.close();
     _typingController.close();
     _chatRequestController.close();

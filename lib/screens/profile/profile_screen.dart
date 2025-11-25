@@ -11,7 +11,6 @@ import 'package:student/screens/auth/change_password_screen.dart';
 import 'package:student/screens/profile/edit_profile_screen.dart';
 import 'package:student/screens/profile/blocked_users_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_button.dart';
 import '../../l10n/app_localizations.dart';
@@ -65,15 +64,10 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     }
   }
 
-  Future<void> _loadProfile({bool clearImageCache = false}) async {
+  Future<void> _loadProfile() async {
     setState(() => _isLoading = true);
     
     try {
-      // Clear image cache if requested (after profile update)
-      if (clearImageCache) {
-        await _clearProfileImageCache();
-      }
-      
       final profile = await _authService.getStudentProfile();
       final studentId = _authService.currentUser?.id;
       
@@ -99,27 +93,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
       if (mounted) {
         setState(() => _isLoading = false);
       }
-    }
-  }
-
-  /// Clear cached images for profile photos
-  Future<void> _clearProfileImageCache() async {
-    try {
-      final cacheManager = DefaultCacheManager();
-      
-      // Clear old main photo from cache
-      if (_mainPhoto?['photo_url'] != null) {
-        await cacheManager.removeFile(_mainPhoto!['photo_url']);
-        print('🗑️ Cleared cached main photo');
-      }
-      
-      // Clear old avatar from cache
-      if (_profile?['avatar_url'] != null) {
-        await cacheManager.removeFile(_profile!['avatar_url']);
-        print('🗑️ Cleared cached avatar');
-      }
-    } catch (e) {
-      print('⚠️ Error clearing image cache: $e');
     }
   }
 
@@ -245,7 +218,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                               ).then((result) async {
                                 if (result == true) {
                                   await _preloadService.refreshUserData();
-                                  _loadProfile(clearImageCache: true);
+                                  _loadProfile();
                                 }
                               });
                             },
@@ -334,7 +307,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                 child: (_mainPhoto?['photo_url'] != null || _profile?['avatar_url'] != null)
                     ? ClipOval(
                         child: CachedNetworkImage(
-                          key: ValueKey(_mainPhoto?['photo_url'] ?? _profile?['avatar_url']),
                           imageUrl: _mainPhoto?['photo_url'] ?? _profile!['avatar_url'],
                           fit: BoxFit.cover,
                           fadeInDuration: Duration.zero, // No fade animation for cached images
@@ -386,7 +358,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                     ).then((result) async {
                       if (result == true) {
                         await _preloadService.refreshUserData();
-                        _loadProfile(clearImageCache: true);
+                        _loadProfile();
                       }
                     });
                   },
@@ -465,7 +437,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                     ).then((result) async {
                       if (result == true) {
                         await _preloadService.refreshUserData();
-                        _loadProfile(clearImageCache: true);
+                        _loadProfile();
                       }
                     });
                   },

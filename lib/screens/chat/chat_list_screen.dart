@@ -46,8 +46,30 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     
     // Listen to conversation updates
     _chatService.onConversationUpdate.listen((update) {
-      _preloadService.invalidateChat();
-      _loadData(forceRefresh: true); // Force refresh on real-time updates
+      if (mounted) {
+        // Update individual conversation instead of full reload
+        final conversationId = update['id'];
+        final index = _conversations.indexWhere((c) => c['id'] == conversationId);
+        
+        setState(() {
+          if (index != -1) {
+            // Update existing conversation
+            _conversations[index] = {..._conversations[index], ...update};
+            _filteredConversations = _conversations;
+          } else {
+            // New conversation - add it
+            _conversations.insert(0, update);
+            _filteredConversations = _conversations;
+          }
+        });
+        
+        // Update cache
+        _preloadService.cacheChat(
+          conversations: _conversations,
+          teachers: _availableTeachers,
+          requests: _pendingRequests,
+        );
+      }
     });
     
     // Listen for subscription updates (when student subscribes to a course)
@@ -1162,7 +1184,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    lastMessage.isEmpty ? 'No messages yet' : lastMessage,
+                    _getLastMessagePreview(conversation),
                     style: TextStyle(
                       fontSize: 14,
                       color: const Color(0xFF999999),
@@ -1441,5 +1463,38 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
         );
       },
     );
+  }
+
+  String _getLastMessagePreview(Map<String, dynamic> conversation) {
+    final lastMessage = conversation['last_message'] ?? '';
+    final hasAttachment = conversation['has_attachment'] == true;
+    final attachmentType = conversation['last_attachment_type'];
+    
+    // If there's an attachment but no text, show attachment type
+    if (hasAttachment && lastMessage.isEmpty) {
+      switch (attachmentType) {
+        case 'image':
+          return '🖼️ Image';
+        case 'voice':
+          return '🎤 Voice message';
+        case 'file':
+          return '📎 File';
+        default:
+          return '📎 Attachment';
+      }
+    }
+    
+    // If there's text, return it (even if there's also an attachment)
+    if (lastMessage.isNotEmpty) {
+      return lastMessage;
+    }
+    
+    // No message and no attachment
+    return 'Start chatting...';
+  }
+  
+  bool _isImageType(String? fileType) {
+    if (fileType == null) return false;
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(fileType.toLowerCase());
   }
 }

@@ -189,7 +189,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                         _buildSection('Notification Categories'),
                         _buildToggleTile(
                           'Chat Messages',
-                          'Get notified about new messages',
+                          'Get push notifications about new messages',
                           FontAwesomeIcons.message,
                           _chatEnabled,
                           (value) {

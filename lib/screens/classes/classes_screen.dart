@@ -427,6 +427,7 @@ class _ClassesScreenState extends State<ClassesScreen>
     final sessionStatus = _sessionService.getSessionStatus(session);
     final canJoin = _sessionService.canJoinSession(session);
     final timeUntil = _sessionService.getTimeUntilSession(session);
+    final isMakeup = session['is_makeup'] == true;
 
     final scheduledDate = DateTime.parse(session['scheduled_date']);
     final dateStr =
@@ -476,6 +477,38 @@ class _ClassesScreenState extends State<ClassesScreen>
       ),
       child: Column(
         children: [
+          // Makeup session indicator
+          if (isMakeup) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.refresh,
+                    color: Colors.orange.shade700,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'MAKEUP CLASS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange.shade700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           // Live indicator for in-progress sessions
           if (isInProgress) ...[
             Container(
@@ -879,18 +912,30 @@ class _ClassesScreenState extends State<ClassesScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: timeUntil == 'Now' 
+                      ? Colors.green.shade50 
+                      : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.schedule, color: Colors.blue.shade700, size: 18),
+                    Icon(
+                      timeUntil == 'Now' ? Icons.play_circle : Icons.schedule, 
+                      color: timeUntil == 'Now' 
+                          ? Colors.green.shade700 
+                          : Colors.blue.shade700, 
+                      size: 18
+                    ),
                     const SizedBox(width: 8),
                     Text(
-                      'Starts in $timeUntil',
+                      timeUntil == 'Now' 
+                          ? 'Waiting for teacher to start' 
+                          : 'Starts in $timeUntil',
                       style: TextStyle(
-                        color: Colors.blue.shade700,
+                        color: timeUntil == 'Now' 
+                            ? Colors.green.shade700 
+                            : Colors.blue.shade700,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),

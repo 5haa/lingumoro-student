@@ -19,10 +19,28 @@ class NotificationService {
           .select()
           .eq('user_id', userId)
           .eq('user_type', 'student')
+          .isFilter('deleted_at', null)  // Exclude cleared notifications
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
       List<Map<String, dynamic>> notifications = List<Map<String, dynamic>>.from(response);
+      
+      // ALWAYS exclude chat notifications from in-app notification list
+      // Chat notifications are only shown as push notifications, not in the notification list
+      notifications = notifications.where((notif) {
+        final type = notif['type'] as String?;
+        if (type == null) return true;
+        
+        // Filter out all chat-related notifications
+        if (type == 'chat_message' || 
+            type == 'chat_request_received' || 
+            type == 'chat_request_accepted' || 
+            type == 'chat_request_rejected') {
+          return false;
+        }
+        
+        return true;
+      }).toList();
       
       // Filter based on preferences if requested
       if (respectInAppPreferences) {
@@ -39,7 +57,7 @@ class NotificationService {
             if (type == null) return true;
             
             // Check category-specific preferences for in-app display
-            if (type.startsWith('chat_') && prefs['chat_enabled'] == false) return false;
+            // Note: chat_ notifications are already filtered out above
             if (type.startsWith('session_') && prefs['session_enabled'] == false) return false;
             if (type.startsWith('payment_') && prefs['payment_enabled'] == false) return false;
             if (type.startsWith('points_') && prefs['points_enabled'] == false) return false;
@@ -192,6 +210,49 @@ class NotificationService {
     channel.unsubscribe();
   }
 
+  /// Clear a single notification (soft delete)
+  Future<bool> clearNotification(String notificationId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return false;
+
+      final response = await _supabase.rpc(
+        'clear_notification',
+        params: {
+          'p_notification_id': notificationId,
+          'p_user_id': userId,
+          'p_user_type': 'student',
+        },
+      );
+
+      return response as bool;
+    } catch (e) {
+      print('Error clearing notification: $e');
+      return false;
+    }
+  }
+
+  /// Clear all notifications (soft delete)
+  Future<int> clearAllNotifications() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return 0;
+
+      final response = await _supabase.rpc(
+        'clear_all_notifications',
+        params: {
+          'p_user_id': userId,
+          'p_user_type': 'student',
+        },
+      );
+
+      return response as int;
+    } catch (e) {
+      print('Error clearing all notifications: $e');
+      return 0;
+    }
+  }
+
   /// Delete old notifications (older than 90 days)
   Future<void> cleanupOldNotifications() async {
     try {
@@ -202,4 +263,3 @@ class NotificationService {
     }
   }
 }
-

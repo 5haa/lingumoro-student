@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../config/app_colors.dart';
 
 class ChatConversationScreen extends StatefulWidget {
@@ -136,19 +137,34 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     _chatService.subscribeToMessages(widget.conversationId);
     _chatService.onMessage.listen((message) {
       if (mounted) {
-        // Check if message already exists to prevent duplicates
         final messageId = message['id'];
-        final exists = _messages.any((m) => m['id'] == messageId);
-        
-        if (!exists) {
+        final existingIndex = _messages.indexWhere((m) => m['id'] == messageId);
+
+        if (existingIndex != -1) {
+          // If message with this ID already exists, update it (e.g., if it was a temp message that got its real ID)
           setState(() {
-            _messages.add(message);
+            _messages[existingIndex] = message;
           });
-          // Update cache with new message
           _preloadService.addMessageToCache(widget.conversationId, message);
-          _scrollToBottom(animate: true); // Smooth scroll for new messages
-          _markMessagesAsRead();
+        } else {
+          // Check if there's a temporary message that this real message might be replacing
+          final tempIndex = _messages.indexWhere((m) => m['is_temp'] == true && m['sender_id'] == message['sender_id'] && m['message_text'] == message['message_text']);
+          if (tempIndex != -1) {
+            // Replace the temporary message with the real one
+            setState(() {
+              _messages[tempIndex] = message;
+            });
+            _preloadService.addMessageToCache(widget.conversationId, message);
+          } else {
+            // Otherwise, it's a new message, add it
+            setState(() {
+              _messages.add(message);
+            });
+            _preloadService.addMessageToCache(widget.conversationId, message);
+          }
         }
+        _scrollToBottom(animate: true); // Smooth scroll for new messages
+        _markMessagesAsRead();
       }
     });
 
@@ -159,6 +175,28 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         setState(() {
           _isTyping = data['is_typing'] == true;
         });
+      }
+    });
+
+    // Subscribe to message updates (e.g. read status)
+    _chatService.onMessageUpdate.listen((updatedMessage) {
+      if (mounted) {
+        final index = _messages.indexWhere((m) => m['id'] == updatedMessage['id']);
+        if (index != -1) {
+          setState(() {
+            // Preserve attachments if not in update payload
+            final existingAttachments = _messages[index]['attachments'];
+            _messages[index] = {
+              ..._messages[index],
+              ...updatedMessage,
+            };
+            // Ensure attachments aren't lost
+            if (existingAttachments != null && _messages[index]['attachments'] == null) {
+              _messages[index]['attachments'] = existingAttachments;
+            }
+          });
+          print('📩 Message updated - ID: ${updatedMessage['id']}, is_read: ${_messages[index]['is_read']}');
+        }
       }
     });
   }
@@ -337,6 +375,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
     // Create temporary message for optimistic UI
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Determine attachment type from file
+    String? attachmentType;
+    String? fileName;
+    if (_selectedFile != null) {
+      fileName = _selectedFile!.path.split('/').last;
+      final extension = fileName.toLowerCase().split('.').last;
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension)) {
+        attachmentType = 'image';
+      } else {
+        attachmentType = 'file';
+      }
+    }
+    
     final tempMessage = {
       'id': tempId,
       'conversation_id': widget.conversationId,
@@ -348,6 +400,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       'created_at': DateTime.now().toIso8601String(),
       'is_sending': true, // Custom flag for optimistic UI
       'is_temp': true, // Mark as temporary
+      // Add temporary attachment details for preview
+      if (_selectedFile != null)
+        'attachments': [
+          {
+            'id': tempId,
+            'message_id': tempId,
+            'file_name': fileName,
+            'file_type': fileName?.split('.').last ?? 'file',
+            'attachment_type': attachmentType,
+            'file_url': '', // Empty during upload
+          }
+        ],
     };
 
     // Add to UI immediately
@@ -423,6 +487,46 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
+  Future<void> _pickImageFromCamera() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _selectedFile = File(image.path);
+        });
+      }
+    } catch (e) {
+      _showError('Failed to capture image: $e');
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _selectedFile = File(image.path);
+        });
+      }
+    } catch (e) {
+      _showError('Failed to pick image: $e');
+    }
+  }
+
   Future<void> _startRecording() async {
     final recorder = await _chatService.startRecording();
     if (recorder != null) {
@@ -460,8 +564,40 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     });
 
     if (result != null && result.file != null) {
-      // Send voice message
-      setState(() => _isSending = true);
+      // Create temporary message for optimistic UI
+      final tempId = 'temp_voice_${DateTime.now().millisecondsSinceEpoch}';
+      final fileName = result.file!.path.split('/').last;
+      
+      final tempMessage = {
+        'id': tempId,
+        'conversation_id': widget.conversationId,
+        'sender_id': _currentUserId,
+        'sender_type': 'student',
+        'message_text': '',
+        'has_attachment': true,
+        'is_read': false,
+        'created_at': DateTime.now().toIso8601String(),
+        'is_sending': true,
+        'is_temp': true,
+        'attachments': [
+          {
+            'id': tempId,
+            'message_id': tempId,
+            'file_name': fileName,
+            'file_type': 'mp3',
+            'attachment_type': 'voice',
+            'duration_seconds': result.duration,
+            'file_url': '', // Empty during upload
+          }
+        ],
+      };
+      
+      // Add to UI immediately
+      setState(() {
+        _messages.add(tempMessage);
+        _isSending = true;
+      });
+      _scrollToBottom(animate: true);
       
       try {
         final message = await _chatService.sendVoiceMessage(
@@ -471,11 +607,35 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         );
 
         if (message != null) {
+          // Replace temporary message with real message
+          setState(() {
+            final index = _messages.indexWhere((m) => m['id'] == tempId);
+            if (index != -1) {
+              _messages[index] = message;
+            }
+          });
+          _preloadService.addMessageToCache(widget.conversationId, message);
           _scrollToBottom(animate: true);
         } else {
+          // Mark as failed
+          setState(() {
+            final index = _messages.indexWhere((m) => m['id'] == tempId);
+            if (index != -1) {
+              _messages[index]['is_sending'] = false;
+              _messages[index]['is_failed'] = true;
+            }
+          });
           _showError('Failed to send voice message');
         }
       } catch (e) {
+        // Mark as failed
+        setState(() {
+          final index = _messages.indexWhere((m) => m['id'] == tempId);
+          if (index != -1) {
+            _messages[index]['is_sending'] = false;
+            _messages[index]['is_failed'] = true;
+          }
+        });
         _showError('Error sending voice message: $e');
       } finally {
         setState(() => _isSending = false);
@@ -893,18 +1053,21 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (hasAttachment && attachments != null && attachments.isNotEmpty)
-                        ...attachments.map((attachment) => 
-                          _buildAttachment(Map<String, dynamic>.from(attachment as Map), isMe)),
-                      if (message['message_text'] != null && message['message_text'].toString().isNotEmpty)
-                        Text(
-                          message['message_text'],
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Color(0xFF1A1A1A),
-                            height: 1.4,
-                          ),
+                     if (hasAttachment && attachments != null && attachments.isNotEmpty)
+                      ...attachments.map((attachment) => 
+                        _buildAttachment(Map<String, dynamic>.from(attachment as Map), isMe, message['is_sending'] == true)),
+                    if (message['message_text'] != null && message['message_text'].toString().isNotEmpty)
+                      Text(
+                        message['message_text'],
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF1A1A1A),
+                          height: 1.4,
                         ),
+                      )
+                    else if (hasAttachment && (message['message_text'] == null || message['message_text'].toString().isEmpty))
+                      // Show attachment placeholder when no text
+                      const SizedBox.shrink(),
                     ],
                   ),
                 ),
@@ -969,7 +1132,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  Widget _buildAttachment(Map<String, dynamic> attachment, bool isMe) {
+  Widget _buildAttachment(Map<String, dynamic> attachment, bool isMe, bool isSending) {
     final fileName = attachment['file_name'] ?? 'File';
     final fileType = attachment['file_type'] ?? '';
     final fileUrl = attachment['file_url'] ?? '';
@@ -977,13 +1140,103 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final durationSeconds = attachment['duration_seconds'] as int?;
     final messageId = attachment['message_id'] as String;
 
-    // Voice message player
+    // Voice message player (show placeholder while sending)
     if (attachmentType == 'voice') {
+      if (isSending) {
+        // Show voice message placeholder while uploading
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isMe ? const Color(0xFFBBDEFB) : Colors.grey[300],
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isMe ? const Color(0xFF90CAF9) : Colors.grey[400],
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.mic,
+                  color: Color(0xFF1A1A1A),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 120,
+                    child: LinearProgressIndicator(
+                      backgroundColor: isMe ? const Color(0xFF90CAF9) : Colors.grey[400],
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFF1A1A1A),
+                      ),
+                      minHeight: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '0:${durationSeconds?.toString().padLeft(2, '0') ?? '00'}',
+                    style: const TextStyle(
+                      color: Color(0xFF666666),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+        );
+      }
       return _buildVoiceMessagePlayer(messageId, fileUrl, durationSeconds ?? 0, isMe);
     }
 
     // Image attachment - display inline
     if (attachmentType == 'image' || _isImageFile(fileType)) {
+      if (isSending || fileUrl.isEmpty) {
+        // Show image placeholder while uploading
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.6,
+            maxHeight: 200,
+          ),
+          decoration: BoxDecoration(
+            color: isMe ? const Color(0xFFBBDEFB) : Colors.grey[300],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            height: 150,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.image, color: Colors.grey[600], size: 48),
+                const SizedBox(height: 8),
+                Text(
+                  fileName,
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      
       return GestureDetector(
         onTap: () => _showFullImage(fileUrl),
         child: Container(
@@ -1032,7 +1285,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
     // Regular file attachment
     return GestureDetector(
-      onTap: () => _downloadAndOpenFile(fileUrl, fileName),
+      onTap: isSending ? null : () => _downloadAndOpenFile(fileUrl, fileName),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(10),
@@ -1190,40 +1443,38 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             },
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: StreamBuilder<Duration?>(
-              stream: player.positionStream,
-              builder: (context, snapshot) {
-                final position = snapshot.data ?? Duration.zero;
-                final duration = player.duration ?? Duration(seconds: durationSeconds);
-                
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      child: LinearProgressIndicator(
-                        value: duration.inSeconds > 0 ? position.inSeconds / duration.inSeconds : 0,
-                        backgroundColor: isMe ? const Color(0xFF90CAF9) : Colors.grey[400],
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF1A1A1A),
-                        ),
-                        minHeight: 3,
+          StreamBuilder<Duration?>(
+            stream: player.positionStream,
+            builder: (context, snapshot) {
+              final position = snapshot.data ?? Duration.zero;
+              final duration = player.duration ?? Duration(seconds: durationSeconds);
+              
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 120,
+                    child: LinearProgressIndicator(
+                      value: duration.inSeconds > 0 ? position.inSeconds / duration.inSeconds : 0,
+                      backgroundColor: isMe ? const Color(0xFF90CAF9) : Colors.grey[400],
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFF1A1A1A),
                       ),
+                      minHeight: 3,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                      style: const TextStyle(
-                        color: Color(0xFF666666),
-                        fontSize: 11,
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_formatDuration(position)} / ${_formatDuration(duration)}',
+                    style: const TextStyle(
+                      color: Color(0xFF666666),
+                      fontSize: 11,
                     ),
-                  ],
-                );
-              },
-            ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(width: 8),
         ],
@@ -1590,7 +1841,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   color: Colors.purple,
                   onTap: () {
                     Navigator.pop(context);
-                    _pickFile();
+                    _pickImageFromGallery();
                   },
                 ),
                 _buildAttachmentOption(
@@ -1599,12 +1850,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   color: Colors.pink,
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Camera feature coming soon!'),
-                        backgroundColor: AppColors.primary,
-                      ),
-                    );
+                    _pickImageFromCamera();
                   },
                 ),
                 _buildAttachmentOption(

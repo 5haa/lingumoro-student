@@ -51,19 +51,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _subscribeToNotifications() {
     try {
       _notificationChannel = _notificationService.subscribeToNotifications((notification) {
+        // Filter out chat notifications - they should only appear as push notifications
+        final type = notification['type'] as String?;
+        if (type == 'chat_message' || 
+            type == 'chat_request_received' || 
+            type == 'chat_request_accepted' || 
+            type == 'chat_request_rejected') {
+          // Don't add chat notifications to in-app notification list
+          return;
+        }
+        
         setState(() {
           _notifications.insert(0, notification);
         });
-        // Show snackbar for new notification
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(notification['title'] ?? 'New notification'),
-              backgroundColor: AppColors.primary,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        // Don't show in-app snackbar for any messages - push notifications handle this
+        // Only the notification list updates in real-time
       });
     } catch (e) {
       print('Error subscribing to notifications: $e');
@@ -99,6 +101,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             content: Text('All notifications marked as read'),
             backgroundColor: AppColors.primary,
             duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearAllNotifications() async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Notifications'),
+        content: const Text('Are you sure you want to clear all notifications? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final count = await _notificationService.clearAllNotifications();
+    if (count > 0) {
+      setState(() {
+        _notifications.clear();
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$count notification${count > 1 ? 's' : ''} cleared'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -193,21 +236,42 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       ),
                     ),
                   ),
-                  if (_unreadCount > 0)
-                    TextButton(
-                      onPressed: _markAllAsRead,
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(45, 45),
-                      ),
-                      child: const Text(
-                        'Read all',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
+                  if (_notifications.isNotEmpty)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_unreadCount > 0)
+                          TextButton(
+                            onPressed: _markAllAsRead,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              minimumSize: const Size(45, 30),
+                            ),
+                            child: const Text(
+                              'Read all',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        TextButton(
+                          onPressed: _clearAllNotifications,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(45, 30),
+                          ),
+                          child: const Text(
+                            'Clear',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     )
                   else
                     const SizedBox(width: 45),
