@@ -7,6 +7,7 @@ import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/ai_story_service.dart';
 import 'package:student/services/preload_service.dart';
+import 'package:student/services/points_notification_service.dart';
 import 'package:student/screens/practice/reading_screen.dart';
 import 'package:student/screens/practice/quiz_practice_screen.dart';
 import 'package:student/screens/practice/ai_voice_screen.dart';
@@ -1300,6 +1301,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late YoutubePlayerController _controller;
   final _practiceService = PracticeService();
   final _levelService = LevelService();
+  final _pointsNotificationService = PointsNotificationService();
   bool _hasMarkedAsWatched = false;
   bool _isExitingScreen = false;
   bool _controllerDisposed = false;
@@ -1384,29 +1386,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
       
       if (mounted) {
-        // Show completion message with points
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Text('Video completed! +$pointsReward points ✨'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
+        // Show points notification using the new service
+        _pointsNotificationService.showPointsEarnedNotification(
+          context: context,
+          pointsGained: pointsReward,
+          message: 'Video completed! +$pointsReward points ✨',
         );
-        
-        // Check if leveled up and show dialog
-        if (result['leveledUp'] == true) {
-          _showLevelUpDialog(
-            result['previousLevel'],
-            result['newLevel'],
-            result['newPoints'],
-          );
-        }
         
         // Call the callback
         widget.onVideoCompleted();

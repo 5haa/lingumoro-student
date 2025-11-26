@@ -14,6 +14,7 @@ import 'package:student/config/voice_ai_config.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/ai_voice_session_service.dart';
 import 'package:student/services/level_service.dart';
+import 'package:student/services/points_notification_service.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as kStatus;
@@ -54,6 +55,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   final AIVoiceSessionService _sessionService = AIVoiceSessionService();
   final AuthService _authService = AuthService();
   final LevelService _levelService = LevelService();
+  final PointsNotificationService _pointsNotificationService = PointsNotificationService();
 
   final RecordConfig _recordConfig = const RecordConfig(
     encoder: AudioEncoder.pcm16bits,
@@ -356,6 +358,14 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
         );
 
         if (result['success'] == true && result['pointsAwarded'] > 0) {
+          // Show points notification
+          if (mounted) {
+            _pointsNotificationService.showPointsEarnedNotification(
+              context: context,
+              pointsGained: result['pointsAwarded'],
+            );
+          }
+          
           _showSessionCompletedDialog(
             result['pointsAwarded'],
             result['durationMinutes'],

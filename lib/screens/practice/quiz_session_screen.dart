@@ -5,6 +5,7 @@ import '../../config/app_colors.dart';
 import '../../services/quiz_practice_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/level_service.dart';
+import '../../services/points_notification_service.dart';
 import '../../widgets/custom_back_button.dart';
 
 class QuizSessionScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
   final _quizService = QuizPracticeService();
   final _authService = AuthService();
   final _levelService = LevelService();
+  final _pointsNotificationService = PointsNotificationService();
 
   // Quiz state
   List<Map<String, dynamic>> _questions = [];
@@ -181,6 +183,15 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
         studentAnswers: _studentAnswers,
         durationSeconds: duration,
       );
+      
+      // Show points notification if points were earned
+      if (_totalPoints > 0 && mounted) {
+        _pointsNotificationService.showPointsEarnedNotification(
+          context: context,
+          pointsGained: _totalPoints,
+          message: 'Quiz complete! +$_totalPoints points earned!',
+        );
+      }
     }
 
     setState(() {
@@ -1089,6 +1100,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
     return 'Advanced';
   }
 }
+
 
 
 

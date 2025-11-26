@@ -6,6 +6,8 @@ import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/photo_service.dart';
 import 'package:student/services/preload_service.dart';
+import 'package:student/services/points_notification_service.dart';
+import 'dart:async';
 import 'package:student/screens/auth/auth_screen.dart';
 import 'package:student/screens/auth/change_password_screen.dart';
 import 'package:student/screens/profile/edit_profile_screen.dart';
@@ -28,11 +30,13 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
   final _proService = ProSubscriptionService();
   final _photoService = PhotoService();
   final _preloadService = PreloadService();
+  final _pointsNotificationService = PointsNotificationService();
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _levelProgress;
   Map<String, dynamic>? _proSubscription;
   Map<String, dynamic>? _mainPhoto;
   bool _isLoading = false;
+  StreamSubscription? _pointsSubscription;
 
   @override
   bool get wantKeepAlive => true; // Keep state alive when switching tabs
@@ -41,6 +45,37 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
   void initState() {
     super.initState();
     _loadProfileFromCache();
+    _subscribeToPointsUpdates();
+  }
+
+  void _subscribeToPointsUpdates() {
+    final user = _authService.currentUser;
+    if (user == null) return;
+    
+    // Subscribe to real-time points updates
+    _pointsNotificationService.subscribeToPointsUpdates(user.id, context);
+    
+    // Listen to points updates
+    _pointsSubscription = _pointsNotificationService.onPointsUpdate.listen((update) async {
+      print('📊 Points update received in profile: ${update['pointsGained']} points');
+      
+      // Force refresh from API (bypass cache)
+      await _preloadService.refreshUserData();
+      
+      // Reload profile to get fresh data
+      if (mounted) {
+        setState(() {
+          _levelProgress = _preloadService.levelProgress;
+          _profile = _preloadService.profile;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pointsSubscription?.cancel();
+    super.dispose();
   }
 
   void _loadProfileFromCache() {

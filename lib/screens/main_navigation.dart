@@ -4,6 +4,7 @@ import 'package:student/config/app_colors.dart';
 import 'package:student/widgets/app_drawer.dart';
 import 'package:student/l10n/app_localizations.dart';
 import 'package:student/services/chat_service.dart';
+import 'package:student/services/points_notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home/home_screen.dart';
 import 'classes/classes_screen.dart';
@@ -22,6 +23,7 @@ class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   int _unreadMessageCount = 0;
   final _chatService = ChatService();
+  final _pointsNotificationService = PointsNotificationService();
   RealtimeChannel? _conversationChannel;
   
   late final List<Widget> _screens;
@@ -38,11 +40,26 @@ class _MainNavigationState extends State<MainNavigation> {
     ];
     _loadUnreadCount();
     _setupRealtimeListener();
+    
+    // Setup points subscription after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupPointsSubscription();
+    });
+  }
+
+  void _setupPointsSubscription() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId != null && mounted) {
+      // Subscribe to real-time points updates
+      _pointsNotificationService.subscribeToPointsUpdates(userId, context);
+      print('✅ Subscribed to points updates for user: $userId');
+    }
   }
 
   @override
   void dispose() {
     _conversationChannel?.unsubscribe();
+    _pointsNotificationService.unsubscribe();
     super.dispose();
   }
 
