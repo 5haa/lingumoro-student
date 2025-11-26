@@ -6,6 +6,7 @@ import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/ai_story_service.dart';
+import 'package:student/services/reading_service.dart';
 import 'package:student/services/preload_service.dart';
 import 'package:student/services/points_notification_service.dart';
 import 'package:student/screens/practice/reading_screen.dart';
@@ -28,6 +29,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   final _proService = ProSubscriptionService();
   final _quizService = QuizPracticeService();
   final _aiStoryService = AIStoryService();
+  final _readingService = ReadingService();
   final _preloadService = PreloadService();
   
   List<Map<String, dynamic>> _videos = [];
@@ -43,8 +45,8 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     'total_questions': 0,
     'accuracy': 0.0,
   };
-  int _storiesGenerated = 0;
-  int _remainingStories = 0;
+  int _completedReadings = 0;
+  int _totalReadings = 0;
 
   @override
   bool get wantKeepAlive => true; // Keep state alive when switching tabs
@@ -89,8 +91,8 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
         _videos = cached.videos;
         _watchedVideos = cached.watchedVideos;
         _quizStats = cached.quizStats;
-        _storiesGenerated = cached.storiesGenerated;
-        _remainingStories = cached.remainingStories;
+        _completedReadings = cached.completedReadings ?? 0;
+        _totalReadings = cached.totalReadings ?? 0;
         _isLoading = false;
       });
       print('✅ Loaded practice data from cache');
@@ -138,8 +140,8 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
         videos: _videos,
         watchedVideos: _watchedVideos,
         quizStats: _quizStats,
-        storiesGenerated: _storiesGenerated,
-        remainingStories: _remainingStories,
+        completedReadings: _completedReadings,
+        totalReadings: _totalReadings,
       );
 
       setState(() {
@@ -188,11 +190,11 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   Future<void> _loadReadingStats() async {
     try {
       if (_studentId == null) return;
-      final remaining = await _aiStoryService.getRemainingStories(_studentId!);
-      final history = await _aiStoryService.getStoryHistory(_studentId!);
+      final completed = await _readingService.getCompletedCount(_studentId!);
+      final total = await _readingService.getTotalReadingsCount();
       setState(() {
-        _remainingStories = remaining;
-        _storiesGenerated = history.length;
+        _completedReadings = completed;
+        _totalReadings = total;
       });
     } catch (e) {
       print('Error loading reading stats: $e');
@@ -277,7 +279,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                         const SizedBox(height: 12),
 
                         _buildPracticeCard(
-                          title: 'Reading Stories',
+                          title: 'Reading Practice',
                           icon: FontAwesomeIcons.book,
                           emoji: '📖',
                           color: Colors.blue.shade600,
@@ -286,7 +288,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          stat2Label: '$_storiesGenerated stories',
+                          stat2Label: '$_completedReadings/$_totalReadings completed',
                           onTap: () => _navigateToReading(),
                           isLocked: !_hasProSubscription,
                           showProgress: false,
@@ -1305,6 +1307,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _hasMarkedAsWatched = false;
   bool _isExitingScreen = false;
   bool _controllerDisposed = false;
+  int _actualWatchedSeconds = 0;
+  int _lastRecordedPosition = 0;
 
   @override
   void initState() {
@@ -1316,9 +1320,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       initialVideoId: videoId,
       flags: const YoutubePlayerFlags(
         autoPlay: true,
-        controlsVisibleAtStart: true,
-        disableDragSeek: true, // Prevent skipping
+        controlsVisibleAtStart: false, // Hide controls to prevent skipping
+        disableDragSeek: true, // Prevent drag seeking
         enableCaption: true,
+        hideControls: false,
       ),
     );
 
@@ -1327,18 +1332,49 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _videoListener() {
     if (_controller.value.isReady && !_hasMarkedAsWatched) {
-      // Check if video is near the end (95% watched)
-      final position = _controller.value.position.inSeconds;
-      final duration = _controller.metadata.duration.inSeconds;
+      final currentPosition = _controller.value.position.inSeconds;
       
-      if (duration > 0) {
-        final percentage = (position / duration * 100).round();
-        
-        // Mark as watched when 95% complete
-        if (percentage >= 95 && !_hasMarkedAsWatched) {
-          _hasMarkedAsWatched = true;
-          _markVideoAsWatched();
+      // Detect if user skipped forward (jumped more than 2 seconds)
+      if (currentPosition > _lastRecordedPosition + 2) {
+        // User tried to skip, seek back to last valid position
+        _controller.seekTo(Duration(seconds: _lastRecordedPosition));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ Please watch the video without skipping'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
         }
+        return;
+      }
+      
+      // Only increment actual watch time if playing normally (max 1 second increment)
+      if (currentPosition > _lastRecordedPosition && 
+          currentPosition <= _lastRecordedPosition + 2) {
+        setState(() {
+          _actualWatchedSeconds += (currentPosition - _lastRecordedPosition);
+          _lastRecordedPosition = currentPosition;
+        });
+      }
+      
+      // Get required watch duration from admin settings (in seconds)
+      final requiredDuration = (widget.video['duration_seconds'] as int?) ?? 0;
+      
+      // If admin didn't set a duration, use 95% of video length as fallback
+      int requiredWatchTime;
+      if (requiredDuration > 0) {
+        requiredWatchTime = requiredDuration;
+      } else {
+        final videoDuration = _controller.metadata.duration.inSeconds;
+        requiredWatchTime = (videoDuration * 0.95).round();
+      }
+      
+      // Mark as watched when required duration is reached
+      if (_actualWatchedSeconds >= requiredWatchTime && !_hasMarkedAsWatched) {
+        _hasMarkedAsWatched = true;
+        _markVideoAsWatched();
       }
     }
   }
@@ -1518,6 +1554,90 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.dispose();
   }
 
+  Widget _buildWatchProgressIndicator() {
+    final requiredDuration = (widget.video['duration_seconds'] as int?) ?? 0;
+    int requiredWatchTime;
+    
+    if (requiredDuration > 0) {
+      requiredWatchTime = requiredDuration;
+    } else {
+      final videoDuration = _controller.metadata.duration.inSeconds;
+      requiredWatchTime = (videoDuration * 0.95).round();
+    }
+    
+    final remainingSeconds = (requiredWatchTime - _actualWatchedSeconds).clamp(0, requiredWatchTime);
+    final progressPercent = requiredWatchTime > 0 
+        ? (_actualWatchedSeconds / requiredWatchTime * 100).clamp(0, 100) 
+        : 0;
+    
+    final isCompleted = _actualWatchedSeconds >= requiredWatchTime;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isCompleted ? Colors.green.shade50 : Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isCompleted ? Colors.green.shade200 : Colors.blue.shade200,
+          width: 2,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                isCompleted ? Icons.check_circle : Icons.timer_outlined,
+                color: isCompleted ? Colors.green.shade700 : Colors.blue.shade700,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isCompleted 
+                      ? '✅ Watch requirement completed!' 
+                      : 'Watch time: ${_formatTime(remainingSeconds)} remaining',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isCompleted ? Colors.green.shade700 : Colors.blue.shade700,
+                  ),
+                ),
+              ),
+              Text(
+                '${progressPercent.toStringAsFixed(0)}%',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isCompleted ? Colors.green.shade700 : Colors.blue.shade700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progressPercent / 100,
+              backgroundColor: Colors.white,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isCompleted ? Colors.green : Colors.blue,
+              ),
+              minHeight: 8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(int seconds) {
+    final mins = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${mins}m ${secs}s';
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -1532,6 +1652,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               
               // Video Player
               _buildVideoPlayerSection(),
+              
+              // Watch Progress Indicator
+              _buildWatchProgressIndicator(),
               
               Expanded(
                 child: SingleChildScrollView(
@@ -1662,12 +1785,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     return YoutubePlayer(
       controller: _controller,
-      showVideoProgressIndicator: true,
+      showVideoProgressIndicator: false, // Hide progress bar to prevent clicking/seeking
       progressIndicatorColor: AppColors.primary,
       progressColors: ProgressBarColors(
         playedColor: AppColors.primary,
         handleColor: Colors.red.shade600,
       ),
+      onReady: () {
+        // Video is ready
+      },
+      onEnded: (metaData) {
+        // Video ended naturally
+        if (!_hasMarkedAsWatched) {
+          _hasMarkedAsWatched = true;
+          _markVideoAsWatched();
+        }
+      },
     );
   }
 

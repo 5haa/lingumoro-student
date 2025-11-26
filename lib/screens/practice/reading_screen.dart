@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:student/services/ai_story_service.dart';
+import 'package:student/services/reading_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/config/app_colors.dart';
+import 'package:student/screens/practice/reading_detail_screen.dart';
 import '../../widgets/custom_back_button.dart';
 
 class ReadingScreen extends StatefulWidget {
@@ -14,15 +14,14 @@ class ReadingScreen extends StatefulWidget {
 }
 
 class _ReadingScreenState extends State<ReadingScreen> {
-  final _aiStoryService = AIStoryService();
+  final _readingService = ReadingService();
   final _authService = AuthService();
-  final _themeController = TextEditingController();
   
-  bool _isGenerating = false;
-  int _remainingStories = 0;
-  List<Map<String, dynamic>> _storyHistory = [];
-  Map<String, dynamic>? _currentStory;
-  bool _isLoadingHistory = true;
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _readings = [];
+  Map<String, bool> _progressMap = {};
+  int _completedCount = 0;
+  int _totalCount = 0;
 
   @override
   void initState() {
@@ -34,21 +33,27 @@ class _ReadingScreenState extends State<ReadingScreen> {
     final studentId = _authService.currentUser?.id;
     if (studentId == null) return;
 
+    setState(() => _isLoading = true);
+
     try {
-      final remaining = await _aiStoryService.getRemainingStories(studentId);
-      final history = await _aiStoryService.getStoryHistory(studentId);
+      final readings = await _readingService.getAllReadings();
+      final progressMap = await _readingService.getStudentProgress(studentId);
+      final completedCount = await _readingService.getCompletedCount(studentId);
+      final totalCount = await _readingService.getTotalReadingsCount();
 
       setState(() {
-        _remainingStories = remaining;
-        _storyHistory = history;
-        _isLoadingHistory = false;
+        _readings = readings;
+        _progressMap = progressMap;
+        _completedCount = completedCount;
+        _totalCount = totalCount;
+        _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoadingHistory = false);
+      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading data: $e'),
+            content: Text('Error loading readings: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -56,91 +61,50 @@ class _ReadingScreenState extends State<ReadingScreen> {
     }
   }
 
-  Future<void> _generateStory() async {
-    final theme = _themeController.text.trim();
+  Future<bool> _isReadingUnlocked(Map<String, dynamic> reading) async {
+    final studentId = _authService.currentUser?.id;
+    if (studentId == null) return false;
+
+    return await _readingService.isReadingUnlocked(
+      studentId,
+      reading,
+      _readings,
+      _progressMap,
+    );
+  }
+
+  void _openReading(Map<String, dynamic> reading) async {
+    final studentId = _authService.currentUser?.id;
+    if (studentId == null) return;
+
+    // Check if unlocked
+    final isUnlocked = await _isReadingUnlocked(reading);
     
-    if (theme.isEmpty) {
+    if (!isUnlocked) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a theme for your story'),
+          content: Text('Complete the previous reading to unlock this one'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final studentId = _authService.currentUser?.id;
-    if (studentId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please log in to generate stories'),
-          backgroundColor: Colors.red,
+    // Navigate to reading detail
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReadingDetailScreen(
+          reading: reading,
+          studentId: studentId,
         ),
-      );
-      return;
+      ),
+    );
+
+    // Reload data if completed
+    if (result == true) {
+      _loadData();
     }
-
-    setState(() => _isGenerating = true);
-
-    try {
-      final result = await _aiStoryService.generateStory(studentId, theme);
-
-      if (result['success'] == true) {
-        setState(() {
-          _currentStory = result;
-          _themeController.clear();
-        });
-
-        // Small delay to ensure database commit
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        // Reload data to update remaining stories count
-        await _loadData();
-
-        // Show success message
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const FaIcon(FontAwesomeIcons.circleCheck, color: Colors.white, size: 18),
-                  const SizedBox(width: 12),
-                  Text('Story generated! ${result['wordCount']} words ✨'),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['error'] ?? 'Failed to generate story'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() => _isGenerating = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _themeController.dispose();
-    super.dispose();
   }
 
   @override
@@ -150,39 +114,21 @@ class _ReadingScreenState extends State<ReadingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar
             _buildTopBar(),
-            
-            // Main Content
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _loadData,
                 color: AppColors.primary,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Stats Card
-                      _buildStatsCard(),
-                      const SizedBox(height: 20),
-
-                      // Generate Story Section
-                      _buildGenerateSection(),
-                      const SizedBox(height: 20),
-
-                      // Current Story Display
-                      if (_currentStory != null) ...[
-                        _buildCurrentStory(),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // Story History
-                      _buildStoryHistory(),
-                    ],
-                  ),
-                ),
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        ),
+                      )
+                    : _readings.isEmpty
+                        ? _buildEmptyState()
+                        : _buildReadingsList(),
               ),
             ),
           ],
@@ -196,13 +142,11 @@ class _ReadingScreenState extends State<ReadingScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          // Back Icon
           const CustomBackButton(),
-          
           const Expanded(
             child: Center(
               child: Text(
-                'READING STORIES',
+                'READINGS',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -212,574 +156,329 @@ class _ReadingScreenState extends State<ReadingScreen> {
               ),
             ),
           ),
-          
-          // Placeholder for right side (to keep centered)
           const SizedBox(width: 40),
         ],
       ),
     );
   }
 
-  Widget _buildStatsCard() {
-    return Container(
+  Widget _buildReadingsList() {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade400.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const FaIcon(
-                  FontAwesomeIcons.book,
-                  size: 24,
-                  color: Colors.blue,
-                ),
-              ),
-              const SizedBox(width: 15),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'AI Story Generator',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Generate personalized stories',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          _buildProgressCard(),
           const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: AppColors.lightGrey,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildStatColumn(
-                    'Remaining Today',
-                    '$_remainingStories',
-                    Colors.blue.shade400,
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  color: AppColors.border,
-                ),
-                Expanded(
-                  child: _buildStatColumn(
-                    'Total Stories',
-                    '${_storyHistory.length}',
-                    Colors.purple.shade400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatColumn(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGenerateSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
           const Text(
-            'Generate New Story',
+            'All Readings',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _themeController,
-            enabled: !_isGenerating && _remainingStories > 0,
-            decoration: InputDecoration(
-              labelText: 'Story Theme',
-              hintText: 'e.g., friendship, adventure, space exploration...',
-              prefixIcon: const FaIcon(
-                FontAwesomeIcons.lightbulb,
-                color: AppColors.textSecondary,
-                size: 18,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary, width: 2),
-              ),
-              filled: true,
-              fillColor: AppColors.lightGrey,
-              labelStyle: const TextStyle(color: AppColors.textSecondary),
-              hintStyle: const TextStyle(color: AppColors.textHint),
-            ),
-            style: const TextStyle(color: AppColors.textPrimary),
-            maxLength: 100,
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isGenerating || _remainingStories <= 0
-                  ? null
-                  : _generateStory,
-              icon: _isGenerating
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const FaIcon(FontAwesomeIcons.wandMagicSparkles, size: 18),
-              label: Text(
-                _isGenerating
-                    ? 'Generating Story...'
-                    : _remainingStories > 0
-                        ? 'Generate Story'
-                        : 'Daily Limit Reached',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.shade300,
-                disabledForegroundColor: Colors.grey.shade600,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ),
-          if (_remainingStories <= 0) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
-              ),
-              child: Row(
-                children: [
-                  FaIcon(FontAwesomeIcons.circleInfo, color: Colors.orange.shade700, size: 16),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'You\'ve used all your stories for today. Come back tomorrow!',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          const SizedBox(height: 12),
+          ...(_readings.asMap().entries.map((entry) {
+            return _buildReadingCard(entry.value, entry.key);
+          })),
         ],
       ),
     );
   }
 
-  Widget _buildCurrentStory() {
+  Widget _buildProgressCard() {
+    final percentage = _totalCount > 0 
+        ? (_completedCount / _totalCount * 100).toInt() 
+        : 0;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.blue.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Your Generated Story',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.lightGrey,
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const FaIcon(
-                    FontAwesomeIcons.copy,
-                    size: 18,
-                    color: AppColors.textSecondary,
-                  ),
-                  onPressed: () {
-                    Clipboard.setData(
-                      ClipboardData(text: _currentStory!['story']),
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Story copied to clipboard'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  },
-                  tooltip: 'Copy story',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
+            child: const FaIcon(
+              FontAwesomeIcons.book,
+              size: 32,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FaIcon(FontAwesomeIcons.tag, size: 14, color: Colors.blue.shade700),
-                const SizedBox(width: 8),
-                Text(
-                  'Theme: ${_currentStory!['theme']}',
+                const Text(
+                  'Your Progress',
                   style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade900,
-                    fontSize: 14,
+                    fontSize: 16,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$_completedCount / $_totalCount Completed',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: _totalCount > 0 ? _completedCount / _totalCount : 0,
+                    backgroundColor: Colors.white.withOpacity(0.3),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    minHeight: 8,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$percentage% Complete',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.9),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            _currentStory!['story'],
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.6,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.lightGrey,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FaIcon(FontAwesomeIcons.penToSquare, size: 14, color: AppColors.textSecondary),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${_currentStory!['wordCount']} words',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.purple.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FaIcon(FontAwesomeIcons.wandMagicSparkles, size: 14, color: Colors.purple.shade700),
-                    const SizedBox(width: 6),
-                    Text(
-                      'AI Generated',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.purple.shade800,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildStoryHistory() {
-    if (_isLoadingHistory) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-          ),
-        ),
-      );
-    }
+  Widget _buildReadingCard(Map<String, dynamic> reading, int index) {
+    final isCompleted = _progressMap[reading['id']] ?? false;
+    final hasAudio = reading['audio_url'] != null && reading['audio_url'].toString().isNotEmpty;
 
-    if (_storyHistory.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppColors.grey.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: FaIcon(
-                  FontAwesomeIcons.bookOpen,
-                  size: 40,
-                  color: AppColors.grey.withOpacity(0.3),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'No stories yet',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: AppColors.textSecondary.withOpacity(0.6),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Generate your first story above!',
-                style: TextStyle(
-                  color: AppColors.textSecondary.withOpacity(0.5),
-                  fontSize: 14,
-                ),
+    return FutureBuilder<bool>(
+      future: _isReadingUnlocked(reading),
+      builder: (context, snapshot) {
+        final isUnlocked = snapshot.data ?? false;
+        final isLocked = !isUnlocked && !isCompleted;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(15),
+            border: isCompleted
+                ? Border.all(color: Colors.green.shade300, width: 2)
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Your Story History',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...(_storyHistory.map((story) => _buildHistoryCard(story))),
-      ],
-    );
-  }
-
-  Widget _buildHistoryCard(Map<String, dynamic> story) {
-    final date = DateTime.parse(story['generated_at']);
-    final dateStr = '${date.day}/${date.month}/${date.year}';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => setState(() => _currentStory = {
-                'story': story['story_text'],
-                'theme': story['theme'],
-                'wordCount': story['word_count'],
-              }),
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade400.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: FaIcon(
-                    FontAwesomeIcons.book,
-                    color: Colors.blue.shade400,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        story['theme'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        dateStr,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isLocked ? null : () => _openReading(reading),
+              borderRadius: BorderRadius.circular(15),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
                   children: [
-                    Text(
-                      '${story['word_count']} words',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
+                    // Order badge or status icon
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? Colors.green.shade400
+                            : isLocked
+                                ? AppColors.grey.withOpacity(0.3)
+                                : Colors.blue.shade400,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: isCompleted
+                            ? const FaIcon(
+                                FontAwesomeIcons.check,
+                                color: Colors.white,
+                                size: 24,
+                              )
+                            : isLocked
+                                ? const FaIcon(
+                                    FontAwesomeIcons.lock,
+                                    color: Colors.white,
+                                    size: 20,
+                                  )
+                                : Text(
+                                    '${reading['order'] + 1}',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        FaIcon(FontAwesomeIcons.wandMagicSparkles, size: 12, color: Colors.purple.shade400),
-                        const SizedBox(width: 4),
-                        Text(
-                          'AI Story',
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            reading['title'],
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: isLocked
+                                  ? AppColors.textSecondary
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              if (hasAudio) ...[
+                                FaIcon(
+                                  FontAwesomeIcons.volumeHigh,
+                                  size: 12,
+                                  color: isLocked
+                                      ? AppColors.textSecondary
+                                      : Colors.blue.shade600,
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              FaIcon(
+                                FontAwesomeIcons.coins,
+                                size: 12,
+                                color: isLocked
+                                    ? AppColors.textSecondary
+                                    : Colors.amber.shade600,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${reading['points']} pts',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isLocked
+                                      ? AppColors.textSecondary
+                                      : AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (isLocked) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Complete previous reading to unlock',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary.withOpacity(0.7),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (isCompleted)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Text(
+                          'Completed',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.purple.shade600,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade700,
                           ),
                         ),
-                      ],
-                    ),
+                      )
+                    else if (!isLocked)
+                      const FaIcon(
+                        FontAwesomeIcons.chevronRight,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.grey.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: FaIcon(
+                FontAwesomeIcons.bookOpen,
+                size: 50,
+                color: AppColors.grey.withOpacity(0.3),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No readings available',
+              style: TextStyle(
+                fontSize: 20,
+                color: AppColors.textSecondary.withOpacity(0.6),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Check back later for new reading content',
+              style: TextStyle(
+                color: AppColors.textSecondary.withOpacity(0.5),
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

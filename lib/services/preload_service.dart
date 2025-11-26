@@ -82,8 +82,8 @@ class PreloadService {
   List<Map<String, dynamic>>? _practiceVideos;
   Map<String, bool>? _watchedVideos;
   Map<String, dynamic>? _quizStats;
-  int? _storiesGenerated;
-  int? _remainingStories;
+  int? _completedReadings;
+  int? _totalReadings;
   DateTime? _practiceTimestamp;
 
   // Singleton pattern
@@ -324,8 +324,8 @@ class PreloadService {
     _practiceVideos = null;
     _watchedVideos = null;
     _quizStats = null;
-    _storiesGenerated = null;
-    _remainingStories = null;
+    _completedReadings = null;
+    _totalReadings = null;
     _practiceTimestamp = null;
     print('🧹 All caches cleared');
   }
@@ -502,16 +502,16 @@ class PreloadService {
     List<Map<String, dynamic>> videos,
     Map<String, bool> watchedVideos,
     Map<String, dynamic> quizStats,
-    int storiesGenerated,
-    int remainingStories
+    int? completedReadings,
+    int? totalReadings
   })? get practiceData {
     if (_practiceVideos == null || _practiceTimestamp == null) return null;
     return (
       videos: _practiceVideos!,
       watchedVideos: _watchedVideos ?? {},
       quizStats: _quizStats ?? {},
-      storiesGenerated: _storiesGenerated ?? 0,
-      remainingStories: _remainingStories ?? 0
+      completedReadings: _completedReadings ?? 0,
+      totalReadings: _totalReadings ?? 0
     );
   }
 
@@ -520,14 +520,14 @@ class PreloadService {
     required List<Map<String, dynamic>> videos,
     required Map<String, bool> watchedVideos,
     required Map<String, dynamic> quizStats,
-    required int storiesGenerated,
-    required int remainingStories,
+    int? completedReadings,
+    int? totalReadings,
   }) {
     _practiceVideos = videos;
     _watchedVideos = watchedVideos;
     _quizStats = quizStats;
-    _storiesGenerated = storiesGenerated;
-    _remainingStories = remainingStories;
+    _completedReadings = completedReadings;
+    _totalReadings = totalReadings;
     _practiceTimestamp = DateTime.now();
     print('📦 Cached ${videos.length} practice videos and stats');
   }
@@ -537,8 +537,8 @@ class PreloadService {
     _practiceVideos = null;
     _watchedVideos = null;
     _quizStats = null;
-    _storiesGenerated = null;
-    _remainingStories = null;
+    _completedReadings = null;
+    _totalReadings = null;
     _practiceTimestamp = null;
     print('🗑️ Invalidated practice cache');
   }
