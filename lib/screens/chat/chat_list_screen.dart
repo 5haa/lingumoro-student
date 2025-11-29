@@ -45,30 +45,97 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     _chatService.subscribeToConversations();
     
     // Listen to conversation updates
-    _chatService.onConversationUpdate.listen((update) {
+    _chatService.onConversationUpdate.listen((update) async {
       if (mounted) {
         // Update individual conversation instead of full reload
         final conversationId = update['id'];
         final index = _conversations.indexWhere((c) => c['id'] == conversationId);
         
-        setState(() {
-          if (index != -1) {
-            // Update existing conversation
+        if (index != -1) {
+          // Update existing conversation
+          setState(() {
             _conversations[index] = {..._conversations[index], ...update};
             _filteredConversations = _conversations;
-          } else {
-            // New conversation - add it
-            _conversations.insert(0, update);
-            _filteredConversations = _conversations;
+          });
+          
+          // Update cache
+          _preloadService.cacheChat(
+            conversations: _conversations,
+            teachers: _availableTeachers,
+            requests: _pendingRequests,
+          );
+        } else {
+          // New conversation or undeleted conversation - fetch full data
+          try {
+            final userId = _chatService.supabase.auth.currentUser?.id;
+            if (userId != null) {
+              // Fetch the full conversation with joined data
+              final fullConversation = await _chatService.supabase
+                  .from('chat_conversations')
+                  .select('''
+                    *,
+                    teacher:teacher_id (
+                      id,
+                      full_name,
+                      avatar_url,
+                      email
+                    ),
+                    student:student_id (
+                      id,
+                      full_name,
+                      avatar_url,
+                      email
+                    ),
+                    peer:participant2_id (
+                      id,
+                      full_name,
+                      avatar_url,
+                      email
+                    )
+                  ''')
+                  .eq('id', conversationId)
+                  .maybeSingle();
+              
+              if (fullConversation != null && 
+                  fullConversation['deleted_by_student'] == false) {
+                // Add to list if not deleted
+                setState(() {
+                  _conversations.insert(0, fullConversation);
+                  _filteredConversations = _conversations;
+                });
+                
+                // Update cache
+                _preloadService.cacheChat(
+                  conversations: _conversations,
+                  teachers: _availableTeachers,
+                  requests: _pendingRequests,
+                );
+                
+                // Subscribe to status of the new participant
+                final conversationType = fullConversation['conversation_type'] ?? 'teacher_student';
+                if (conversationType == 'teacher_student') {
+                  final teacherId = fullConversation['teacher_id'];
+                  if (teacherId != null) {
+                    _subscribeToUserStatus(teacherId, 'teacher');
+                  }
+                } else {
+                  final currentUserId = _chatService.supabase.auth.currentUser?.id;
+                  String? otherPartyId;
+                  if (fullConversation['student_id'] == currentUserId) {
+                    otherPartyId = fullConversation['participant2_id'];
+                  } else {
+                    otherPartyId = fullConversation['student_id'];
+                  }
+                  if (otherPartyId != null) {
+                    _subscribeToUserStatus(otherPartyId, 'student');
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            print('Error fetching full conversation: $e');
           }
-        });
-        
-        // Update cache
-        _preloadService.cacheChat(
-          conversations: _conversations,
-          teachers: _availableTeachers,
-          requests: _pendingRequests,
-        );
+        }
       }
     });
     
@@ -341,7 +408,9 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
       final now = DateTime.now();
       final difference = now.difference(date);
 
-      if (difference.inMinutes < 60) {
+      if (difference.inMinutes < 1) {
+        return 'just now';
+      } else if (difference.inMinutes < 60) {
         return '${difference.inMinutes}m ago';
       } else if (difference.inDays == 0) {
         return DateFormat.jm().format(date);

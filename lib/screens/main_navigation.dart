@@ -68,14 +68,26 @@ class _MainNavigationState extends State<MainNavigation> {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return;
 
-      final result = await Supabase.instance.client
+      // Get conversations where student is the primary participant
+      final result1 = await Supabase.instance.client
           .from('chat_conversations')
           .select('student_unread_count')
           .eq('student_id', userId);
 
+      // Get conversations where student is participant2 (student-to-student chats)
+      // In this case, their unread count is stored in teacher_unread_count
+      final result2 = await Supabase.instance.client
+          .from('chat_conversations')
+          .select('teacher_unread_count')
+          .eq('participant2_id', userId);
+
       int totalUnread = 0;
-      for (var conv in result) {
+      for (var conv in result1) {
         totalUnread += (conv['student_unread_count'] as int?) ?? 0;
+      }
+      for (var conv in result2) {
+        // For participant2, unread count is stored in teacher_unread_count
+        totalUnread += (conv['teacher_unread_count'] as int?) ?? 0;
       }
 
       if (mounted) {
@@ -94,6 +106,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
     _conversationChannel = Supabase.instance.client
         .channel('unread-messages-$userId')
+        // Listen for updates where student is the primary participant
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
@@ -101,6 +114,48 @@ class _MainNavigationState extends State<MainNavigation> {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'student_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            _loadUnreadCount();
+          },
+        )
+        // Listen for inserts where student is the primary participant
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_conversations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'student_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            _loadUnreadCount();
+          },
+        )
+        // Listen for updates where student is participant2 (student-to-student chats)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'chat_conversations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'participant2_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            _loadUnreadCount();
+          },
+        )
+        // Listen for inserts where student is participant2 (student-to-student chats)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_conversations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'participant2_id',
             value: userId,
           ),
           callback: (payload) {

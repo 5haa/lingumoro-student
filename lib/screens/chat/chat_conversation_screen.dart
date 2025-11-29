@@ -52,6 +52,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Timer? _typingTimer;
   Timer? _statusRefreshTimer;
   
+  // Pagination state
+  bool _isLoadingMore = false;
+  bool _hasMoreMessages = true;
+  static const int _messagesPerPage = 30;
+  static const int _moreMessagesCount = 20;
+  
   // Voice recording state
   AudioRecorder? _audioRecorder;
   bool _isRecording = false;
@@ -69,6 +75,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     _messageController.addListener(() {
       setState(() {}); // Rebuild to show/hide mic button
     });
+    
+    // Add scroll listener for pagination
+    _scrollController.addListener(_onScroll);
+    
     _loadMessagesFromCache();
     _setupRealtimeSubscriptions();
     _markMessagesAsRead();
@@ -201,12 +211,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     });
   }
 
+  void _onScroll() {
+    // Check if user scrolled to the top (remember, list is reversed)
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 &&
+        !_isLoadingMore &&
+        _hasMoreMessages) {
+      _loadMoreMessages();
+    }
+  }
+
   Future<void> _loadMessages() async {
     if (mounted) {
       setState(() => _isLoading = true);
     }
     
-    final messages = await _chatService.getMessages(widget.conversationId);
+    // Load initial batch of messages
+    final messages = await _chatService.getMessages(
+      widget.conversationId,
+      limit: _messagesPerPage,
+      offset: 0,
+    );
     
     // Cache the messages
     _preloadService.cacheMessages(widget.conversationId, messages);
@@ -215,9 +239,44 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       setState(() {
         _messages = messages;
         _isLoading = false;
+        // Check if there might be more messages
+        _hasMoreMessages = messages.length >= _messagesPerPage;
       });
       
       // No need to scroll - reverse: true handles it naturally
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    if (_isLoadingMore || !_hasMoreMessages) return;
+    
+    setState(() => _isLoadingMore = true);
+    
+    try {
+      // Load more messages with offset
+      final moreMessages = await _chatService.getMessages(
+        widget.conversationId,
+        limit: _moreMessagesCount,
+        offset: _messages.length,
+      );
+      
+      if (mounted) {
+        setState(() {
+          // Insert at the beginning since messages are in chronological order
+          _messages.insertAll(0, moreMessages);
+          _isLoadingMore = false;
+          // Check if there are still more messages
+          _hasMoreMessages = moreMessages.length >= _moreMessagesCount;
+        });
+        
+        // Update cache with all messages
+        _preloadService.cacheMessages(widget.conversationId, _messages);
+      }
+    } catch (e) {
+      print('Error loading more messages: $e');
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+      }
     }
   }
 
@@ -936,8 +995,24 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           reverse: true, // Latest messages at bottom
                           controller: _scrollController,
                           padding: const EdgeInsets.all(16),
-                          itemCount: _messages.length,
+                          itemCount: _messages.length + (_isLoadingMore ? 1 : 0),
                           itemBuilder: (context, index) {
+                            // Show loading indicator at the end (top when reversed)
+                            if (index == _messages.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            
                             // Reverse index since list is reversed
                             final reversedIndex = _messages.length - 1 - index;
                             final message = _messages[reversedIndex];

@@ -73,6 +73,32 @@ class ChatService {
         // Keep the first (oldest) conversation
         conversation = conversations.first;
         
+        // If conversation was deleted by student, undelete it
+        if (conversation['deleted_by_student'] == true) {
+          await _supabase
+              .from('chat_conversations')
+              .update({
+                'deleted_by_student': false,
+                'student_deleted_at': null,
+              })
+              .eq('id', conversation['id']);
+          
+          // Refresh conversation data
+          conversation = await _supabase
+              .from('chat_conversations')
+              .select('''
+                *,
+                teacher:teacher_id (
+                  id,
+                  full_name,
+                  avatar_url,
+                  email
+                )
+              ''')
+              .eq('id', conversation['id'])
+              .single();
+        }
+        
         // Delete duplicates if they exist
         if (conversations.length > 1) {
           print('Found ${conversations.length} duplicate conversations, cleaning up...');
@@ -130,6 +156,32 @@ class ChatService {
           
           if (retryConversations.isNotEmpty) {
             conversation = retryConversations.first;
+            
+            // If this conversation was deleted by student, undelete it
+            if (conversation['deleted_by_student'] == true) {
+              await _supabase
+                  .from('chat_conversations')
+                  .update({
+                    'deleted_by_student': false,
+                    'student_deleted_at': null,
+                  })
+                  .eq('id', conversation['id']);
+              
+              // Refresh conversation data
+              conversation = await _supabase
+                  .from('chat_conversations')
+                  .select('''
+                    *,
+                    teacher:teacher_id (
+                      id,
+                      full_name,
+                      avatar_url,
+                      email
+                    )
+                  ''')
+                  .eq('id', conversation['id'])
+                  .single();
+            }
           } else {
             rethrow;
           }
@@ -273,14 +325,54 @@ class ChatService {
   /// Get messages for a conversation
   Future<List<Map<String, dynamic>>> getMessages(String conversationId, {int limit = 50, int offset = 0}) async {
     try {
-      final messages = await _supabase
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return [];
+
+      // Get conversation to check deletion timestamp
+      final conversation = await _supabase
+          .from('chat_conversations')
+          .select('student_id, participant2_id, student_deleted_at, teacher_deleted_at, conversation_type')
+          .eq('id', conversationId)
+          .maybeSingle();
+
+      if (conversation == null) return [];
+
+      // Determine the user's deletion timestamp based on their role in the conversation
+      DateTime? deletedAt;
+      if (conversation['conversation_type'] == 'teacher_student') {
+        // For teacher-student chats, student always uses student_deleted_at
+        deletedAt = conversation['student_deleted_at'] != null
+            ? DateTime.parse(conversation['student_deleted_at'])
+            : null;
+      } else {
+        // For student-student chats, check if user is student_id or participant2_id
+        if (conversation['student_id'] == userId) {
+          deletedAt = conversation['student_deleted_at'] != null
+              ? DateTime.parse(conversation['student_deleted_at'])
+              : null;
+        } else if (conversation['participant2_id'] == userId) {
+          // participant2 uses teacher_deleted_at
+          deletedAt = conversation['teacher_deleted_at'] != null
+              ? DateTime.parse(conversation['teacher_deleted_at'])
+              : null;
+        }
+      }
+
+      var query = _supabase
           .from('chat_messages')
           .select('''
             *,
             attachments:chat_attachments (*)
           ''')
           .eq('conversation_id', conversationId)
-          .isFilter('deleted_at', null)
+          .isFilter('deleted_at', null);
+
+      // Only show messages created after the deletion timestamp
+      if (deletedAt != null) {
+        query = query.gt('created_at', deletedAt.toIso8601String());
+      }
+
+      final messages = await query
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -649,6 +741,7 @@ class ChatService {
     
     _conversationsChannel = _supabase
         .channel('conversations:$userId')
+        // Listen for updates where student is the primary participant
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
@@ -656,6 +749,48 @@ class ChatService {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'student_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            _conversationUpdateController.add(payload.newRecord);
+          },
+        )
+        // Listen for inserts where student is the primary participant
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_conversations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'student_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            _conversationUpdateController.add(payload.newRecord);
+          },
+        )
+        // Listen for updates where student is participant2 (student-to-student chats)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'chat_conversations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'participant2_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            _conversationUpdateController.add(payload.newRecord);
+          },
+        )
+        // Listen for inserts where student is participant2 (student-to-student chats)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_conversations',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'participant2_id',
             value: userId,
           ),
           callback: (payload) {
@@ -962,6 +1097,52 @@ class ChatService {
             .single();
 
         conversation = newConversation;
+      } else {
+        // If conversation was deleted by current user, undelete it
+        final isStudent1 = conversation['student_id'] == userId;
+        final isStudent2 = conversation['participant2_id'] == userId;
+        
+        bool needsUpdate = false;
+        Map<String, dynamic> updates = {};
+        
+        if (isStudent1 && conversation['deleted_by_student'] == true) {
+          updates['deleted_by_student'] = false;
+          updates['student_deleted_at'] = null;
+          needsUpdate = true;
+        } else if (isStudent2 && conversation['deleted_by_teacher'] == true) {
+          // For participant2, the deleted flag is stored in deleted_by_teacher
+          updates['deleted_by_teacher'] = false;
+          updates['teacher_deleted_at'] = null;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          await _supabase
+              .from('chat_conversations')
+              .update(updates)
+              .eq('id', conversation['id']);
+          
+          // Refresh conversation data
+          conversation = await _supabase
+              .from('chat_conversations')
+              .select('''
+                *,
+                peer:participant2_id (
+                  id,
+                  full_name,
+                  avatar_url,
+                  email
+                ),
+                student:student_id (
+                  id,
+                  full_name,
+                  avatar_url,
+                  email
+                )
+              ''')
+              .eq('id', conversation['id'])
+              .single();
+        }
       }
 
       return conversation;
