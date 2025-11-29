@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
 import '../../services/notification_service.dart';
+import '../../services/notification_badge_controller.dart';
+import '../../services/notification_badge_controller.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -15,6 +17,7 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final NotificationService _notificationService = NotificationService();
+  final NotificationBadgeController _badgeController = NotificationBadgeController();
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
   RealtimeChannel? _notificationChannel;
@@ -83,6 +86,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           _notifications[index]['is_read'] = true;
         }
       });
+      // Trigger badge update
+      _badgeController.triggerUpdate();
     }
   }
 
@@ -94,6 +99,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           notification['is_read'] = true;
         }
       });
+      
+      // Trigger badge update
+      _badgeController.triggerUpdate();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,6 +143,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       setState(() {
         _notifications.clear();
       });
+      
+      // Trigger badge update
+      _badgeController.triggerUpdate();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
