@@ -173,6 +173,7 @@ class ChatService {
             )
           ''')
           .or('student_id.eq.$userId,participant2_id.eq.$userId')
+          .eq('deleted_by_student', false)
           .order('last_message_at', ascending: false);
 
       // Deduplicate conversations with the same student_id and teacher_id
@@ -279,6 +280,7 @@ class ChatService {
             attachments:chat_attachments (*)
           ''')
           .eq('conversation_id', conversationId)
+          .isFilter('deleted_at', null)
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 

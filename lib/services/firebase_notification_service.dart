@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'local_notification_service.dart';
+import 'notification_badge_controller.dart';
 
 class FirebaseNotificationService {
   static final FirebaseNotificationService _instance = FirebaseNotificationService._internal();
@@ -12,6 +13,7 @@ class FirebaseNotificationService {
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final LocalNotificationService _localNotificationService = LocalNotificationService();
+  final NotificationBadgeController _badgeController = NotificationBadgeController();
   final SupabaseClient _supabase = Supabase.instance.client;
 
   String? _currentToken;
@@ -159,6 +161,9 @@ class FirebaseNotificationService {
     print('Received foreground message: ${message.messageId}');
     print('Notification: ${message.notification?.title}');
     print('Data: ${message.data}');
+
+    // Trigger badge update when notification arrives
+    _badgeController.triggerUpdate();
 
     // Suppress chat notifications when app is in foreground
     if (message.data['action'] == 'open_chat') {

@@ -12,6 +12,7 @@ import '../../l10n/app_localizations.dart';
 import '../teachers/teachers_list_screen.dart';
 import '../students/students_list_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../../widgets/notification_badge_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -340,29 +341,31 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           ),
           
           // Notification Icon
-          Container(
-            width: 45,
-            height: 45,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IconButton(
-              icon: const FaIcon(FontAwesomeIcons.bell, size: 20),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const NotificationsScreen(),
+          NotificationBadgeWidget(
+            child: Container(
+              width: 45,
+              height: 45,
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
                   ),
-                );
-              },
+                ],
+              ),
+              child: IconButton(
+                icon: const FaIcon(FontAwesomeIcons.bell, size: 20),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ],

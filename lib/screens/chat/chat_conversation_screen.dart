@@ -1036,43 +1036,50 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           Flexible(
-            child: Column(
-              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isMe ? const Color(0xFFE3F2FD) : const Color(0xFFF0F0F0),
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(18),
-                      topRight: const Radius.circular(18),
-                      bottomLeft: Radius.circular(isMe ? 18 : 2),
-                      bottomRight: Radius.circular(isMe ? 2 : 18),
+            child: GestureDetector(
+              onLongPress: isMe ? () => _showMessageOptions(message) : null,
+              child: Column(
+                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isMe ? const Color(0xFFE3F2FD) : const Color(0xFFF0F0F0),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(18),
+                        topRight: const Radius.circular(18),
+                        bottomLeft: Radius.circular(isMe ? 18 : 2),
+                        bottomRight: Radius.circular(isMe ? 2 : 18),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (hasAttachment && attachments != null && attachments.isNotEmpty)
+                          ...attachments.map(
+                            (attachment) => _buildAttachment(
+                              Map<String, dynamic>.from(attachment as Map),
+                              isMe,
+                              message['is_sending'] == true,
+                            ),
+                          ),
+                        if (message['message_text'] != null && message['message_text'].toString().isNotEmpty)
+                          Text(
+                            message['message_text'],
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: Color(0xFF1A1A1A),
+                              height: 1.4,
+                            ),
+                          )
+                        else if (hasAttachment && (message['message_text'] == null || message['message_text'].toString().isEmpty))
+                          // Show attachment placeholder when no text
+                          const SizedBox.shrink(),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                     if (hasAttachment && attachments != null && attachments.isNotEmpty)
-                      ...attachments.map((attachment) => 
-                        _buildAttachment(Map<String, dynamic>.from(attachment as Map), isMe, message['is_sending'] == true)),
-                    if (message['message_text'] != null && message['message_text'].toString().isNotEmpty)
-                      Text(
-                        message['message_text'],
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Color(0xFF1A1A1A),
-                          height: 1.4,
-                        ),
-                      )
-                    else if (hasAttachment && (message['message_text'] == null || message['message_text'].toString().isEmpty))
-                      // Show attachment placeholder when no text
-                      const SizedBox.shrink(),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
+                  const SizedBox(height: 2),
+                  Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Failed message - show retry button
@@ -1127,6 +1134,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               ],
             ),
           ),
+        ),
         ],
       ),
     );
@@ -1147,10 +1155,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: isMe ? const Color(0xFFBBDEFB) : Colors.grey[300],
-            borderRadius: BorderRadius.circular(18),
-          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1382,10 +1386,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isMe ? const Color(0xFFBBDEFB) : Colors.grey[300],
-        borderRadius: BorderRadius.circular(18),
-      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1710,6 +1710,197 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         ],
       ),
     );
+  }
+
+  void _showDeleteChatConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        backgroundColor: AppColors.white,
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        title: const Text(
+          'Delete Chat?',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete this chat with ${widget.recipientName}? This action cannot be undone.',
+          style: const TextStyle(
+            fontSize: 15,
+            color: AppColors.textSecondary,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteChat();
+            },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteChat() async {
+    try {
+      final response = await _chatService.supabase
+          .from('chat_conversations')
+          .update({
+            'deleted_by_student': true,
+            'student_deleted_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', widget.conversationId);
+
+      if (mounted) {
+        Navigator.pop(context); // Go back to chat list
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chat deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error deleting chat: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete chat. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showMessageOptions(Map<String, dynamic> message) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle at top
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const FaIcon(
+                FontAwesomeIcons.trashCan,
+                color: Colors.red,
+                size: 20,
+              ),
+              title: const Text(
+                'Unsend Message',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.red,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _unsendMessage(message['id']);
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _unsendMessage(String messageId) async {
+    try {
+      final userId = _chatService.supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      await _chatService.supabase
+          .from('chat_messages')
+          .update({
+            'deleted_at': DateTime.now().toIso8601String(),
+            'deleted_by': userId,
+            'deleted_by_type': 'student',
+          })
+          .eq('id', messageId);
+
+      // Update local state
+      setState(() {
+        _messages.removeWhere((msg) => msg['id'] == messageId);
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message unsent'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error unsending message: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to unsend message. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showBlockConfirmation() {
