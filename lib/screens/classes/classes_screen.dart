@@ -428,6 +428,8 @@ class _ClassesScreenState extends State<ClassesScreen>
     final canJoin = _sessionService.canJoinSession(session);
     final timeUntil = _sessionService.getTimeUntilSession(session);
     final isMakeup = session['is_makeup'] == true;
+    final isTeacherCreated = session['teacher_created'] == true;
+    final isCancelled = session['status'] == 'cancelled';
 
     final scheduledDate = DateTime.parse(session['scheduled_date']);
     final dateStr =
@@ -501,6 +503,70 @@ class _ClassesScreenState extends State<ClassesScreen>
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                       color: Colors.orange.shade700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          // Cancelled session indicator
+          if (isCancelled) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade300),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.cancel_outlined,
+                    color: Colors.red.shade700,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'CANCELLED',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red.shade700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          // Teacher-created session indicator
+          if (isTeacherCreated) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.add_circle_outline,
+                    color: AppColors.primary,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'EXTRA CLASS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -945,37 +1011,65 @@ class _ClassesScreenState extends State<ClassesScreen>
               ),
             ],
           ] else ...[
-            // For finished sessions, add a button to rate the teacher
+            // For finished sessions, show status-specific message
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: AppColors.redGradient,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.star, color: Colors.white, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Tap to view teacher & rate',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+            if (isCancelled) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'This class was cancelled',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ] else ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: AppColors.redGradient,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.star, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Tap to view teacher & rate',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ],
       ),
     );
     
     // Wrap finished sessions in GestureDetector to navigate to teacher details
+    // But not for cancelled sessions
     if (!isUpcoming && session['status'] == 'completed') {
       return GestureDetector(
         onTap: () => _navigateToTeacherDetail(session),

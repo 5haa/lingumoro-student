@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/widgets/app_drawer.dart';
+import 'package:student/widgets/pro_upgrade_modal.dart';
 import 'package:student/l10n/app_localizations.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/services/points_notification_service.dart';
+import 'package:student/services/pro_subscription_service.dart';
+import 'package:student/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home/home_screen.dart';
 import 'classes/classes_screen.dart';
@@ -24,6 +27,8 @@ class _MainNavigationState extends State<MainNavigation> {
   int _unreadMessageCount = 0;
   final _chatService = ChatService();
   final _pointsNotificationService = PointsNotificationService();
+  final _proService = ProSubscriptionService();
+  final _authService = AuthService();
   RealtimeChannel? _conversationChannel;
   
   late final List<Widget> _screens;
@@ -236,7 +241,30 @@ class _MainNavigationState extends State<MainNavigation> {
     final bool showBadge = index == 3 && _unreadMessageCount > 0;
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        // Check if this is the practice tab (index 2)
+        if (index == 2) {
+          final userId = _authService.currentUser?.id;
+          if (userId != null) {
+            final hasPro = await _proService.hasActivePro(userId);
+            if (!hasPro) {
+              // Show PRO upgrade modal instead of navigating to practice
+              if (mounted) {
+                showProUpgradeModal(
+                  context,
+                  onSuccess: () {
+                    // After successful voucher redemption, navigate to practice
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                );
+              }
+              return;
+            }
+          }
+        }
+        
         setState(() {
           _currentIndex = index;
         });
