@@ -242,126 +242,127 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Column(
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Photo Carousel Section with Add Button
+            Stack(
+              clipBehavior: Clip.none, // Allow button to overflow
               children: [
-                // Photo Carousel Section (Telegram-style) - extends to top
                 _buildPhotoCarouselSection(initials),
                 
-                const SizedBox(height: 20),
-                
-                // Form Section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        // Full Name
-                        CustomTextField(
-                          labelText: 'Full Name',
-                          hintText: 'Enter your full name',
-                          controller: _nameController,
-                          prefixIcon: const Icon(
-                            FontAwesomeIcons.user,
-                            size: 18,
-                            color: AppColors.grey,
+                // Add Photo Button (fixed position relative to carousel)
+                Positioned(
+                  bottom: -28, // Half of button height (56/2 = 28) extends below carousel
+                  right: 20,
+                  child: GestureDetector(
+                    onTap: _isUploadingPhoto ? null : _pickAndUploadPhoto,
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter your name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Email
-                        CustomTextField(
-                          labelText: 'Email',
-                          hintText: 'Enter your email',
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          enabled: false,
-                          prefixIcon: const Icon(
-                            FontAwesomeIcons.envelope,
-                            size: 18,
-                            color: AppColors.grey,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Bio
-                        CustomTextField(
-                          labelText: 'Bio',
-                          hintText: 'Tell us about yourself...',
-                          controller: _bioController,
-                          maxLines: 4,
-                          prefixIcon: const Icon(
-                            FontAwesomeIcons.info,
-                            size: 18,
-                            color: AppColors.grey,
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-
-                        // Save Button
-                        CustomButton(
-                          text: 'SAVE CHANGES',
-                          onPressed: _isLoading ? () {} : _saveProfile,
-                          isLoading: _isLoading,
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+                        ],
+                      ),
+                      child: _isUploadingPhoto
+                          ? const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.add,
+                              color: Colors.white,
+                              size: 32,
+                            ),
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-          
-          // Floating Add Photo Button (half on carousel, half on page)
-          Positioned(
-            top: 450 - 28, // Half of button height (56/2 = 28) from carousel bottom
-            right: 20,
-            child: GestureDetector(
-              onTap: _isUploadingPhoto ? null : _pickAndUploadPhoto,
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+            
+            const SizedBox(height: 20),
+            
+            // Form Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    // Full Name
+                    CustomTextField(
+                      labelText: 'Full Name',
+                      hintText: 'Enter your full name',
+                      controller: _nameController,
+                      prefixIcon: const Icon(
+                        FontAwesomeIcons.user,
+                        size: 18,
+                        color: AppColors.grey,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your name';
+                        }
+                        return null;
+                      },
                     ),
+                    const SizedBox(height: 20),
+
+                    // Email
+                    CustomTextField(
+                      labelText: 'Email',
+                      hintText: 'Enter your email',
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      enabled: false,
+                      prefixIcon: const Icon(
+                        FontAwesomeIcons.envelope,
+                        size: 18,
+                        color: AppColors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Bio
+                    CustomTextField(
+                      labelText: 'Bio',
+                      hintText: 'Tell us about yourself...',
+                      controller: _bioController,
+                      maxLines: 4,
+                      prefixIcon: const Icon(
+                        FontAwesomeIcons.info,
+                        size: 18,
+                        color: AppColors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Save Button
+                    CustomButton(
+                      text: 'SAVE CHANGES',
+                      onPressed: _isLoading ? () {} : _saveProfile,
+                      isLoading: _isLoading,
+                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
-                child: _isUploadingPhoto
-                    ? const Center(
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 32,
-                      ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

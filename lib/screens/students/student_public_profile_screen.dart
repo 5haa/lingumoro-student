@@ -156,339 +156,254 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     final fullName = widget.studentData['full_name'] ?? 'Unknown';
     final email = widget.studentData['email'] ?? '';
     final level = languages.isNotEmpty ? languages.length : 1;
+    final initials = fullName.isNotEmpty
+        ? fullName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
+        : 'ST';
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
+      body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header with back button and menu
+            // Photo Carousel Section (full screen, Telegram-style)
+            _buildPhotoCarouselSection(initials, fullName),
+            
+            const SizedBox(height: 20),
+            
+            // Profile Info Section
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
                 children: [
-                  const CustomBackButton(),
-                  const Spacer(),
-                  if (!_isCheckingBlock)
-                    Container(
-                      width: 45,
-                      height: 45,
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: PopupMenuButton<String>(
-                        padding: EdgeInsets.zero,
-                        icon: const FaIcon(
-                          FontAwesomeIcons.ellipsisVertical,
-                          size: 16,
-                          color: AppColors.textPrimary,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        onSelected: (value) {
-                          if (value == 'block') {
-                            _toggleBlock();
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'block',
-                            child: Row(
+                  // Name and Level
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              fullName,
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
                               children: [
-                                FaIcon(
-                                  _isBlocked ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.ban,
-                                  color: _isBlocked ? Colors.green : Colors.red,
-                                  size: 16,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: AppColors.redGradient,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const FaIcon(
+                                        FontAwesomeIcons.trophy,
+                                        size: 12,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Level $level',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: 12),
-                                Text(_isBlocked ? 'Unblock User' : 'Block User'),
                               ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                ],
-              ),
-            ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
 
-            // Scrollable content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    
-                    // Profile Card
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: AppColors.redGradient,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          // Photo carousel
-                          _buildPhotoCarousel(),
-                          const SizedBox(height: 20),
-                          
-                          // Name
-                          Text(
-                            fullName,
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          
-                          // Email
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const FaIcon(
-                                  FontAwesomeIcons.envelope,
-                                  size: 12,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  email,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          
-                          // Province
-                          if (province != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
+                  // Email & Province Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  const FaIcon(
-                                    FontAwesomeIcons.locationDot,
-                                    size: 12,
-                                    color: Colors.white,
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const FaIcon(
+                                      FontAwesomeIcons.envelope,
+                                      size: 14,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${province['name']} (${province['name_ar']})',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w500,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      email,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          const SizedBox(height: 16),
-                          
-                          // Level badge
-                          Container(
+                              if (province != null) ...[
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const FaIcon(
+                                        FontAwesomeIcons.locationDot,
+                                        size: 14,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        '${province['name']} (${province['name_ar']})',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.textSecondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+
+                  // Bio Section
+                  if (bio != null && bio.isNotEmpty)
+                    _buildInfoCard(
+                      icon: FontAwesomeIcons.circleInfo,
+                      title: 'About',
+                      child: Text(
+                        bio,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: AppColors.textSecondary,
+                          height: 1.6,
+                        ),
+                      ),
+                    ),
+                  if (bio != null && bio.isNotEmpty) const SizedBox(height: 20),
+
+                  // Languages Section
+                  if (languages.isNotEmpty)
+                    _buildInfoCard(
+                      icon: FontAwesomeIcons.language,
+                      title: 'Learning Languages',
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: languages.map((language) {
+                          return Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
+                              horizontal: 14,
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppColors.primary.withOpacity(0.3),
+                                width: 1.5,
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const FaIcon(
-                                  FontAwesomeIcons.trophy,
-                                  size: 16,
-                                  color: AppColors.primary,
-                                ),
-                                const SizedBox(width: 10),
+                                if (language['flag_url'] != null)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: CachedNetworkImage(
+                                      imageUrl: language['flag_url'],
+                                      width: 24,
+                                      height: 16,
+                                      fit: BoxFit.cover,
+                                      fadeInDuration: Duration.zero,
+                                      fadeOutDuration: Duration.zero,
+                                      placeholderFadeInDuration: Duration.zero,
+                                      errorWidget: (context, url, error) =>
+                                          const FaIcon(
+                                        FontAwesomeIcons.flag,
+                                        size: 14,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  const FaIcon(
+                                    FontAwesomeIcons.flag,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Level $level',
+                                  language['name'] ?? '',
                                   style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
                                     color: AppColors.primary,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          );
+                        }).toList(),
                       ),
                     ),
 
-                    const SizedBox(height: 24),
-
-                    // Bio Section
-                    if (bio != null && bio.isNotEmpty)
-                      _buildInfoCard(
-                        icon: FontAwesomeIcons.circleInfo,
-                        title: 'About',
-                        child: Text(
-                          bio,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: AppColors.textSecondary,
-                            height: 1.6,
-                          ),
-                        ),
-                      ),
-                    if (bio != null && bio.isNotEmpty) const SizedBox(height: 16),
-
-                    // Languages Section
-                    if (languages.isNotEmpty)
-                      _buildInfoCard(
-                        icon: FontAwesomeIcons.language,
-                        title: 'Learning Languages',
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: languages.map((language) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.primary.withOpacity(0.3),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (language['flag_url'] != null)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: CachedNetworkImage(
-                                        imageUrl: language['flag_url'],
-                                        width: 24,
-                                        height: 16,
-                                        fit: BoxFit.cover,
-                                        fadeInDuration: Duration.zero,
-                                        fadeOutDuration: Duration.zero,
-                                        placeholderFadeInDuration: Duration.zero,
-                                        errorWidget: (context, url, error) =>
-                                            const FaIcon(
-                                          FontAwesomeIcons.flag,
-                                          size: 14,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    const FaIcon(
-                                      FontAwesomeIcons.flag,
-                                      size: 14,
-                                      color: AppColors.primary,
-                                    ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    language['name'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-
-                    const SizedBox(height: 24),
-
-                    // Info note
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.blue.shade100,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
-                              shape: BoxShape.circle,
-                            ),
-                            child: FaIcon(
-                              FontAwesomeIcons.circleInfo,
-                              color: Colors.blue.shade700,
-                              size: 16,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              'You can connect with this student because you\'re both learning the same language!',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.blue.shade900,
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-                  ],
-                ),
+                  if (languages.isNotEmpty) const SizedBox(height: 32),
+                ],
               ),
             ),
           ],
@@ -550,189 +465,213 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     );
   }
 
-  Widget _buildDefaultAvatar() {
-    final initial = (widget.studentData['full_name']?.isNotEmpty ?? false)
-        ? widget.studentData['full_name']![0].toUpperCase()
-        : '?';
-
+  Widget _buildPhotoCarouselSection(String initials, String fullName) {
     return Container(
+      height: 450,
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        shape: BoxShape.circle,
+        color: Colors.black,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPhotoCarousel() {
-    if (_isLoadingPhotos) {
-      return Container(
-        width: 130,
-        height: 130,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.2),
-        ),
-        child: const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        ),
-      );
-    }
-
-    if (_photos.isEmpty) {
-      return Container(
-        width: 130,
-        height: 130,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white,
-            width: 4,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipOval(child: _buildDefaultAvatar()),
-      );
-    }
-
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => _showFullScreenPhoto(),
-          onHorizontalDragEnd: (details) {
-            if (details.primaryVelocity! > 0) {
-              _previousPhoto();
-            } else if (details.primaryVelocity! < 0) {
-              _nextPhoto();
-            }
-          },
-          child: Container(
-            width: 130,
-            height: 130,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white,
-                width: 4,
+      child: Stack(
+        children: [
+          // Photo Carousel
+          if (_isLoadingPhotos)
+            Container(
+              decoration: BoxDecoration(
+                gradient: AppColors.redGradient,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
-              ],
+              ),
+            )
+          else if (_photos.isEmpty)
+            Container(
+              decoration: BoxDecoration(
+                gradient: AppColors.redGradient,
+              ),
+              child: Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    fontSize: 80,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: () => _showFullScreenPhoto(),
+              child: PageView.builder(
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPhotoIndex = index;
+                  });
+                },
+                itemCount: _photos.length,
+                itemBuilder: (context, index) {
+                  final photo = _photos[index];
+                  return CachedNetworkImage(
+                    key: ValueKey(photo['photo_url']),
+                    imageUrl: photo['photo_url'],
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    placeholder: (context, url) => Container(
+                      decoration: BoxDecoration(
+                        gradient: AppColors.redGradient,
+                      ),
+                      child: Center(
+                        child: Text(
+                          initials,
+                          style: const TextStyle(
+                            fontSize: 80,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      decoration: BoxDecoration(
+                        gradient: AppColors.redGradient,
+                      ),
+                      child: Center(
+                        child: Text(
+                          initials,
+                          style: const TextStyle(
+                            fontSize: 80,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-            child: ClipOval(
-              child: CachedNetworkImage(
-                imageUrl: _photos[_currentPhotoIndex]['photo_url'],
-                fit: BoxFit.cover,
-                fadeInDuration: Duration.zero,
-                fadeOutDuration: Duration.zero,
-                placeholderFadeInDuration: Duration.zero,
-                memCacheWidth: 400, // Optimize for larger display
-                placeholder: (context, url) => Container(
-                  color: Colors.white.withOpacity(0.2),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          
+          // Gradient Overlay
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.7),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // Back Button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 10,
+            left: 10,
+            child: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.4),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          
+          // Menu Button (Block/Unblock)
+          if (!_isCheckingBlock)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              right: 10,
+              child: PopupMenuButton<String>(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.4),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+                ),
+                color: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                onSelected: (value) {
+                  if (value == 'block') {
+                    _toggleBlock();
+                  }
+                },
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<String>(
+                      value: 'block',
+                      child: Row(
+                        children: [
+                          FaIcon(
+                            _isBlocked ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.ban,
+                            color: _isBlocked ? Colors.green : Colors.red,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(_isBlocked ? 'Unblock User' : 'Block User'),
+                        ],
+                      ),
+                    ),
+                  ];
+                },
+              ),
+            ),
+          
+          // Photo Indicators
+          if (_photos.isNotEmpty && _photos.length > 1)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 15,
+              left: 70,
+              right: 70,
+              child: Row(
+                children: List.generate(
+                  _photos.length,
+                  (index) => Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 4),
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: _currentPhotoIndex == index
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
                 ),
-                errorWidget: (context, url, error) => _buildDefaultAvatar(),
               ),
             ),
-          ),
-        ),
-        
-        if (_photos.length > 1) ...[
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                onPressed: _previousPhoto,
-                icon: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const FaIcon(
-                    FontAwesomeIcons.chevronLeft,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                ),
-                iconSize: 28,
-              ),
-              
-              ...List.generate(_photos.length, (index) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: _currentPhotoIndex == index ? 10 : 7,
-                  height: _currentPhotoIndex == index ? 10 : 7,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _currentPhotoIndex == index
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.5),
-                  ),
-                );
-              }),
-              
-              IconButton(
-                onPressed: _nextPhoto,
-                icon: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const FaIcon(
-                    FontAwesomeIcons.chevronRight,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                ),
-                iconSize: 28,
-              ),
-            ],
-          ),
         ],
-      ],
+      ),
     );
-  }
-
-  void _previousPhoto() {
-    if (_photos.isEmpty) return;
-    setState(() {
-      _currentPhotoIndex = (_currentPhotoIndex - 1 + _photos.length) % _photos.length;
-    });
-  }
-
-  void _nextPhoto() {
-    if (_photos.isEmpty) return;
-    setState(() {
-      _currentPhotoIndex = (_currentPhotoIndex + 1) % _photos.length;
-    });
   }
 
   void _showFullScreenPhoto() {
