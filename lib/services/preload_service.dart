@@ -266,6 +266,7 @@ class PreloadService {
         _studentService.getStudentLanguages(),
         _blockingService.getBlockedUserIds(),
         _blockingService.getUsersWhoBlockedMe(),
+        _proService.validateAndUpdateDeviceSession(studentId), // ADDED: Validate device session
       ]);
 
       _profile = results[0] as Map<String, dynamic>?;
@@ -277,8 +278,16 @@ class PreloadService {
       final blocked = results[5] as Set<String>;
       final blockers = results[6] as Set<String>;
       _blockedUserIds = {...blocked, ...blockers};
+      
+      // Device session info is in results[7]
+      final deviceSession = results[7] as Map<String, dynamic>?;
+      
+      // Update pro subscription to include device session validity
+      if (_proSubscription != null && deviceSession != null) {
+        _proSubscription!['device_session_valid'] = deviceSession['is_valid'] == true;
+      }
 
-      print('✅ Preloaded user profile data (including subscriptions & blocks)');
+      print('✅ Preloaded user profile data (including subscriptions & device session & blocks)');
     } catch (e) {
       print('❌ Failed to preload user data: $e');
     }

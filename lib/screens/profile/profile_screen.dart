@@ -35,6 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _levelProgress;
   Map<String, dynamic>? _proSubscription;
+  Map<String, dynamic>? _deviceSessionInfo;
   Map<String, dynamic>? _mainPhoto;
   bool _isLoading = false;
   StreamSubscription? _pointsSubscription;
@@ -47,6 +48,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     super.initState();
     _loadProfileFromCache();
     _subscribeToPointsUpdates();
+    // Force reload to get fresh device session info
+    Future.microtask(() => _loadProfile());
   }
 
   void _subscribeToPointsUpdates() {
@@ -86,7 +89,21 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
       _levelProgress = _preloadService.levelProgress;
       _proSubscription = _preloadService.proSubscription;
       _mainPhoto = _preloadService.mainPhoto;
+      _deviceSessionInfo = _proService.getCachedDeviceSession();
       _isLoading = false;
+      
+      // Ensure device session validity is checked
+      if (_proSubscription != null && _deviceSessionInfo != null) {
+        // Update pro subscription to reflect device session validity
+        final deviceValid = _deviceSessionInfo!['is_valid'] == true;
+        final hasPro = _proSubscription!['expires_at'] != null;
+        
+        // Override pro status based on device session
+        if (hasPro && !deviceValid) {
+          print('⚠️ Pro subscription exists but device session is invalid');
+        }
+      }
+      
       print('✅ Loaded profile data from cache');
       
       // Force rebuild to show cached data
@@ -110,10 +127,13 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
       Map<String, dynamic>? progress;
       Map<String, dynamic>? proSub;
       Map<String, dynamic>? mainPhoto;
+      Map<String, dynamic>? deviceSession;
       if (studentId != null) {
         progress = await _levelService.getStudentProgress(studentId);
         proSub = await _proService.getProStatus(studentId);
         mainPhoto = await _photoService.getMainPhoto(studentId);
+        // Validate device session
+        deviceSession = await _proService.validateAndUpdateDeviceSession(studentId);
       }
       
       if (mounted) {
@@ -122,6 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
           _levelProgress = progress;
           _proSubscription = proSub;
           _mainPhoto = mainPhoto;
+          _deviceSessionInfo = deviceSession;
           _isLoading = false;
         });
       }
@@ -216,26 +237,30 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
             
             // Content
             Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          // Profile Avatar and Basic Info
-                          _buildProfileHeader(context),
-                          const SizedBox(height: 25),
-                          
-                          // User Level Card
-                          if (_levelProgress != null) _buildUserLevelCard(),
-                          if (_levelProgress != null) const SizedBox(height: 15),
-                          
-                          // Subscription Card
-                          _buildSubscriptionCard(context),
+              child: RefreshIndicator(
+                onRefresh: _loadProfile,
+                color: AppColors.primary,
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            // Profile Avatar and Basic Info
+                            _buildProfileHeader(context),
+                            const SizedBox(height: 25),
+                            
+                            // User Level Card
+                            if (_levelProgress != null) _buildUserLevelCard(),
+                            if (_levelProgress != null) const SizedBox(height: 15),
+                            
+                            // Subscription Card
+                            _buildSubscriptionCard(context),
                           const SizedBox(height: 25),
                           
                           // Personal Information Section
@@ -302,6 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                         ],
                       ),
                     ),
+              ),
             ),
           ],
         ),
@@ -649,10 +675,23 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
 
   Widget _buildSubscriptionCard(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final isPro = _proSubscription != null;
+    
+    // Check both subscription existence and device session validity
+    final hasProSubscription = _proSubscription != null && 
+                               _proSubscription!['expires_at'] != null;
+    
+    // Check device session validity
+    final hasValidSession = _deviceSessionInfo?['is_valid'] == true;
+    
+    // Pro is active only if both subscription exists and device session is valid
+    final isPro = hasProSubscription && hasValidSession;
+    
+    // Check if pro is active on another device
+    final activeOnOtherDevice = hasProSubscription && !hasValidSession;
+    
     String? expiryText;
     
-    if (isPro && _proSubscription!['expires_at'] != null) {
+    if (hasProSubscription && _proSubscription!['expires_at'] != null) {
       try {
         final expiresAt = _proSubscription!['expires_at'] as String;
         expiryText = _proService.formatExpiryDate(expiresAt);
@@ -664,13 +703,13 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: isPro ? AppColors.redGradient : null,
-        color: isPro ? null : AppColors.white,
+        gradient: isPro && hasValidSession ? AppColors.redGradient : null,
+        color: (isPro && hasValidSession) ? null : AppColors.white,
         borderRadius: BorderRadius.circular(20),
-        border: isPro ? null : Border.all(color: AppColors.border, width: 1),
+        border: (isPro && hasValidSession) ? null : Border.all(color: AppColors.border, width: 1),
         boxShadow: [
           BoxShadow(
-            color: isPro 
+            color: (isPro && hasValidSession)
               ? AppColors.primary.withOpacity(0.3)
               : Colors.black.withOpacity(0.05),
             blurRadius: 15,
@@ -678,67 +717,121 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isPro ? Colors.white.withOpacity(0.2) : AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: FaIcon(
-              isPro ? FontAwesomeIcons.crown : FontAwesomeIcons.user,
-              color: isPro ? Colors.white : AppColors.primary,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isPro ? l10n.proMember : l10n.freeMember,
-                  style: TextStyle(
-                    color: isPro ? Colors.white : AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  isPro 
-                    ? (expiryText != null 
-                        ? '${l10n.expiresPro}: $expiryText'
-                        : l10n.unlimitedFeatures)
-                    : l10n.limitedFeatures,
-                  style: TextStyle(
-                    color: isPro ? Colors.white.withOpacity(0.9) : AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!isPro)
-            GestureDetector(
-              onTap: () => _showRedeemVoucherDialog(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: AppColors.redGradient,
-                  borderRadius: BorderRadius.circular(15),
+                  color: (isPro && hasValidSession) 
+                    ? Colors.white.withOpacity(0.2) 
+                    : AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  l10n.upgrade,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                child: FaIcon(
+                  (isPro && hasValidSession) ? FontAwesomeIcons.crown : FontAwesomeIcons.user,
+                  color: (isPro && hasValidSession) ? Colors.white : AppColors.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (isPro && hasValidSession) ? l10n.proMember : l10n.freeMember,
+                      style: TextStyle(
+                        color: (isPro && hasValidSession) ? Colors.white : AppColors.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      (isPro && hasValidSession)
+                        ? (expiryText != null 
+                            ? '${l10n.expiresPro}: $expiryText'
+                            : l10n.unlimitedFeatures)
+                        : activeOnOtherDevice
+                          ? 'Pro active on another device'
+                          : l10n.limitedFeatures,
+                      style: TextStyle(
+                        color: (isPro && hasValidSession) 
+                          ? Colors.white.withOpacity(0.9) 
+                          : AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isPro)
+                GestureDetector(
+                  onTap: () => _showRedeemVoucherDialog(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.redGradient,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      l10n.upgrade,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          // Show activation button if pro is active on another device
+          if (activeOnOtherDevice) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Your PRO subscription is currently active on another device. Activate it here to use PRO features.',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _activateOnThisDevice,
+                icon: const Icon(Icons.phone_android, size: 18),
+                label: const Text('Activate on This Device'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -1009,5 +1102,77 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
         _loadProfile();
       },
     );
+  }
+
+  Future<void> _activateOnThisDevice() async {
+    final studentId = _authService.currentUser?.id;
+    if (studentId == null) return;
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+        ),
+      ),
+    );
+
+    try {
+      // Validate and update device session (force claim)
+      final result = await _proService.validateAndUpdateDeviceSession(
+        studentId,
+        forceClaim: true,
+      );
+      
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+      
+      if (result['is_valid'] == true) {
+        // 1. Clear pro service cache to force fresh check
+        _proService.clearDeviceSessionCache();
+        
+        // 2. Update global preload cache immediately
+        await _preloadService.refreshUserData();
+        
+        // 3. Invalidate practice cache to force reload
+        _preloadService.invalidatePractice();
+        
+        // 4. Reload profile to reflect changes locally
+        await _loadProfile();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ PRO features activated on this device!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Failed to activate: ${result['error'] ?? 'Unknown error'}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

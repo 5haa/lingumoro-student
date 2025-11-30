@@ -56,6 +56,15 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     super.initState();
     _loadDataFromCache();
   }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload data when returning to this screen (e.g., after activation in Profile)
+    if (mounted && !_isLoading) {
+      _loadDataFromCache();
+    }
+  }
 
   @override
   void dispose() {
@@ -74,15 +83,29 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     }
     _studentId = user.id;
 
-    // Check PRO status from cache
+    // Check PRO status from cache INCLUDING device session validity
+    bool hasPro = false;
     if (_preloadService.proSubscription != null) {
       final sub = _preloadService.proSubscription!;
       final expiresAt = sub['expires_at'] as String?;
+      final deviceSessionValid = sub['device_session_valid'] == true;
+      
       if (expiresAt != null) {
         final expiryDate = DateTime.parse(expiresAt);
-        _hasProSubscription = expiryDate.isAfter(DateTime.now());
+        final notExpired = expiryDate.isAfter(DateTime.now());
+        hasPro = notExpired && deviceSessionValid; // Both conditions must be true
       }
     }
+    
+    // Check cached device session from ProSubscriptionService
+    final cachedSession = _proService.getCachedDeviceSession();
+    if (cachedSession != null) {
+      hasPro = cachedSession['is_valid'] == true;
+    }
+    
+    setState(() {
+      _hasProSubscription = hasPro;
+    });
 
     // Try to load from cache
     final cached = _preloadService.practiceData;
@@ -95,7 +118,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
         _totalReadings = cached.totalReadings ?? 0;
         _isLoading = false;
       });
-      print('✅ Loaded practice data from cache');
+      print('✅ Loaded practice data from cache (Pro: $hasPro)');
       return;
     }
     
@@ -256,7 +279,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           ),
                           stat2Label: '${_quizStats['total_sessions'] ?? 0} quizzes',
                           onTap: () => _navigateToQuiz(),
-                          isLocked: !_hasProSubscription,
+                          isLocked: false,
                           showProgress: false,
                         ),
                         const SizedBox(height: 12),
@@ -273,7 +296,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           ),
                           stat2Label: 'Real-time chat',
                           onTap: () => _navigateToVoiceAI(),
-                          isLocked: !_hasProSubscription,
+                          isLocked: false,
                           showProgress: false,
                         ),
                         const SizedBox(height: 12),
@@ -290,7 +313,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           ),
                           stat2Label: '$_completedReadings/$_totalReadings completed',
                           onTap: () => _navigateToReading(),
-                          isLocked: !_hasProSubscription,
+                          isLocked: false,
                           showProgress: false,
                         ),
                         const SizedBox(height: 12),
@@ -307,7 +330,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           ),
                           stat2Label: '${_videos.length} videos',
                           onTap: () => _navigateToVideoPractice(),
-                          isLocked: !_hasProSubscription,
+                          isLocked: false,
                           showProgress: true,
                           progressValue: _videos.isNotEmpty
                               ? ((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt()
@@ -516,56 +539,115 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     );
   }
 
-  void _navigateToVoiceAI() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AIVoicePracticeScreen(),
+  Future<bool> _checkProBeforeNavigation() async {
+    if (_studentId == null) return false;
+    
+    // Show quick loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+        ),
       ),
-    ).then((_) {
-      // Invalidate and reload only if activity completed
-      _preloadService.invalidatePractice();
-      _loadAllData();
-    });
+    );
+
+    try {
+      // Validate device session right now
+      final result = await _proService.validateAndUpdateDeviceSession(
+        _studentId!, 
+        forceClaim: false
+      );
+      
+      // Close loading
+      if (mounted) Navigator.pop(context);
+      
+      if (result['is_valid'] == true) {
+        return true;
+      } else {
+        if (mounted) {
+          // Refresh state
+          setState(() => _hasProSubscription = false);
+          
+          if (result['active_on_other_device'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ Pro features are active on another device. Activate here in Profile.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          } else {
+            _showProRequiredDialog();
+          }
+        }
+        return false;
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      return false;
+    }
   }
 
-  void _navigateToVideoPractice() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const VideoPracticeListScreen(),
-      ),
-    ).then((_) {
-      // Invalidate and reload only if video watched
-      _preloadService.invalidatePractice();
-      _loadAllData();
-    });
+  void _navigateToVoiceAI() async {
+    if (await _checkProBeforeNavigation()) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AIVoicePracticeScreen(),
+        ),
+      ).then((_) {
+        _preloadService.invalidatePractice();
+        _loadAllData();
+      });
+    }
   }
 
-  void _navigateToReading() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const ReadingScreen(),
-      ),
-    ).then((_) {
-      // Invalidate and reload only if story generated
-      _preloadService.invalidatePractice();
-      _loadAllData();
-    });
+  void _navigateToVideoPractice() async {
+    if (await _checkProBeforeNavigation()) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const VideoPracticeListScreen(),
+        ),
+      ).then((_) {
+        _preloadService.invalidatePractice();
+        _loadAllData();
+      });
+    }
   }
 
-  void _navigateToQuiz() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const QuizPracticeScreen(),
-      ),
-    ).then((_) {
-      // Invalidate and reload only if quiz completed
-      _preloadService.invalidatePractice();
-      _loadAllData();
-    });
+  void _navigateToReading() async {
+    if (await _checkProBeforeNavigation()) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ReadingScreen(),
+        ),
+      ).then((_) {
+        _preloadService.invalidatePractice();
+        _loadAllData();
+      });
+    }
+  }
+
+  void _navigateToQuiz() async {
+    if (await _checkProBeforeNavigation()) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const QuizPracticeScreen(),
+        ),
+      ).then((_) {
+        _preloadService.invalidatePractice();
+        _loadAllData();
+      });
+    }
   }
 
   void _showProRequiredDialog() {

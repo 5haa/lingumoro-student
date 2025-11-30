@@ -4,6 +4,98 @@ import 'dart:convert';
 
 class ProSubscriptionService {
   final _supabase = Supabase.instance.client;
+  
+  // Cache for device session validation
+  Map<String, dynamic>? _cachedDeviceSession;
+  DateTime? _cacheTimestamp;
+  static const Duration _cacheValidity = Duration(seconds: 30); // Reduced to 30s for better responsiveness
+
+  /// Get current session token
+  String? getSessionToken() {
+    try {
+      final session = _supabase.auth.currentSession;
+      return session?.accessToken;
+    } catch (e) {
+      print('Error getting session token: $e');
+      return null;
+    }
+  }
+
+  /// Validate and update device session for PRO subscription
+  /// [forceClaim] - If true, will take over session from another device
+  Future<Map<String, dynamic>> validateAndUpdateDeviceSession(String studentId, {bool forceClaim = false}) async {
+    try {
+      final sessionToken = getSessionToken();
+      
+      if (sessionToken == null) {
+        return {
+          'has_pro': false,
+          'is_valid': false,
+          'active_on_other_device': false,
+          'device_changed': false,
+          'error': 'No session token available',
+        };
+      }
+
+      final response = await _supabase.rpc('check_pro_device_session', params: {
+        'p_student_id': studentId,
+        'p_session_token': sessionToken,
+        'p_force_claim': forceClaim,
+      });
+
+      if (response is Map<String, dynamic>) {
+        // Cache the result
+        _cachedDeviceSession = response;
+        _cacheTimestamp = DateTime.now();
+        
+        print('✅ Device session validated: $response');
+        return response;
+      }
+      
+      throw Exception('Invalid response format');
+    } catch (e) {
+      print('❌ Error validating device session: $e');
+      return {
+        'has_pro': false,
+        'is_valid': false,
+        'active_on_other_device': false,
+        'device_changed': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  /// Check if device session is valid (uses cache if available)
+  Future<bool> isDeviceSessionValid(String studentId) async {
+    // Check cache first
+    if (_cachedDeviceSession != null && _cacheTimestamp != null) {
+      final cacheAge = DateTime.now().difference(_cacheTimestamp!);
+      if (cacheAge < _cacheValidity) {
+        return _cachedDeviceSession!['is_valid'] == true;
+      }
+    }
+
+    // Cache expired or doesn't exist, validate
+    final result = await validateAndUpdateDeviceSession(studentId);
+    return result['is_valid'] == true;
+  }
+
+  /// Get cached device session info (without making network call)
+  Map<String, dynamic>? getCachedDeviceSession() {
+    if (_cachedDeviceSession != null && _cacheTimestamp != null) {
+      final cacheAge = DateTime.now().difference(_cacheTimestamp!);
+      if (cacheAge < _cacheValidity) {
+        return _cachedDeviceSession;
+      }
+    }
+    return null;
+  }
+
+  /// Clear device session cache
+  void clearDeviceSessionCache() {
+    _cachedDeviceSession = null;
+    _cacheTimestamp = null;
+  }
 
   /// Check if student has active PRO subscription
   Future<Map<String, dynamic>?> getProStatus(String studentId) async {
@@ -23,13 +115,20 @@ class ProSubscriptionService {
   }
 
   /// Check if student has active PRO subscription (boolean)
-  Future<bool> hasActivePro(String studentId) async {
+  /// This now validates device session by default
+  Future<bool> hasActivePro(String studentId, {bool checkDeviceSession = true}) async {
     try {
-      final response = await _supabase.rpc('has_active_pro_subscription', params: {
-        'p_student_id': studentId,
-      });
-
-      return response == true;
+      if (checkDeviceSession) {
+        // Check device session validity
+        final sessionValid = await isDeviceSessionValid(studentId);
+        return sessionValid;
+      } else {
+        // Old behavior - just check if pro exists
+        final response = await _supabase.rpc('has_active_pro_subscription', params: {
+          'p_student_id': studentId,
+        });
+        return response == true;
+      }
     } catch (e) {
       print('Error checking PRO status: $e');
       return false;

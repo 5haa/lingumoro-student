@@ -16,6 +16,7 @@ import 'package:student/services/auth_service.dart';
 import 'package:student/services/ai_voice_session_service.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/points_notification_service.dart';
+import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as kStatus;
@@ -57,6 +58,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   final AuthService _authService = AuthService();
   final LevelService _levelService = LevelService();
   final PointsNotificationService _pointsNotificationService = PointsNotificationService();
+  final ProSubscriptionService _proService = ProSubscriptionService();
 
   final RecordConfig _recordConfig = const RecordConfig(
     encoder: AudioEncoder.pcm16bits,
@@ -124,6 +126,37 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   @override
   void initState() {
     super.initState();
+    _checkProAndLoadSessionInfo();
+  }
+
+  Future<void> _checkProAndLoadSessionInfo() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      Navigator.pop(context);
+      return;
+    }
+
+    // Check device session validity
+    final result = await _proService.validateAndUpdateDeviceSession(
+      user.id,
+      forceClaim: false,
+    );
+
+    if (result['is_valid'] != true) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Pro features are active on another device. Activate in Profile to use.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    // If valid, load session info
     _loadSessionInfo();
   }
 

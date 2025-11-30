@@ -1,10 +1,12 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/firebase_notification_service.dart';
 import 'package:student/services/preload_service.dart';
+import 'package:student/services/pro_subscription_service.dart';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
   final _firebaseNotificationService = FirebaseNotificationService();
+  final _proSubscriptionService = ProSubscriptionService();
 
   User? get currentUser => _supabase.auth.currentUser;
   
@@ -85,6 +87,17 @@ class AuthService {
       } catch (e) {
         print('❌ Failed to initialize Firebase notifications: $e');
       }
+      
+      // Validate device session for pro subscription (force claim on signup)
+      try {
+        await _proSubscriptionService.validateAndUpdateDeviceSession(
+          response.user!.id, 
+          forceClaim: true
+        );
+        print('✅ Device session validated for new user');
+      } catch (e) {
+        print('❌ Failed to validate device session: $e');
+      }
     }
 
     return response;
@@ -139,6 +152,20 @@ class AuthService {
         print('✅ Firebase notifications initialized successfully');
       } catch (e) {
         print('❌ Failed to initialize Firebase notifications: $e');
+      }
+      
+      // Validate and update device session for pro subscription (force claim on login)
+      try {
+        final sessionResult = await _proSubscriptionService.validateAndUpdateDeviceSession(
+          response.user!.id,
+          forceClaim: true
+        );
+        if (sessionResult['device_changed'] == true) {
+          print('🔄 Pro subscription device session updated to this device');
+        }
+        print('✅ Device session validated: ${sessionResult}');
+      } catch (e) {
+        print('❌ Failed to validate device session: $e');
       }
     }
 

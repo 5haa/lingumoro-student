@@ -9,6 +9,7 @@ import 'package:student/screens/onboarding_screen.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/firebase_notification_service.dart';
 import 'package:student/services/preload_service.dart';
+import 'package:student/services/pro_subscription_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -85,11 +86,12 @@ class _SplashScreenState extends State<SplashScreen> {
           });
         }
       } else {
-        // Preload data and initialize Firebase notifications in parallel
+        // Preload data, initialize Firebase notifications, and validate device session in parallel
         await Future.wait([
           minimumSplashDuration,
           _preloadAppData(isLoggedIn: true),
           _initializeFirebaseNotifications(),
+          _validateDeviceSession(),
         ]);
         
         nextScreen = const MainNavigation();
@@ -133,6 +135,24 @@ class _SplashScreenState extends State<SplashScreen> {
       print('✅ Firebase notifications initialized on app startup');
     } catch (e) {
       print('❌ Failed to initialize Firebase notifications: $e');
+    }
+  }
+
+  Future<void> _validateDeviceSession() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) {
+        final proService = ProSubscriptionService();
+        final result = await proService.validateAndUpdateDeviceSession(userId);
+        
+        if (result['device_changed'] == true) {
+          print('🔄 Pro subscription device session updated on app startup');
+        }
+        
+        print('✅ Device session validated on app startup: ${result}');
+      }
+    } catch (e) {
+      print('❌ Failed to validate device session on app startup: $e');
     }
   }
 

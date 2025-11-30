@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/reading_service.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/screens/practice/reading_detail_screen.dart';
 import '../../widgets/custom_back_button.dart';
@@ -16,6 +17,7 @@ class ReadingScreen extends StatefulWidget {
 class _ReadingScreenState extends State<ReadingScreen> {
   final _readingService = ReadingService();
   final _authService = AuthService();
+  final _proService = ProSubscriptionService();
   
   bool _isLoading = true;
   List<Map<String, dynamic>> _readings = [];
@@ -26,6 +28,37 @@ class _ReadingScreenState extends State<ReadingScreen> {
   @override
   void initState() {
     super.initState();
+    _checkProAndLoadData();
+  }
+  
+  Future<void> _checkProAndLoadData() async {
+    final studentId = _authService.currentUser?.id;
+    if (studentId == null) {
+      Navigator.pop(context);
+      return;
+    }
+
+    // Check device session validity
+    final result = await _proService.validateAndUpdateDeviceSession(
+      studentId,
+      forceClaim: false,
+    );
+
+    if (result['is_valid'] != true) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Pro features are active on another device. Activate in Profile to use.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    // If valid, load data
     _loadData();
   }
 
