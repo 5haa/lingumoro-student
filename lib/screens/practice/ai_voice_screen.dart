@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -92,6 +93,11 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   
   // Buffer for current streaming transcript
   String _currentTranscript = "";
+  
+  // UI state for bubble and chat
+  double _soundLevel = 0.0;
+  Timer? _amplitudeTimer;
+  bool _isChatExpanded = false;
 
   // Voice Settings
   String _selectedVoice = VoiceAIConfig.defaultVoice;
@@ -109,6 +115,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   bool _canStartSession = true;
   String _sessionLimitReason = "";
   
+  // Loading state
+  bool _isLoadingSession = true;
+  
   // Points and stats
   Map<String, dynamic> _todayStats = {};
 
@@ -122,17 +131,29 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     final user = _authService.currentUser;
     if (user == null) return;
 
-    final sessionInfo = await _sessionService.canStartSession(user.id);
-    final todayStats = await _sessionService.getTodayStats(user.id);
+    try {
+      final sessionInfo = await _sessionService.canStartSession(user.id);
+      final todayStats = await _sessionService.getTodayStats(user.id);
 
-    setState(() {
-      _canStartSession = sessionInfo['canStart'];
-      _remainingSessions = sessionInfo['remainingSessions'];
-      _maxSessions = sessionInfo['maxSessions'];
-      _maxSessionDurationMinutes = sessionInfo['durationMinutes'];
-      _sessionLimitReason = sessionInfo['reason'];
-      _todayStats = todayStats;
-    });
+      if (mounted) {
+        setState(() {
+          _canStartSession = sessionInfo['canStart'];
+          _remainingSessions = sessionInfo['remainingSessions'];
+          _maxSessions = sessionInfo['maxSessions'];
+          _maxSessionDurationMinutes = sessionInfo['durationMinutes'];
+          _sessionLimitReason = sessionInfo['reason'];
+          _todayStats = todayStats;
+          _isLoadingSession = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading session info: $e");
+      if (mounted) {
+        setState(() {
+          _isLoadingSession = false;
+        });
+      }
+    }
   }
 
   void _startSessionTimer() {
@@ -194,6 +215,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   @override
   void dispose() {
     _stopSessionTimer();
+    _amplitudeTimer?.cancel();
     _disconnect();
     _player.dispose();
     _audioRecorder.dispose();
@@ -329,6 +351,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
   Future<void> _disconnect() async {
     _allowRecorderRestart = false;
+    _amplitudeTimer?.cancel();
     await _recorderSubscription?.cancel();
     _recorderSubscription = null;
     try {
@@ -347,6 +370,11 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
     // Stop session timer
     _stopSessionTimer();
+    
+    // Reset sound level
+    setState(() {
+      _soundLevel = 0.0;
+    });
 
     // End session and award points
     if (_currentSessionId != null) {
@@ -736,6 +764,10 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final displayMessages = _isChatExpanded 
+        ? _messages 
+        : _messages.length > 2 ? _messages.sublist(_messages.length - 2) : _messages;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -743,173 +775,91 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
           children: [
             // Top Bar
             _buildTopBar(),
+            
+            // Session Timer Header (Always visible)
+            _buildSessionHeader(),
 
-            // Session Info Banner
-            if (_status != AppStatus.disconnected) _buildSessionInfoBanner(),
-
-            // Transcript Area
+            // Main Content (Bubble)
             Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+              flex: _isChatExpanded ? 3 : 5,
+              child: Center(
+                child: AIAgentBubble(
+                  soundLevel: _soundLevel,
+                  isAgentSpeaking: _isPlayingTts,
                 ),
-                child: _messages.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            FaIcon(
-                              FontAwesomeIcons.microphone,
-                              size: 64,
-                              color: AppColors.textSecondary.withOpacity(0.3),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              "Click 'Start Conversation' to begin...",
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            _buildSessionStats(),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(20),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = _messages[index];
-                          return _buildMessageBubble(msg);
-                        },
-                      ),
+              ),
+            ),
+            
+            // Single Toggle Button for Start/Stop
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+              child: ElevatedButton(
+                onPressed: _isLoadingSession ? null : (_status == AppStatus.disconnected
+                    ? _startConversation
+                    : _disconnect),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  backgroundColor: _status == AppStatus.disconnected ? Colors.black : Colors.white,
+                  foregroundColor: _status == AppStatus.disconnected ? Colors.white : Colors.black,
+                  elevation: 0,
+                  side: _status == AppStatus.disconnected 
+                      ? null 
+                      : const BorderSide(color: Colors.black12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: Text(
+                  _status == AppStatus.disconnected ? "Start" : "Stop",
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
 
-            // Status and Controls
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // Status Indicator
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          _statusMessage,
-                          style: TextStyle(
-                            color: _getStatusColor(),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_isWarmingUp && !_sessionReady) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "Initializing real-time session...",
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  // Buttons
-                  Row(
+            // Integrated Chat Area
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: _isChatExpanded ? 400 : null,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.6,
+              ),
+              child: GestureDetector(
+                onTap: _messages.isNotEmpty ? () {
+                  setState(() {
+                    _isChatExpanded = !_isChatExpanded;
+                  });
+                } : null,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  color: Colors.transparent,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _status == AppStatus.disconnected
-                              ? _startConversation
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            "Start Conversation",
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      if (_messages.isNotEmpty && !_isChatExpanded)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 15),
+                          width: 30,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(1.5),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _status != AppStatus.disconnected
-                              ? _disconnect
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: Colors.red.shade400,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            "Stop Conversation",
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
+                        
+                      if (_messages.isNotEmpty)
+                        _isChatExpanded 
+                          ? Expanded(child: _buildMessageList(displayMessages))
+                          : _buildMessageList(displayMessages),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
+            
+            if (!_isChatExpanded)
+              const SizedBox(height: 20),
           ],
         ),
       ),
@@ -963,225 +913,121 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       ),
     );
   }
-
-  Widget _buildMessageBubble(ChatMessage msg) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment:
-            msg.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+  
+  Widget _buildSessionHeader() {
+    // Calculate current session number properly
+    final sessionsUsedToday = _maxSessions - _remainingSessions;
+    final currentSession = _status != AppStatus.disconnected ? sessionsUsedToday + 1 : sessionsUsedToday;
+    final minutes = _sessionDurationSeconds ~/ 60;
+    final seconds = _sessionDurationSeconds % 60;
+    final formattedTime = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment:
-                msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: msg.isUser ? AppColors.primary : Colors.green.shade400,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  msg.isUser ? "You" : "AI",
+          // Session Indicator
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.black12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.event_note, size: 14, color: Colors.black54),
+                const SizedBox(width: 6),
+                Text(
+                  'Session $currentSession/$_maxSessions',
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Colors.black87,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                DateFormat.jm().format(msg.timestamp),
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
-              ),
-              if (!msg.isComplete && msg.isUser) ...[
-                const SizedBox(width: 8),
-                const Text(
-                  "⏳ Listening...",
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 10),
-                ),
               ],
-            ],
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 2,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-              border: Border(
-                left: BorderSide(
-                  color: msg.isUser
-                      ? AppColors.primary
-                      : Colors.green.shade400,
-                  width: 4,
-                ),
-              ),
             ),
-            child: Text(
-              msg.text,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                height: 1.5,
-              ),
+          ),
+          
+          // Timer
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.timer_outlined, size: 14, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(
+                  formattedTime,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Colors.white,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildSessionInfoBanner() {
-    final minutes = _sessionDurationSeconds ~/ 60;
-    final seconds = _sessionDurationSeconds % 60;
-    final remainingSeconds = (_maxSessionDurationMinutes * 60) - _sessionDurationSeconds;
-    final remainingMinutes = remainingSeconds ~/ 60;
-    final progress = _sessionDurationSeconds / (_maxSessionDurationMinutes * 60);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.teal.shade400, Colors.teal.shade600],
-        ),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.teal.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.timer, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+  
+  Widget _buildMessageList(List<ChatMessage> messages) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: _isChatExpanded ? const BouncingScrollPhysics() : const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: messages.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final message = messages[index];
+        return Row(
+          mainAxisAlignment: message.isUser 
+              ? MainAxisAlignment.end 
+              : MainAxisAlignment.start,
+          children: [
+            Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.75,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: message.isUser 
+                    ? const Color(0xFFE0E0E0) 
+                    : Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(24),
+                  topRight: const Radius.circular(24),
+                  bottomLeft: Radius.circular(message.isUser ? 24 : 4),
+                  bottomRight: Radius.circular(message.isUser ? 4 : 24),
+                ),
+                boxShadow: message.isUser ? [] : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              Text(
-                '$remainingMinutes min left',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
+              child: Text(
+                message.text,
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: message.isUser ? FontWeight.w400 : FontWeight.w500,
+                  fontSize: 15,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: progress,
-            backgroundColor: Colors.white.withOpacity(0.3),
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-            minHeight: 6,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionStats() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                Icons.today,
-                'Today',
-                '$_remainingSessions/$_maxSessions',
-                'sessions left',
-                Colors.blue.shade600,
-              ),
-              Container(width: 1, height: 40, color: Colors.blue.shade200),
-              _buildStatItem(
-                Icons.timer,
-                'Duration',
-                '$_maxSessionDurationMinutes min',
-                'per session',
-                Colors.green.shade600,
-              ),
-            ],
-          ),
-          if (_todayStats.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Divider(color: Colors.blue.shade200),
-            const SizedBox(height: 8),
-            Text(
-              'Today: ${_todayStats['totalSessions']} sessions • ${_todayStats['totalMinutes']} minutes • ${_todayStats['totalPoints']} points earned',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.blue.shade700,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(IconData icon, String label, String value, String subtitle, Color color) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 28),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey.shade600,
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -1206,6 +1052,25 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
           _handleRecorderStreamClosed();
         },
         onDone: _handleRecorderStreamClosed,
+      );
+      
+      // Start amplitude timer for bubble visualization
+      _amplitudeTimer?.cancel();
+      _amplitudeTimer = Timer.periodic(
+        const Duration(milliseconds: 50),
+        (timer) async {
+          try {
+            final amplitude = await _audioRecorder.getAmplitude();
+            if (mounted && _status != AppStatus.disconnected) {
+              setState(() {
+                final normalized = (amplitude.current + 50).clamp(0.0, 50.0) / 50.0;
+                _soundLevel = normalized;
+              });
+            }
+          } catch (e) {
+            // Ignore amplitude errors
+          }
+        },
       );
     } catch (e) {
       debugPrint("Failed to start recorder stream: $e");
@@ -1267,6 +1132,219 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     if (_status == AppStatus.disconnected || !_sessionReady) return;
     _allowRecorderRestart = true;
     await _startRecorderStream();
+  }
+}
+
+// Extension for taking last N elements from list
+extension ListExtension<E> on List<E> {
+  List<E> takeLast(int n) {
+    if (length <= n) return this;
+    return sublist(length - n);
+  }
+}
+
+class AIAgentBubble extends StatefulWidget {
+  final double soundLevel;
+  final bool isAgentSpeaking;
+
+  const AIAgentBubble({
+    super.key, 
+    required this.soundLevel,
+    required this.isAgentSpeaking,
+  });
+
+  @override
+  State<AIAgentBubble> createState() => _AIAgentBubbleState();
+}
+
+class _AIAgentBubbleState extends State<AIAgentBubble>
+    with TickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late AnimationController _waveController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(
+      begin: 0.95,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+
+    _waveController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _waveController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final soundMultiplier = 1.0 + (widget.soundLevel * 2.0);
+    
+    return AnimatedBuilder(
+      animation: Listenable.merge([_pulseController, _waveController]),
+      builder: (context, child) {
+        return CustomPaint(
+          painter: AIBubblePainter(
+            pulseValue: _pulseAnimation.value,
+            waveValue: _waveController.value,
+            soundLevel: widget.soundLevel,
+            soundMultiplier: soundMultiplier,
+            isAgentSpeaking: widget.isAgentSpeaking,
+          ),
+          size: const Size(300, 300),
+        );
+      },
+    );
+  }
+}
+
+class AIBubblePainter extends CustomPainter {
+  final double pulseValue;
+  final double waveValue;
+  final double soundLevel;
+  final double soundMultiplier;
+  final bool isAgentSpeaking;
+
+  AIBubblePainter({
+    required this.pulseValue,
+    required this.waveValue,
+    required this.soundLevel,
+    required this.soundMultiplier,
+    required this.isAgentSpeaking,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final baseRadius = size.width / 4;
+
+    if (soundLevel > 0.01) {
+      _drawSoundWaves(canvas, center, baseRadius);
+    }
+
+    _drawMainBubble(canvas, center, baseRadius);
+  }
+
+  void _drawSoundWaves(Canvas canvas, Offset center, double baseRadius) {
+    final wavePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 0.5 + (soundLevel * 0.3);
+
+    final numWaves = 3 + (soundLevel * 2).round();
+    
+    for (int i = 0; i < numWaves; i++) {
+      final waveProgress = (waveValue + (i * 0.33)) % 1.0;
+      final waveRadius = baseRadius * (1.0 + waveProgress * (1.2 + soundLevel * 0.5));
+      final opacity = (1.0 - waveProgress) * (0.2 + soundLevel * 0.3);
+
+      wavePaint.color = Colors.black.withOpacity(opacity);
+
+      final path = Path();
+      const segments = 120;
+      
+      for (int j = 0; j <= segments; j++) {
+        final angle = (j / segments) * 2 * math.pi;
+        final waveIntensity = 2.0 + (soundLevel * 4.0);
+        final waveOffset = math.sin(angle * 8 + waveValue * 2 * math.pi) * waveIntensity;
+        
+        final radius = waveRadius + waveOffset;
+        final x = center.dx + radius * math.cos(angle);
+        final y = center.dy + radius * math.sin(angle);
+
+        if (j == 0) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+      path.close();
+
+      canvas.drawPath(path, wavePaint);
+    }
+  }
+
+  void _drawMainBubble(Canvas canvas, Offset center, double baseRadius) {
+    final bubblePath = Path();
+    const segments = 120; 
+
+    final soundExpansion = isAgentSpeaking 
+        ? 1.0 
+        : 1.0 + (soundLevel * 0.1); 
+
+    for (int i = 0; i <= segments; i++) {
+      final angle = (i / segments) * 2 * math.pi;
+
+      double waveIntensity;
+      
+      if (isAgentSpeaking) {
+        waveIntensity = 2.5; 
+      } else {
+        waveIntensity = 0.2; 
+      }
+      
+      final wave1 = math.sin(angle * 2 + waveValue * 2 * math.pi) * 4.0 * waveIntensity;
+      final wave2 = math.sin(angle * 3 - waveValue * 4 * math.pi) * 2.5 * waveIntensity;
+      final wave3 = math.cos(angle * 5 + waveValue * 2 * math.pi) * 1.5 * waveIntensity;
+
+      final radius = (baseRadius * pulseValue * soundExpansion) + wave1 + wave2 + wave3;
+
+      final x = center.dx + radius * math.cos(angle);
+      final y = center.dy + radius * math.sin(angle);
+
+      if (i == 0) {
+        bubblePath.moveTo(x, y);
+      } else {
+        bubblePath.lineTo(x, y);
+      }
+    }
+    bubblePath.close();
+
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.2)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
+
+    canvas.drawPath(
+      bubblePath.shift(const Offset(0, 5)),
+      shadowPaint,
+    );
+
+    final bubblePaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF2A2A2A),
+          const Color(0xFF000000),
+        ],
+        stops: const [0.0, 1.0],
+        center: const Alignment(-0.3, -0.3),
+      ).createShader(Rect.fromCircle(center: center, radius: baseRadius));
+
+    canvas.drawPath(bubblePath, bubblePaint);
+  }
+
+  @override
+  bool shouldRepaint(AIBubblePainter oldDelegate) {
+    return oldDelegate.pulseValue != pulseValue ||
+        oldDelegate.waveValue != waveValue ||
+        oldDelegate.soundLevel != soundLevel ||
+        oldDelegate.isAgentSpeaking != isAgentSpeaking;
   }
 }
 
