@@ -904,32 +904,78 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FaIcon(
-              FontAwesomeIcons.video,
-              size: 80,
-              color: AppColors.textSecondary,
+            Container(
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.red.shade50, Colors.red.shade100],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: FaIcon(
+                FontAwesomeIcons.video,
+                size: 60,
+                color: Colors.red.shade400,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             const Text(
-              'No Practice Videos Available',
+              'No Videos Yet',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Check back later for new practice content!',
+            Text(
+              'Practice videos will appear here.\nCheck back soon for new content!',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 color: AppColors.textSecondary,
+                height: 1.5,
               ),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'New videos coming soon',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -944,17 +990,21 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // Header
+          // Hero Header with Gradient
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(15),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFED4264), Color(0xFFFFEDBC)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
+                  color: Colors.red.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -963,48 +1013,86 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: FaIcon(
-                        FontAwesomeIcons.video,
-                        color: Colors.red.shade400,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Practice Videos',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                    const Text('📹', style: TextStyle(fontSize: 48)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Video Practice',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  offset: Offset(0, 2),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Learn ${_videos.length} lessons at your own pace',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.95),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Watch videos in order to unlock the next one',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                Row(
+                const SizedBox(height: 20),
+                // Progress Bar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildProgressIndicator(),
-                    const SizedBox(width: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Overall Progress',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${_watchedVideos.values.where((w) => w).length}/${_videos.length} Completed',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white.withOpacity(0.95),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: _videos.isNotEmpty 
+                            ? _watchedVideos.values.where((w) => w).length / _videos.length 
+                            : 0,
+                        backgroundColor: Colors.white.withOpacity(0.3),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        minHeight: 10,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
-                      '${_watchedVideos.values.where((w) => w).length} / ${_videos.length} completed',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                      '${_videos.isNotEmpty ? ((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt() : 0}% Complete',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -1012,7 +1100,35 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
+
+          // Section Title
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: FaIcon(
+                  FontAwesomeIcons.listUl,
+                  color: Colors.red.shade600,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Lesson Playlist',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
           // Videos List
           ...List.generate(_videos.length, (index) {
@@ -1027,36 +1143,6 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     );
   }
 
-  Widget _buildProgressIndicator() {
-    final watchedCount = _watchedVideos.values.where((w) => w).length;
-    final totalCount = _videos.length;
-    final progress = totalCount > 0 ? watchedCount / totalCount : 0.0;
-
-    return SizedBox(
-      width: 60,
-      height: 60,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          CircularProgressIndicator(
-            value: progress,
-            backgroundColor: AppColors.lightGrey,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.red.shade400),
-            strokeWidth: 6,
-          ),
-          Text(
-            '${(progress * 100).toInt()}%',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildVideoCard(
     Map<String, dynamic> video,
     int number,
@@ -1064,15 +1150,20 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     bool canWatch,
   ) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(16),
+        border: isWatched 
+            ? Border.all(color: Colors.green.shade300, width: 2)
+            : Border.all(color: AppColors.border.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: isWatched 
+                ? Colors.green.withOpacity(0.1)
+                : Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1082,146 +1173,217 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
           onTap: canWatch
               ? () => _openVideoPlayer(video)
               : () => _showLockedDialog(),
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(15.0),
+            padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                // Video Number Badge
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: canWatch
-                        ? Colors.red.shade400
-                        : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: isWatched
-                        ? const Icon(
-                            Icons.check_circle,
-                            color: Colors.white,
-                            size: 28,
-                          )
-                        : !canWatch
-                            ? Icon(
-                                Icons.lock,
-                                color: Colors.grey.shade600,
-                                size: 24,
+                // Enhanced Thumbnail/Number Badge
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        gradient: isWatched
+                            ? LinearGradient(
+                                colors: [Colors.green.shade400, Colors.green.shade600],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               )
-                            : Text(
-                                '$number',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                  ),
+                            : canWatch
+                                ? const LinearGradient(
+                                    colors: [Color(0xFFED4264), Color(0xFFFFB88C)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : LinearGradient(
+                                    colors: [Colors.grey.shade300, Colors.grey.shade400],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isWatched ? Colors.green : canWatch ? Colors.red : Colors.grey)
+                                .withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: isWatched
+                            ? const Icon(
+                                Icons.check_circle_rounded,
+                                color: Colors.white,
+                                size: 36,
+                              )
+                            : !canWatch
+                                ? const Icon(
+                                    Icons.lock_rounded,
+                                    color: Colors.white,
+                                    size: 28,
+                                  )
+                                : const FaIcon(
+                                    FontAwesomeIcons.play,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                      ),
+                    ),
+                    if (!isWatched && canWatch)
+                      Positioned(
+                        top: 4,
+                        left: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$number',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade600,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 16),
 
                 // Video Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        video['title'] ?? 'Untitled',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: canWatch ? AppColors.textPrimary : AppColors.textSecondary,
-                        ),
-                      ),
-                      if (video['description'] != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          video['description'],
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: canWatch ? AppColors.textSecondary : AppColors.textHint,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 8),
                       Row(
                         children: [
-                          if (video['level'] != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                          Expanded(
+                            child: Text(
+                              video['title'] ?? 'Untitled',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: canWatch ? AppColors.textPrimary : AppColors.textSecondary,
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Level ${video['level']}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.blue.shade700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          // Points reward badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.star,
-                                  size: 12,
-                                  color: Colors.amber.shade700,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '+${video['points_reward'] ?? 10}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.amber.shade900,
-                                  ),
-                                ),
-                              ],
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (video['duration_seconds'] != null) ...[
+                          if (isWatched) ...[
                             const SizedBox(width: 8),
-                            Text(
-                              _formatDuration(video['duration_seconds']),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check, size: 12, color: Colors.green.shade700),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Done',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ],
                       ),
+                      if (video['description'] != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          video['description'],
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: canWatch ? AppColors.textSecondary : AppColors.textHint,
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          if (video['duration_seconds'] != null)
+                            _buildInfoChip(
+                              icon: FontAwesomeIcons.clock,
+                              text: _formatDuration(video['duration_seconds']),
+                              color: Colors.blue,
+                            ),
+                          if (video['level'] != null)
+                            _buildInfoChip(
+                              icon: FontAwesomeIcons.signal,
+                              text: 'Level ${video['level']}',
+                              color: Colors.purple,
+                            ),
+                          _buildInfoChip(
+                            icon: FontAwesomeIcons.star,
+                            text: '+${video['points_reward'] ?? 10}',
+                            color: Colors.amber,
+                          ),
+                        ],
+                      ),
+                      if (!canWatch) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 14,
+                              color: Colors.orange.shade600,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Complete previous video to unlock',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.orange.shade700,
+                                  fontStyle: FontStyle.italic,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
 
                 // Arrow Icon
-                FaIcon(
-                  canWatch ? FontAwesomeIcons.play : FontAwesomeIcons.lock,
-                  color: canWatch ? Colors.red.shade400 : Colors.grey[400],
-                  size: 28,
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: canWatch 
+                        ? Colors.red.shade50 
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: FaIcon(
+                    canWatch ? FontAwesomeIcons.chevronRight : FontAwesomeIcons.lock,
+                    color: canWatch ? Colors.red.shade600 : Colors.grey.shade400,
+                    size: 16,
+                  ),
                 ),
               ],
             ),
@@ -1231,10 +1393,78 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     );
   }
 
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String text,
+    required MaterialColor color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.shade100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FaIcon(
+            icon,
+            size: 10,
+            color: color.shade700,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color.shade900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatDuration(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
-    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+    return '${minutes}m ${remainingSeconds}s';
+  }
+
+  Widget _buildDetailChip({
+    required IconData icon,
+    required String label,
+    required MaterialColor color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FaIcon(
+            icon,
+            size: 14,
+            color: color.shade700,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color.shade900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLockedDialog() {
@@ -1573,58 +1803,139 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final isCompleted = _actualWatchedSeconds >= requiredWatchTime;
     
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isCompleted ? Colors.green.shade50 : Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: isCompleted 
+              ? [Colors.green.shade50, Colors.green.shade100]
+              : [Colors.blue.shade50, Colors.blue.shade100],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCompleted ? Colors.green.shade200 : Colors.blue.shade200,
+          color: isCompleted ? Colors.green.shade300 : Colors.blue.shade300,
           width: 2,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: (isCompleted ? Colors.green : Colors.blue).withOpacity(0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(
-                isCompleted ? Icons.check_circle : Icons.timer_outlined,
-                color: isCompleted ? Colors.green.shade700 : Colors.blue.shade700,
-                size: 20,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isCompleted ? Colors.green.shade600 : Colors.blue.shade600,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isCompleted ? Colors.green : Colors.blue).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  isCompleted ? Icons.check_circle_rounded : Icons.play_circle_filled,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isCompleted 
+                          ? 'Congratulations!' 
+                          : 'Keep Watching',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isCompleted ? Colors.green.shade900 : Colors.blue.shade900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isCompleted 
+                          ? 'Video completed successfully' 
+                          : '${_formatTime(remainingSeconds)} remaining',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: isCompleted ? Colors.green.shade700 : Colors.blue.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Text(
-                  isCompleted 
-                      ? '✅ Watch requirement completed!' 
-                      : 'Watch time: ${_formatTime(remainingSeconds)} remaining',
+                  '${progressPercent.toStringAsFixed(0)}%',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                     color: isCompleted ? Colors.green.shade700 : Colors.blue.shade700,
                   ),
                 ),
               ),
-              Text(
-                '${progressPercent.toStringAsFixed(0)}%',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isCompleted ? Colors.green.shade700 : Colors.blue.shade700,
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progressPercent / 100,
-              backgroundColor: Colors.white,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isCompleted ? Colors.green : Colors.blue,
-              ),
-              minHeight: 8,
+            borderRadius: BorderRadius.circular(10),
+            child: Stack(
+              children: [
+                Container(
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: progressPercent / 100,
+                  child: Container(
+                    height: 12,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isCompleted
+                            ? [Colors.green.shade400, Colors.green.shade600]
+                            : [Colors.blue.shade400, Colors.blue.shade600],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isCompleted ? Colors.green : Colors.blue).withOpacity(0.4),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1662,91 +1973,176 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.video['title'] ?? 'Untitled',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                      // Video Title Card
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFFED4264), Color(0xFFFFB88C)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const FaIcon(
+                                    FontAwesomeIcons.video,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    widget.video['title'] ?? 'Untitled',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                if (widget.video['level'] != null)
+                                  _buildDetailChip(
+                                    icon: FontAwesomeIcons.signal,
+                                    label: 'Level ${widget.video['level']}',
+                                    color: Colors.purple,
+                                  ),
+                                _buildDetailChip(
+                                  icon: FontAwesomeIcons.star,
+                                  label: '+${widget.video['points_reward'] ?? 10} points',
+                                  color: Colors.amber,
+                                ),
+                                if (widget.video['duration_seconds'] != null)
+                                  _buildDetailChip(
+                                    icon: FontAwesomeIcons.clock,
+                                    label: _formatDuration(widget.video['duration_seconds']),
+                                    color: Colors.blue,
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 15),
-                      if (widget.video['level'] != null)
+                      
+                      if (widget.video['description'] != null) ...[
+                        const SizedBox(height: 16),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.star,
-                                size: 16,
-                                color: Colors.blue.shade700,
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                              const SizedBox(width: 6),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const FaIcon(
+                                      FontAwesomeIcons.alignLeft,
+                                      color: AppColors.primary,
+                                      size: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Text(
+                                    'About this lesson',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
                               Text(
-                                'Level ${widget.video['level']}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.blue.shade700,
+                                widget.video['description'],
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppColors.textSecondary,
+                                  height: 1.6,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      if (widget.video['description'] != null) ...[
-                        const SizedBox(height: 20),
-                        const Divider(color: AppColors.border),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Description',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.video['description'],
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: AppColors.textSecondary,
-                            height: 1.5,
-                          ),
-                        ),
                       ],
-                      const SizedBox(height: 20),
+                      
+                      const SizedBox(height: 16),
+                      // Info Banner
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [Colors.orange.shade50, Colors.orange.shade100],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: Colors.amber.shade200,
+                            color: Colors.orange.shade200,
+                            width: 1.5,
                           ),
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: Colors.amber.shade700,
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.lightbulb_rounded,
+                                color: Colors.orange.shade600,
+                                size: 24,
+                              ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 14),
                             const Expanded(
                               child: Text(
-                                'Watch the entire video to unlock the next one!',
+                                'Watch the entire video to unlock the next lesson and earn points!',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w600,
                                   color: AppColors.textPrimary,
+                                  height: 1.4,
                                 ),
                               ),
                             ),
@@ -1771,7 +2167,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: Colors.black12,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: const Center(
           child: Icon(
@@ -1783,24 +2179,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
     }
 
-    return YoutubePlayer(
-      controller: _controller,
-      showVideoProgressIndicator: false, // Hide progress bar to prevent clicking/seeking
-      progressIndicatorColor: AppColors.primary,
-      progressColors: ProgressBarColors(
-        playedColor: AppColors.primary,
-        handleColor: Colors.red.shade600,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      onReady: () {
-        // Video is ready
-      },
-      onEnded: (metaData) {
-        // Video ended naturally
-        if (!_hasMarkedAsWatched) {
-          _hasMarkedAsWatched = true;
-          _markVideoAsWatched();
-        }
-      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: YoutubePlayer(
+          controller: _controller,
+          showVideoProgressIndicator: false,
+          progressIndicatorColor: AppColors.primary,
+          progressColors: ProgressBarColors(
+            playedColor: Colors.red.shade600,
+            handleColor: Colors.red.shade700,
+            backgroundColor: Colors.grey.shade300,
+            bufferedColor: Colors.grey.shade400,
+          ),
+          onReady: () {
+            // Video is ready
+          },
+          onEnded: (metaData) {
+            // Video ended naturally
+            if (!_hasMarkedAsWatched) {
+              _hasMarkedAsWatched = true;
+              _markVideoAsWatched();
+            }
+          },
+        ),
+      ),
     );
   }
 
@@ -1834,5 +2248,46 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ),
     );
   }
+
+  String _formatDuration(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes}m ${remainingSeconds}s';
+  }
+
+  Widget _buildDetailChip({
+    required IconData icon,
+    required String label,
+    required MaterialColor color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FaIcon(
+            icon,
+            size: 14,
+            color: color.shade700,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color.shade900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
