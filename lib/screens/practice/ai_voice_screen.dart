@@ -182,32 +182,79 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.timer_off, color: Colors.orange.shade600, size: 28),
-            const SizedBox(width: 12),
-            const Text('Time\'s Up!', style: TextStyle(color: AppColors.textPrimary)),
-          ],
-        ),
-        content: Text(
-          'Your $_maxSessionDurationMinutes-minute session has ended. Great job practicing!',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('OK'),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(30),
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.timer_off_outlined,
+                  size: 48,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Title
+              const Text(
+                'Time\'s Up!',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              
+              // Message
+              Text(
+                'Your $_maxSessionDurationMinutes-minute session has ended. Great job practicing!',
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 15,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+              
+              // Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    'Got it',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -421,65 +468,113 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   void _showSessionCompletedDialog(int points, int minutes) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.celebration, color: Colors.green.shade600, size: 28),
-            const SizedBox(width: 12),
-            const Text('Great Job!', style: TextStyle(color: AppColors.textPrimary)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'You practiced for $minutes minute${minutes != 1 ? 's' : ''}!',
-              style: const TextStyle(fontSize: 16, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(12),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Text(
+                  '🎉',
+                  style: TextStyle(fontSize: 42),
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.star, color: Colors.amber.shade700, size: 32),
-                  const SizedBox(width: 8),
-                  Text(
-                    '+$points Points',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.amber.shade900,
+              const SizedBox(height: 24),
+              
+              // Title
+              const Text(
+                'Great Job!',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              
+              // Message
+              Text(
+                'You practiced for $minutes minute${minutes != 1 ? 's' : ''}!',
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 15,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              
+              // Points Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('⭐', style: TextStyle(fontSize: 28)),
+                    const SizedBox(width: 8),
+                    Text(
+                      '+$points Points',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Remaining sessions
+              Text(
+                'Sessions remaining: $_remainingSessions',
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 28),
+              
+              // Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                ],
+                  child: const Text(
+                    'Awesome!',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Sessions remaining today: $_remainingSessions',
-              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Awesome!'),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -568,32 +663,80 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   void _showSessionLimitDialog(String reason) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.timer, color: Colors.orange.shade600, size: 28),
-            const SizedBox(width: 12),
-            const Text('Session Limit Reached', style: TextStyle(color: AppColors.textPrimary)),
-          ],
-        ),
-        content: Text(
-          reason,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 16),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('OK'),
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(30),
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.timer_outlined,
+                  size: 48,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Title
+              const Text(
+                'Session Limit Reached',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              
+              // Message
+              Text(
+                reason,
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 15,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+              
+              // Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    'Got it',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

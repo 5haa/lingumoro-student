@@ -34,7 +34,7 @@ class ChatConversationScreen extends StatefulWidget {
   State<ChatConversationScreen> createState() => _ChatConversationScreenState();
 }
 
-class _ChatConversationScreenState extends State<ChatConversationScreen> {
+class _ChatConversationScreenState extends State<ChatConversationScreen> with WidgetsBindingObserver {
   final _chatService = ChatService();
   final _presenceService = PresenceService();
   final _blockingService = BlockingService();
@@ -71,6 +71,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentUserId = _chatService.supabase.auth.currentUser?.id;
     _messageController.addListener(() {
       setState(() {}); // Rebuild to show/hide mic button
@@ -127,6 +128,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _chatService.unsubscribeAll();
     _presenceService.unsubscribeFromUser(widget.recipientId, 'teacher');
     _presenceService.dispose();
@@ -140,6 +142,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       player.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground - refresh messages
+      print('🔄 Chat conversation: App resumed - refreshing messages');
+      _loadMessages();
+      _markMessagesAsRead();
+    }
   }
 
   void _setupRealtimeSubscriptions() {

@@ -17,7 +17,7 @@ class ChatListScreen extends StatefulWidget {
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAliveClientMixin {
+class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final _chatService = ChatService();
   final _presenceService = PresenceService();
   final _sessionUpdateService = SessionUpdateService();
@@ -41,6 +41,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadDataFromCache();
     _chatService.subscribeToConversations();
     
@@ -153,12 +154,24 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _statusRefreshTimer?.cancel();
     _searchController.dispose();
     _sessionUpdateService.removeListener(_handleSubscriptionUpdate);
     _chatService.dispose();
     _presenceService.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground - refresh chat conversations
+      print('🔄 Chat screen: App resumed - refreshing data');
+      _loadData(forceRefresh: false);
+    }
   }
 
   void _handleSubscriptionUpdate() {

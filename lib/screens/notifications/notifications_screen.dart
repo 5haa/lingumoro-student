@@ -15,7 +15,7 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsBindingObserver {
   final NotificationService _notificationService = NotificationService();
   final NotificationBadgeController _badgeController = NotificationBadgeController();
   List<Map<String, dynamic>> _notifications = [];
@@ -25,16 +25,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadNotifications();
     _subscribeToNotifications();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_notificationChannel != null) {
       _notificationService.unsubscribe(_notificationChannel!);
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground - refresh notifications
+      print('🔄 Notifications screen: App resumed - refreshing data');
+      _loadNotifications();
+    }
   }
 
   Future<void> _loadNotifications() async {
