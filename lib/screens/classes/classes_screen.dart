@@ -59,8 +59,39 @@ class _ClassesScreenState extends State<ClassesScreen>
     // Try to load from cache first
     final cached = _preloadService.sessions;
     if (cached != null) {
+      final now = DateTime.now();
+      final upcomingSessions = <Map<String, dynamic>>[];
+      final finishedSessions = List<Map<String, dynamic>>.from(cached.finished);
+      
+      // Filter cached upcoming sessions: move expired ones to finished
+      for (var session in cached.upcoming) {
+        try {
+          final scheduledDate = DateTime.parse(session['scheduled_date']);
+          final startTime = session['scheduled_start_time'] ?? '00:00:00';
+          final timeParts = startTime.split(':');
+          final scheduledDateTime = DateTime(
+            scheduledDate.year,
+            scheduledDate.month,
+            scheduledDate.day,
+            int.parse(timeParts[0]),
+            int.parse(timeParts[1]),
+          );
+          
+          final status = session['status'] ?? '';
+          // Move to finished if: completed, cancelled, or time has passed (unless in_progress)
+          if (status == 'completed' || status == 'cancelled' || status == 'missed' ||
+              (scheduledDateTime.isBefore(now) && status != 'in_progress')) {
+            finishedSessions.add(session);
+          } else {
+            upcomingSessions.add(session);
+          }
+        } catch (e) {
+          // If parsing fails, keep in upcoming
+          upcomingSessions.add(session);
+        }
+      }
+      
       // Sort upcoming sessions
-      final upcomingSessions = List<Map<String, dynamic>>.from(cached.upcoming);
       upcomingSessions.sort((a, b) {
         try {
           final fullDateTimeA = DateTime.parse('${a['scheduled_date']} ${a['scheduled_start_time'] ?? '00:00:00'}');
@@ -73,7 +104,7 @@ class _ClassesScreenState extends State<ClassesScreen>
       
       setState(() {
         _upcomingSessions = upcomingSessions;
-        _finishedSessions = cached.finished;
+        _finishedSessions = finishedSessions;
         _isLoading = false;
       });
       print('✅ Loaded sessions from cache');
@@ -93,8 +124,42 @@ class _ClassesScreenState extends State<ClassesScreen>
         _sessionService.getPastSessions(),
       ]);
       
-      final upcomingSessions = results[0];
-      final finishedSessions = results[1];
+      final upcomingSessions = <Map<String, dynamic>>[];
+      final finishedSessions = List<Map<String, dynamic>>.from(results[1]);
+      final now = DateTime.now();
+      
+      // Filter sessions: move expired ones to finished
+      for (var session in results[0]) {
+        try {
+          final scheduledDate = DateTime.parse(session['scheduled_date']);
+          final startTime = session['scheduled_start_time'] ?? '00:00:00';
+          final timeParts = startTime.split(':');
+          final scheduledDateTime = DateTime(
+            scheduledDate.year,
+            scheduledDate.month,
+            scheduledDate.day,
+            int.parse(timeParts[0]),
+            int.parse(timeParts[1]),
+          );
+          
+          final status = session['status'] ?? '';
+          // Move to finished if: completed, cancelled, or time has passed (unless in_progress)
+          if (status == 'completed' || status == 'cancelled' || status == 'missed' ||
+              (scheduledDateTime.isBefore(now) && status != 'in_progress')) {
+            finishedSessions.add(session);
+          } else {
+            upcomingSessions.add(session);
+          }
+        } catch (e) {
+          // If parsing fails, check status
+          final status = session['status'] ?? '';
+          if (status == 'completed' || status == 'cancelled' || status == 'missed') {
+            finishedSessions.add(session);
+          } else {
+            upcomingSessions.add(session);
+          }
+        }
+      }
       
       // Sort upcoming sessions by date and time - closest to start at the top
       upcomingSessions.sort((a, b) {
@@ -109,6 +174,24 @@ class _ClassesScreenState extends State<ClassesScreen>
           final fullDateTimeB = DateTime.parse('${b['scheduled_date']} $timeB');
           
           return fullDateTimeA.compareTo(fullDateTimeB);
+        } catch (e) {
+          return 0;
+        }
+      });
+      
+      // Sort finished sessions by date and time - most recent first
+      finishedSessions.sort((a, b) {
+        try {
+          final dateA = DateTime.parse(a['scheduled_date']);
+          final dateB = DateTime.parse(b['scheduled_date']);
+          
+          final timeA = a['scheduled_start_time'] ?? '00:00:00';
+          final timeB = b['scheduled_start_time'] ?? '00:00:00';
+          
+          final fullDateTimeA = DateTime.parse('${a['scheduled_date']} $timeA');
+          final fullDateTimeB = DateTime.parse('${b['scheduled_date']} $timeB');
+          
+          return fullDateTimeB.compareTo(fullDateTimeA);
         } catch (e) {
           return 0;
         }
@@ -1016,25 +1099,56 @@ class _ClassesScreenState extends State<ClassesScreen>
             if (isCancelled) ...[
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.red.shade50,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.red.shade200),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      'This class was cancelled',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'This class was cancelled',
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
+                    if (session['teacher_notes'] != null && session['teacher_notes'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.red.shade600, size: 14),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                session['teacher_notes'],
+                                style: TextStyle(
+                                  color: Colors.red.shade900,
+                                  fontSize: 11,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
