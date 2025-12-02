@@ -352,6 +352,24 @@ class AppLocalizationsEs extends AppLocalizations {
   String get proFeature => 'Función PRO';
   @override
   String get upgradeToAccess => 'Mejora a PRO para acceder a esta función';
+  @override
+  String get videoPracticeTitle => 'Práctica en Video';
+  @override
+  String get overallProgress => 'Progreso General';
+  @override
+  String get lessonPlaylist => 'Lista de Lecciones';
+  @override
+  String get noVideosYet => 'Aún no hay videos';
+  @override
+  String get videosComingSoon => 'Los videos de práctica aparecerán aquí.\n¡Vuelve pronto para ver nuevo contenido!';
+  @override
+  String get videoLockedTitle => 'Video bloqueado';
+  @override
+  String get completePreviousVideoToUnlock => 'Mira el video anterior primero para desbloquear este.';
+  @override
+  String get aboutThisLesson => 'Acerca de esta lección';
+  @override
+  String get watchFullVideoToUnlock => 'Mira todo el video para desbloquear la siguiente lección y ganar puntos.';
   
   // Chat
   @override

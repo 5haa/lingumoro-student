@@ -352,6 +352,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get proFeature => 'ميزة محترفة';
   @override
   String get upgradeToAccess => 'قم بالترقية للوصول إلى هذه الميزة';
+  @override
+  String get videoPracticeTitle => 'تمرين الفيديو';
+  @override
+  String get overallProgress => 'التقدم الكلي';
+  @override
+  String get lessonPlaylist => 'قائمة الدروس';
+  @override
+  String get noVideosYet => 'لا توجد فيديوهات بعد';
+  @override
+  String get videosComingSoon => 'ستظهر فيديوهات التمرين هنا.\nتحقق مرة أخرى قريباً لمحتوى جديد!';
+  @override
+  String get videoLockedTitle => 'الفيديو مقفل';
+  @override
+  String get completePreviousVideoToUnlock => 'يرجى مشاهدة الفيديو السابق أولاً لفتح هذا الفيديو.';
+  @override
+  String get aboutThisLesson => 'حول هذا الدرس';
+  @override
+  String get watchFullVideoToUnlock => 'شاهد الفيديو بالكامل لفتح الدرس التالي والحصول على النقاط!';
   
   // Chat
   @override

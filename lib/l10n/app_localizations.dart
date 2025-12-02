@@ -204,6 +204,15 @@ abstract class AppLocalizations {
   String get noPracticeAvailable;
   String get proFeature;
   String get upgradeToAccess;
+  String get videoPracticeTitle;
+  String get overallProgress;
+  String get lessonPlaylist;
+  String get noVideosYet;
+  String get videosComingSoon;
+  String get videoLockedTitle;
+  String get completePreviousVideoToUnlock;
+  String get aboutThisLesson;
+  String get watchFullVideoToUnlock;
   
   // Chat
   String get chat;

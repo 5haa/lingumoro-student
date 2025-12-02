@@ -14,6 +14,7 @@ import 'package:student/screens/practice/quiz_practice_screen.dart';
 import 'package:student/screens/practice/ai_voice_screen.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import '../../l10n/app_localizations.dart';
 import '../../widgets/custom_back_button.dart';
 
 class PracticeScreen extends StatefulWidget {
@@ -72,12 +73,13 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   }
 
   void _loadDataFromCache() {
+    final l10n = AppLocalizations.of(context);
     // Get student ID first
     final user = _authService.currentUser;
     if (user == null) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Please log in to access practice';
+        _errorMessage = l10n.loginRequired;
       });
       return;
     }
@@ -127,6 +129,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   }
 
   Future<void> _loadAllData() async {
+    final l10n = AppLocalizations.of(context);
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -138,7 +141,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
       if (user == null) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Please log in to access practice';
+          _errorMessage = l10n.loginRequired;
         });
         return;
       }
@@ -173,7 +176,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to load data: ${e.toString()}';
+        _errorMessage = '${l10n.errorLoadingData}: ${e.toString()}';
       });
     }
   }
@@ -238,6 +241,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -245,7 +249,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
         child: Column(
           children: [
             // Top Bar
-            _buildTopBar(),
+            _buildTopBar(l10n),
             
             // Main Content
             Expanded(
@@ -256,7 +260,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                       ),
                     )
                   : _errorMessage != null
-                      ? _buildErrorState()
+                      ? _buildErrorState(l10n)
                       : RefreshIndicator(
                           onRefresh: _loadAllData,
                           color: AppColors.primary,
@@ -264,11 +268,11 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.all(16),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Practice Cards Grid
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Practice Cards Grid
                         _buildPracticeCard(
-                          title: 'Language Quiz',
+                          title: l10n.languageQuiz,
                           icon: FontAwesomeIcons.penToSquare,
                           emoji: '✏️',
                           color: Colors.orange.shade600,
@@ -277,7 +281,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          stat2Label: '${_quizStats['total_sessions'] ?? 0} quizzes',
+                          stat2Label: '${_quizStats['total_sessions'] ?? 0} ${l10n.quizzes}',
                           onTap: () => _navigateToQuiz(),
                           isLocked: false,
                           showProgress: false,
@@ -285,7 +289,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                         const SizedBox(height: 12),
 
                         _buildPracticeCard(
-                          title: 'AI Voice Practice',
+                          title: l10n.aiVoicePractice,
                           icon: FontAwesomeIcons.microphone,
                           emoji: '🎙️',
                           color: Colors.green.shade600,
@@ -294,7 +298,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          stat2Label: 'Real-time chat',
+                          stat2Label: l10n.chat,
                           onTap: () => _navigateToVoiceAI(),
                           isLocked: false,
                           showProgress: false,
@@ -302,7 +306,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                         const SizedBox(height: 12),
 
                         _buildPracticeCard(
-                          title: 'Reading Practice',
+                          title: l10n.readings,
                           icon: FontAwesomeIcons.book,
                           emoji: '📖',
                           color: Colors.blue.shade600,
@@ -311,7 +315,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          stat2Label: '$_completedReadings/$_totalReadings completed',
+                          stat2Label: '$_completedReadings/$_totalReadings ${l10n.completed}',
                           onTap: () => _navigateToReading(),
                           isLocked: false,
                           showProgress: false,
@@ -319,7 +323,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                         const SizedBox(height: 12),
 
                         _buildPracticeCard(
-                          title: 'Video Practice',
+                          title: l10n.videos,
                           icon: FontAwesomeIcons.play,
                           emoji: '📹',
                           color: Colors.red.shade600,
@@ -328,7 +332,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          stat2Label: '${_videos.length} videos',
+                          stat2Label: '${_videos.length} ${l10n.videos}',
                           onTap: () => _navigateToVideoPractice(),
                           isLocked: false,
                           showProgress: true,
@@ -348,7 +352,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -381,11 +385,11 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
             ),
           ),
           
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
-                'PRACTICE',
-                style: TextStyle(
+                l10n.practice,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -414,6 +418,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     bool showProgress = false,
     int? progressValue,
   }) {
+    final l10n = AppLocalizations.of(context);
     return GestureDetector(
       onTap: isLocked ? _showProRequiredDialog : onTap,
       child: Container(
@@ -466,7 +471,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                 children: [
                   _buildBadge(stat2Label, color),
                   if (isLocked)
-                    _buildBadge('PRO Only', Colors.amber.shade700),
+                    _buildBadge(l10n.proFeature, Colors.amber.shade700),
                 ],
               ),
               
@@ -480,16 +485,16 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Lesson',
-                          style: TextStyle(
+                        Text(
+                          l10n.videos,
+                          style: const TextStyle(
                             fontSize: 10,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
-                          isLocked ? '0%' : '${progressValue ?? 0}% Completed',
+                          isLocked ? '0%' : '${progressValue ?? 0}% ${l10n.completed}',
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.white.withOpacity(0.9),
@@ -651,6 +656,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   }
 
   void _showProRequiredDialog() {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -662,22 +668,22 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
           children: [
             FaIcon(FontAwesomeIcons.crown, color: Colors.amber.shade600, size: 28),
             const SizedBox(width: 12),
-            const Text(
-              'PRO Required',
-              style: TextStyle(color: AppColors.textPrimary),
+            Text(
+              l10n.proFeature,
+              style: const TextStyle(color: AppColors.textPrimary),
             ),
           ],
         ),
-        content: const Text(
-          'This practice type requires a PRO subscription. Please upgrade to access all features.',
-          style: TextStyle(color: AppColors.textSecondary),
+        content: Text(
+          l10n.upgradeToAccess,
+          style: const TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Close',
-              style: TextStyle(color: AppColors.textSecondary),
+            child: Text(
+              l10n.close,
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
           ElevatedButton.icon(
@@ -686,7 +692,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
               // Navigate to profile/upgrade screen
             },
             icon: const FaIcon(FontAwesomeIcons.crown),
-            label: const Text('Upgrade'),
+            label: Text(l10n.upgrade),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.amber.shade600,
               foregroundColor: Colors.white,
@@ -697,7 +703,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(AppLocalizations l10n) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -722,7 +728,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
             ElevatedButton.icon(
               onPressed: _loadAllData,
               icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              label: Text(l10n.retry),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -827,13 +833,14 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
             // Top Bar
-            _buildTopBar(),
+            _buildTopBar(l10n),
             
             // Main Content
             Expanded(
@@ -844,7 +851,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                       ),
                     )
                   : _errorMessage != null
-                      ? _buildErrorState()
+                      ? _buildErrorState(l10n)
                       : _videos.isEmpty
                           ? _buildEmptyState()
                           : _buildVideoList(),
@@ -855,7 +862,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -863,11 +870,11 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
           // Back Icon
           const CustomBackButton(),
           
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
-                'VIDEO PRACTICE',
-                style: TextStyle(
+                l10n.videoPracticeTitle,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -884,7 +891,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(AppLocalizations l10n) {
     if (_errorMessage == 'PRO subscription required') {
       return Center(
         child: Padding(
@@ -905,9 +912,9 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'PRO Subscription Required',
-                style: TextStyle(
+              Text(
+                l10n.proSubscriptionRequired,
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -915,9 +922,9 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Unlock practice videos with a PRO subscription',
-                style: TextStyle(
+              Text(
+                l10n.languageQuizProOnly,
+                style: const TextStyle(
                   fontSize: 16,
                   color: AppColors.textSecondary,
                 ),
@@ -927,7 +934,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
               ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back),
-                label: const Text('Go Back'),
+                label: Text(l10n.goBack),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -967,7 +974,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
             ElevatedButton.icon(
               onPressed: _loadPracticeVideos,
               icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              label: Text(l10n.retry),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -984,6 +991,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
   }
 
   Widget _buildEmptyState() {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -1014,9 +1022,9 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            const Text(
-              'No Videos Yet',
-              style: TextStyle(
+            Text(
+              l10n.noVideosYet,
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
@@ -1024,7 +1032,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Practice videos will appear here.\nCheck back soon for new content!',
+              l10n.videosComingSoon,
               style: TextStyle(
                 fontSize: 15,
                 color: AppColors.textSecondary,
@@ -1066,6 +1074,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
   }
 
   Widget _buildVideoList() {
+    final l10n = AppLocalizations.of(context);
     return RefreshIndicator(
       onRefresh: _loadPracticeVideos,
       color: AppColors.primary,
@@ -1101,9 +1110,9 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Video Practice',
-                            style: TextStyle(
+                          Text(
+                            l10n.videoPracticeTitle,
+                            style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -1118,7 +1127,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Learn ${_videos.length} lessons at your own pace',
+                            '${l10n.videos} ${_videos.length}',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.white.withOpacity(0.95),
@@ -1138,16 +1147,16 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Overall Progress',
-                          style: TextStyle(
+                        Text(
+                          l10n.overallProgress,
+                          style: const TextStyle(
                             fontSize: 13,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
-                          '${_watchedVideos.values.where((w) => w).length}/${_videos.length} Completed',
+                          '${_watchedVideos.values.where((w) => w).length}/${_videos.length} ${l10n.completed}',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.white.withOpacity(0.95),
@@ -1170,7 +1179,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${_videos.isNotEmpty ? ((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt() : 0}% Complete',
+                      '${_videos.isNotEmpty ? ((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt() : 0}% ${l10n.completed}',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.white.withOpacity(0.9),
@@ -1200,9 +1209,9 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Lesson Playlist',
-                style: TextStyle(
+              Text(
+                l10n.lessonPlaylist,
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -1231,6 +1240,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     bool isWatched,
     bool canWatch,
   ) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -1373,7 +1383,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                                   Icon(Icons.check, size: 12, color: Colors.green.shade700),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'Done',
+                                    l10n.completed,
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
@@ -1413,7 +1423,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                           if (video['level'] != null)
                             _buildInfoChip(
                               icon: FontAwesomeIcons.signal,
-                              text: 'Level ${video['level']}',
+                              text: '${l10n.level} ${video['level']}',
                               color: Colors.purple,
                             ),
                           _buildInfoChip(
@@ -1435,7 +1445,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'Complete previous video to unlock',
+                                l10n.completePreviousVideoToUnlock,
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: Colors.orange.shade700,
@@ -1550,6 +1560,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
   }
 
   void _showLockedDialog() {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1561,17 +1572,17 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
           children: [
             Icon(Icons.lock, color: Colors.red.shade400),
             const SizedBox(width: 12),
-            const Text('Video Locked', style: TextStyle(color: AppColors.textPrimary)),
+            Text(l10n.videoLockedTitle, style: const TextStyle(color: AppColors.textPrimary)),
           ],
         ),
-        content: const Text(
-          'Please watch the previous video first to unlock this one.',
-          style: TextStyle(color: AppColors.textSecondary),
+        content: Text(
+          l10n.completePreviousVideoToUnlock,
+          style: const TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK', style: TextStyle(color: AppColors.primary)),
+            child: Text(l10n.ok, style: const TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -1867,6 +1878,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Widget _buildWatchProgressIndicator() {
+    final l10n = AppLocalizations.of(context);
     final requiredDuration = (widget.video['duration_seconds'] as int?) ?? 0;
     int requiredWatchTime;
     
@@ -1936,10 +1948,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                      Text(
                       isCompleted 
-                          ? 'Congratulations!' 
-                          : 'Keep Watching',
+                          ? l10n.success
+                          : l10n.continueWatching,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1949,8 +1961,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     const SizedBox(height: 2),
                     Text(
                       isCompleted 
-                          ? 'Video completed successfully' 
-                          : '${_formatTime(remainingSeconds)} remaining',
+                          ? l10n.completedVideos 
+                          : '${_formatTime(remainingSeconds)}',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -2162,9 +2174,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 10),
-                                  const Text(
-                                    'About this lesson',
-                                    style: TextStyle(
+                                  Text(
+                                    AppLocalizations.of(context).aboutThisLesson,
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.textPrimary,
@@ -2217,10 +2229,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               ),
                             ),
                             const SizedBox(width: 14),
-                            const Expanded(
+                            Expanded(
                               child: Text(
-                                'Watch the entire video to unlock the next lesson and earn points!',
-                                style: TextStyle(
+                                AppLocalizations.of(context).watchFullVideoToUnlock,
+                                style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textPrimary,
