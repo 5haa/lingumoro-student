@@ -95,7 +95,35 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get forgotPassword => 'نسيت كلمة المرور؟';
   @override
+  String get forgotPasswordTitle => 'نسيت كلمة المرور';
+  @override
+  String get forgotPasswordDescription => 'أدخل عنوان بريدك الإلكتروني وسنرسل لك رمز التحقق لإعادة تعيين كلمة المرور';
+  @override
+  String get pleaseEnterYourEmail => 'الرجاء إدخال بريدك الإلكتروني';
+  @override
+  String get verificationCodeSentToEmail => 'تم إرسال رمز التحقق إلى بريدك الإلكتروني';
+  @override
+  String get failedToSendCode => 'فشل إرسال الرمز';
+  @override
+  String get sendCode => 'إرسال الرمز';
+  @override
   String get resetPassword => 'إعادة تعيين كلمة المرور';
+  @override
+  String get resetPasswordTitle => 'إعادة تعيين كلمة المرور';
+  @override
+  String get resetPasswordDescription => 'أدخل كلمة المرور الجديدة أدناه';
+  @override
+  String get enterNewPasswordBelow => 'أدخل كلمة المرور الجديدة أدناه';
+  @override
+  String get newPassword => 'كلمة المرور الجديدة';
+  @override
+  String get confirmNewPassword => 'تأكيد كلمة المرور الجديدة';
+  @override
+  String get passwordResetSuccessfully => 'تم إعادة تعيين كلمة المرور بنجاح!';
+  @override
+  String get failedToResetPassword => 'فشل إعادة تعيين كلمة المرور';
+  @override
+  String get userNotLoggedIn => 'المستخدم غير مسجل الدخول';
   @override
   String get dontHaveAccount => 'ليس لديك حساب؟';
   @override
@@ -170,6 +198,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get security => 'الأمان';
   @override
   String get changePassword => 'تغيير كلمة المرور';
+  @override
+  String get changePasswordTitle => 'تغيير كلمة المرور';
+  @override
+  String changePasswordDescription(String email) => 'لتغيير كلمة المرور، نحتاج للتحقق من هويتك. سنرسل رمز التحقق إلى $email';
+  @override
+  String get sendVerificationCode => 'إرسال رمز التحقق';
   @override
   String get updatePassword => 'تحديث كلمة المرور';
   @override
@@ -358,8 +392,6 @@ class AppLocalizationsAr extends AppLocalizations {
   // Teachers
   @override
   String get teachersList => 'المعلمون';
-  @override
-  String get noTeachersAvailable => 'لا يوجد معلمون متاحون';
   @override
   String get noTeachersForLanguage => 'لم يتم العثور على معلمين لـ';
   @override
@@ -625,13 +657,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get pleaseTryAgain => 'الرجاء المحاولة مرة أخرى';
   @override
-  String get justNow => 'الآن';
-  @override
-  String get minutesAgo => 'دقيقة مضت';
-  @override
   String get hoursAgo => 'ساعة مضت';
-  @override
-  String get daysAgo => 'يوم مضى';
   
   // AI Voice Practice
   @override
@@ -804,6 +830,28 @@ class AppLocalizationsAr extends AppLocalizations {
   // Profile additional
   @override
   String get activateOnThisDevice => 'تفعيل على هذا الجهاز';
+  @override
+  String get blockedUsers => 'المستخدمون المحظورون';
+  @override
+  String get manageBlockedUsers => 'إدارة المستخدمين المحظورين';
+  @override
+  String get studentPlaceholder => 'طالب';
+  @override
+  String get editProfileButton => 'تعديل الملف الشخصي';
+  @override
+  String get proActiveOnAnotherDevice => 'برو نشط على جهاز آخر';
+  @override
+  String get proSubscriptionActiveMessage => 'اشتراكك المحترف نشط حالياً على جهاز آخر. قم بتفعيله هنا لاستخدام ميزات برو.';
+  @override
+  String get proFeaturesActivated => '✅ تم تفعيل ميزات برو على هذا الجهاز!';
+  @override
+  String get failedToActivate => '❌ فشل التفعيل';
+  @override
+  String get errorActivation => '❌ خطأ';
+  @override
+  String get unknownError => 'خطأ غير معروف';
+  @override
+  String get logoutFailed => 'فشل تسجيل الخروج';
   
   // Classes additional
   @override
@@ -936,5 +984,65 @@ class AppLocalizationsAr extends AppLocalizations {
   String get failedToUnsendMessage => 'فشل إلغاء إرسال الرسالة. يرجى المحاولة مرة أخرى.';
   @override
   String get failedToBlockUserTryAgain => 'فشل حظر المستخدم. يرجى المحاولة مرة أخرى.';
+  
+  // Chat list screen
+  @override
+  String get messagesTitle => 'الرسائل';
+  @override
+  String get showConversations => 'عرض المحادثات';
+  @override
+  String get startNewChat => 'بدء محادثة جديدة';
+  @override
+  String get requestAccepted => 'تم قبول الطلب!';
+  @override
+  String get failedToAcceptRequest => 'فشل قبول الطلب';
+  @override
+  String get requestRejected => 'تم رفض الطلب';
+  @override
+  String get failedToRejectRequest => 'فشل رفض الطلب';
+  @override
+  String get justNow => 'الآن';
+  @override
+  String minutesAgo(int minutes) => 'منذ ${minutes} د';
+  @override
+  String get oneDayAgo => 'منذ يوم';
+  @override
+  String daysAgo(int days) => 'منذ ${days} أيام';
+  @override
+  String get noResultsFound => 'لا توجد نتائج';
+  @override
+  String get noMessagesYet => 'لا توجد رسائل بعد';
+  @override
+  String get tryDifferentKeywords => 'جرب البحث بكلمات مفتاحية مختلفة';
+  @override
+  String get startConversationWithTeachers => 'ابدأ محادثة مع معلميك';
+  @override
+  String get chatRequestTitle => 'طلب محادثة';
+  @override
+  String get noMessageProvided => 'لم يتم تقديم رسالة';
+  @override
+  String get sentChatRequest => 'أرسل طلب محادثة';
+  @override
+  String get deleteChat => 'حذف المحادثة';
+  @override
+  String get deleteChatQuestion => 'حذف المحادثة؟';
+  @override
+  String deleteChatConfirmation(String name) => 'هل أنت متأكد من حذف هذه المحادثة مع $name؟ لا يمكن التراجع عن هذا الإجراء.';
+  @override
+  String get noTeachersAvailable => 'لا يوجد معلمون متاحون';
+  @override
+  String get subscribeToChatWithTeachers => 'اشترك في دورة للدردشة مع المعلمين';
+  @override
+  String get imageAttachment => '🖼️ صورة';
+  @override
+  String get voiceMessage => '🎤 رسالة صوتية';
+  @override
+  String get fileAttachment => '📎 ملف';
+  @override
+  String get attachmentGeneric => '📎 مرفق';
+  @override
+  String get startChatting => 'ابدأ المحادثة...';
+  @override
+  String get user => 'مستخدم';
 }
 

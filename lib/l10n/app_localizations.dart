@@ -70,7 +70,21 @@ abstract class AppLocalizations {
   String get confirmPassword;
   String get fullName;
   String get forgotPassword;
+  String get forgotPasswordTitle;
+  String get forgotPasswordDescription;
+  String get pleaseEnterYourEmail;
+  String get verificationCodeSentToEmail;
+  String get failedToSendCode;
+  String get sendCode;
   String get resetPassword;
+  String get resetPasswordTitle;
+  String get resetPasswordDescription;
+  String get enterNewPasswordBelow;
+  String get newPassword;
+  String get confirmNewPassword;
+  String get passwordResetSuccessfully;
+  String get failedToResetPassword;
+  String get userNotLoggedIn;
   String get dontHaveAccount;
   String get alreadyHaveAccount;
   String get enterEmail;
@@ -110,6 +124,9 @@ abstract class AppLocalizations {
   String get personalInformation;
   String get security;
   String get changePassword;
+  String get changePasswordTitle;
+  String changePasswordDescription(String email);
+  String get sendVerificationCode;
   String get updatePassword;
   String get currentLevel;
   String get proMember;
@@ -209,7 +226,6 @@ abstract class AppLocalizations {
   
   // Teachers
   String get teachersList;
-  String get noTeachersAvailable;
   String get noTeachersForLanguage;
   String get selectPackage;
   String get selectDayTime;
@@ -354,10 +370,7 @@ abstract class AppLocalizations {
   String get correctAnswer;
   String get failedToGenerateQuiz;
   String get pleaseTryAgain;
-  String get justNow;
-  String get minutesAgo;
   String get hoursAgo;
-  String get daysAgo;
   
   // AI Voice Practice
   String get aiVoicePractice;
@@ -451,6 +464,17 @@ abstract class AppLocalizations {
   
   // Profile additional
   String get activateOnThisDevice;
+  String get blockedUsers;
+  String get manageBlockedUsers;
+  String get studentPlaceholder;
+  String get editProfileButton;
+  String get proActiveOnAnotherDevice;
+  String get proSubscriptionActiveMessage;
+  String get proFeaturesActivated;
+  String get failedToActivate;
+  String get errorActivation;
+  String get unknownError;
+  String get logoutFailed;
   
   // Classes additional
   String get errorLoadingSessions;
@@ -523,6 +547,37 @@ abstract class AppLocalizations {
   // Chat errors
   String get failedToUnsendMessage;
   String get failedToBlockUserTryAgain;
+  
+  // Chat list screen
+  String get messagesTitle;
+  String get showConversations;
+  String get startNewChat;
+  String get requestAccepted;
+  String get failedToAcceptRequest;
+  String get requestRejected;
+  String get failedToRejectRequest;
+  String get justNow;
+  String minutesAgo(int minutes);
+  String get oneDayAgo;
+  String daysAgo(int days);
+  String get noResultsFound;
+  String get noMessagesYet;
+  String get tryDifferentKeywords;
+  String get startConversationWithTeachers;
+  String get chatRequestTitle;
+  String get noMessageProvided;
+  String get sentChatRequest;
+  String get deleteChat;
+  String get deleteChatQuestion;
+  String deleteChatConfirmation(String name);
+  String get noTeachersAvailable;
+  String get subscribeToChatWithTeachers;
+  String get imageAttachment;
+  String get voiceMessage;
+  String get fileAttachment;
+  String get attachmentGeneric;
+  String get startChatting;
+  String get user;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

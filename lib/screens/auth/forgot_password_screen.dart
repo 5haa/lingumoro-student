@@ -4,6 +4,7 @@ import 'package:student/services/auth_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_text_field.dart';
 import 'package:student/widgets/custom_back_button.dart';
+import 'package:student/l10n/app_localizations.dart';
 import 'otp_verification_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -25,10 +26,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
   
   Future<void> _handleSendCode() async {
+    final l10n = AppLocalizations.of(context);
     if (_emailController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email'),
+        SnackBar(
+          content: Text(l10n.pleaseEnterYourEmail),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -42,9 +44,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       await _authService.resetPassword(_emailController.text.trim());
       
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification code sent to your email'),
+          SnackBar(
+            content: Text(l10n.verificationCodeSentToEmail),
             backgroundColor: Colors.green,
           ),
         );
@@ -64,9 +67,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send code: ${e.toString()}'),
+            content: Text('${l10n.failedToSendCode}: ${e.toString()}'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -80,6 +84,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -101,9 +106,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 child: Column(
                   children: [
                     // Title
-                    const Text(
-                      'FORGOT PASSWORD',
-                      style: TextStyle(
+                    Text(
+                      l10n.forgotPasswordTitle,
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -114,10 +119,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const SizedBox(height: 40),
                     
                     // Description
-                    const Text(
-                      'Enter your email address and we will send you a verification code to reset your password',
+                    Text(
+                      l10n.forgotPasswordDescription,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
                         color: AppColors.textSecondary,
                         height: 1.5,
@@ -129,7 +134,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     // Email field
                     CustomTextField(
                       controller: _emailController,
-                      hintText: 'Email',
+                      hintText: l10n.email,
                       keyboardType: TextInputType.emailAddress,
                     ),
                     
@@ -137,7 +142,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     
                     // Send Code button
                     CustomButton(
-                      text: 'SEND CODE',
+                      text: l10n.sendCode,
                       onPressed: _handleSendCode,
                       isLoading: _isLoading,
                     ),

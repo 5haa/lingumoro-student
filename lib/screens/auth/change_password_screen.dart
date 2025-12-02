@@ -3,6 +3,7 @@ import 'package:student/config/app_colors.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_back_button.dart';
+import 'package:student/l10n/app_localizations.dart';
 import 'otp_verification_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -19,10 +20,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Future<void> _handleRequestOTP() async {
     final userEmail = _authService.currentUser?.email;
     
+    final l10n = AppLocalizations.of(context);
     if (userEmail == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('User not logged in'),
+        SnackBar(
+          content: Text(l10n.userNotLoggedIn),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -36,9 +38,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       await _authService.requestChangePasswordOTP();
       
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification code sent to your email'),
+          SnackBar(
+            content: Text(l10n.verificationCodeSentToEmail),
             backgroundColor: Colors.green,
           ),
         );
@@ -58,9 +61,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send code: ${e.toString()}'),
+            content: Text('${l10n.failedToSendCode}: ${e.toString()}'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -74,7 +78,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   
   @override
   Widget build(BuildContext context) {
-    final userEmail = _authService.currentUser?.email ?? 'your email';
+    final l10n = AppLocalizations.of(context);
+    final userEmail = _authService.currentUser?.email ?? l10n.email;
     
     return Scaffold(
       body: SafeArea(
@@ -97,9 +102,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 child: Column(
                   children: [
                     // Title
-                    const Text(
-                      'CHANGE PASSWORD',
-                      style: TextStyle(
+                    Text(
+                      l10n.changePasswordTitle,
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -128,7 +133,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     
                     // Description
                     Text(
-                      'To change your password, we need to verify your identity. We will send a verification code to $userEmail',
+                      l10n.changePasswordDescription(userEmail),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 15,
@@ -141,7 +146,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     
                     // Send Code button
                     CustomButton(
-                      text: 'SEND VERIFICATION CODE',
+                      text: l10n.sendVerificationCode,
                       onPressed: _handleRequestOTP,
                       isLoading: _isLoading,
                     ),

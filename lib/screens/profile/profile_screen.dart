@@ -305,8 +305,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                           const SizedBox(height: 12),
                           _buildActionCard(
                             icon: FontAwesomeIcons.userSlash,
-                            title: 'Blocked Users',
-                            subtitle: 'Manage your blocked users',
+                            title: AppLocalizations.of(context).blockedUsers,
+                            subtitle: AppLocalizations.of(context).manageBlockedUsers,
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -336,7 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
   }
 
   Widget _buildProfileHeader(BuildContext context) {
-    final fullName = _profile?['full_name'] ?? 'Student';
+    final fullName = _profile?['full_name'] ?? AppLocalizations.of(context).studentPlaceholder;
     final initials = fullName.isNotEmpty
         ? fullName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
         : 'ST';
@@ -509,18 +509,18 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                       gradient: AppColors.redGradient,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        FaIcon(
+                        const FaIcon(
                           FontAwesomeIcons.penToSquare,
                           size: 12,
                           color: Colors.white,
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
-                          'Edit Profile',
-                          style: TextStyle(
+                          AppLocalizations.of(context).editProfileButton,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -755,7 +755,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                             ? '${l10n.expiresPro}: $expiryText'
                             : l10n.unlimitedFeatures)
                         : activeOnOtherDevice
-                          ? 'Pro active on another device'
+                          ? l10n.proActiveOnAnotherDevice
                           : l10n.limitedFeatures,
                       style: TextStyle(
                         color: (isPro && hasValidSession) 
@@ -804,8 +804,8 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Your PRO subscription is currently active on another device. Activate it here to use PRO features.',
-                      style: TextStyle(
+                      AppLocalizations.of(context).proSubscriptionActiveMessage,
+                      style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 11,
                       ),
@@ -1066,7 +1066,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('${l10n.logoutConfirm} failed: $e'),
+                        content: Text('${l10n.logoutFailed}: $e'),
                         backgroundColor: AppColors.primary,
                       ),
                     );
@@ -1144,10 +1144,10 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ PRO features activated on this device!'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context).proFeaturesActivated),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
+              duration: const Duration(seconds: 2),
             ),
           );
         }
@@ -1155,7 +1155,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('❌ Failed to activate: ${result['error'] ?? 'Unknown error'}'),
+              content: Text('${AppLocalizations.of(context).failedToActivate}: ${result['error'] ?? AppLocalizations.of(context).unknownError}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -1168,7 +1168,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Error: $e'),
+            content: Text('${AppLocalizations.of(context).errorActivation}: $e'),
             backgroundColor: Colors.red,
           ),
         );

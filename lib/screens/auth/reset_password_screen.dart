@@ -4,6 +4,7 @@ import 'package:student/services/auth_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_text_field.dart';
 import 'package:student/widgets/custom_back_button.dart';
+import 'package:student/l10n/app_localizations.dart';
 import 'auth_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -27,10 +28,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
   
   Future<void> _handleResetPassword() async {
+    final l10n = AppLocalizations.of(context);
     if (_passwordController.text.isEmpty || _confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all fields'),
+        SnackBar(
+          content: Text(l10n.fillAllFields),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -39,8 +41,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     
     if (_passwordController.text.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password must be at least 6 characters'),
+        SnackBar(
+          content: Text(l10n.passwordTooShort),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -49,8 +51,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Passwords do not match'),
+        SnackBar(
+          content: Text(l10n.passwordMismatch),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -63,9 +65,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       await _authService.updatePassword(_passwordController.text);
       
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password reset successfully!'),
+          SnackBar(
+            content: Text(l10n.passwordResetSuccessfully),
             backgroundColor: Colors.green,
           ),
         );
@@ -86,9 +89,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to reset password: ${e.toString()}'),
+            content: Text('${l10n.failedToResetPassword}: ${e.toString()}'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -102,6 +106,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -123,9 +128,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 child: Column(
                   children: [
                     // Title
-                    const Text(
-                      'RESET PASSWORD',
-                      style: TextStyle(
+                    Text(
+                      l10n.resetPasswordTitle,
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -136,10 +141,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     const SizedBox(height: 40),
                     
                     // Description
-                    const Text(
-                      'Enter your new password below',
+                    Text(
+                      l10n.enterNewPasswordBelow,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
                         color: AppColors.textSecondary,
                         height: 1.5,
@@ -151,7 +156,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     // New Password field
                     CustomTextField(
                       controller: _passwordController,
-                      hintText: 'New Password',
+                      hintText: l10n.newPassword,
                       obscureText: true,
                     ),
                     
@@ -160,7 +165,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     // Confirm Password field
                     CustomTextField(
                       controller: _confirmPasswordController,
-                      hintText: 'Confirm New Password',
+                      hintText: l10n.confirmNewPassword,
                       obscureText: true,
                     ),
                     
@@ -168,7 +173,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     
                     // Reset Password button
                     CustomButton(
-                      text: 'RESET PASSWORD',
+                      text: l10n.resetPasswordTitle,
                       onPressed: _handleResetPassword,
                       isLoading: _isLoading,
                     ),

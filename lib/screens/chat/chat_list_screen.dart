@@ -354,8 +354,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     if (mounted) {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Request accepted!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).requestAccepted),
             backgroundColor: Colors.green,
           ),
         );
@@ -381,8 +381,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to accept request'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).failedToAcceptRequest),
             backgroundColor: Colors.red,
           ),
         );
@@ -396,8 +396,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     if (mounted) {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Request rejected'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).requestRejected),
             backgroundColor: Colors.orange,
           ),
         );
@@ -405,8 +405,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
         _loadData(forceRefresh: true); // Refresh the list
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to reject request'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).failedToRejectRequest),
             backgroundColor: Colors.red,
           ),
         );
@@ -423,15 +423,15 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
       final difference = now.difference(date);
 
       if (difference.inMinutes < 1) {
-        return 'just now';
+        return AppLocalizations.of(context).justNow;
       } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m ago';
+        return AppLocalizations.of(context).minutesAgo(difference.inMinutes);
       } else if (difference.inDays == 0) {
         return DateFormat.jm().format(date);
       } else if (difference.inDays == 1) {
-        return '1d ago';
+        return AppLocalizations.of(context).oneDayAgo;
       } else if (difference.inDays < 7) {
-        return '${difference.inDays}d ago';
+        return AppLocalizations.of(context).daysAgo(difference.inDays);
       } else {
         return DateFormat.MMMd().format(date);
       }
@@ -482,7 +482,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
       }
       
       return {
-        'name': (otherParty?['full_name'] ?? 'User').split(' ')[0], // First name only
+        'name': (otherParty?['full_name'] ?? AppLocalizations.of(context).user).split(' ')[0], // First name only
         'image': otherParty?['avatar_url'] ?? '',
       };
     }).toList();
@@ -527,11 +527,11 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                       },
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'MESSAGES',
-                        style: TextStyle(
+                        AppLocalizations.of(context).messagesTitle,
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -566,7 +566,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                           _showAvailable = !_showAvailable;
                         });
                       },
-                      tooltip: _showAvailable ? 'Show Conversations' : 'Start New Chat',
+                      tooltip: _showAvailable ? AppLocalizations.of(context).showConversations : AppLocalizations.of(context).startNewChat,
                     ),
                   ),
                 ],
@@ -760,7 +760,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
               ),
               const SizedBox(height: 20),
               Text(
-                _searchController.text.isNotEmpty ? 'No results found' : 'No messages yet',
+                _searchController.text.isNotEmpty ? AppLocalizations.of(context).noResultsFound : AppLocalizations.of(context).noMessagesYet,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -770,8 +770,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
               const SizedBox(height: 8),
               Text(
                 _searchController.text.isNotEmpty 
-                    ? 'Try searching with different keywords'
-                    : 'Start a conversation with your teachers',
+                    ? AppLocalizations.of(context).tryDifferentKeywords
+                    : AppLocalizations.of(context).startConversationWithTeachers,
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary.withOpacity(0.5),
@@ -787,7 +787,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                     });
                   },
                   icon: const FaIcon(FontAwesomeIcons.plus, size: 14),
-                  label: const Text('Start New Chat'),
+                  label: Text(AppLocalizations.of(context).startNewChat),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
@@ -846,7 +846,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     if (requester == null) return const SizedBox.shrink();
     
     final requesterId = requester['id'] as String;
-    final requesterName = requester['full_name'] ?? 'Student';
+    final requesterName = requester['full_name'] ?? AppLocalizations.of(context).studentPlaceholder;
     final requesterAvatar = requester['avatar_url'];
     final requestId = request['id'] as String;
     final message = request['message'] as String?;
@@ -907,8 +907,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                         ),
                       ),
                       Text(
-                        'Chat Request',
-                        style: TextStyle(
+                        AppLocalizations.of(context).chatRequestTitle,
+                        style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                         ),
@@ -927,9 +927,9 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                       height: 1.5,
                     ),
                   )
-                : const Text(
-                    'No message provided',
-                    style: TextStyle(
+                : Text(
+                    AppLocalizations.of(context).noMessageProvided,
+                    style: const TextStyle(
                       fontSize: 15,
                       color: AppColors.textSecondary,
                       fontStyle: FontStyle.italic,
@@ -938,9 +938,9 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Close',
-                  style: TextStyle(
+                child: Text(
+                  AppLocalizations.of(context).close,
+                  style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1033,7 +1033,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                   Text(
                     message != null && message.isNotEmpty
                         ? message
-                        : 'Sent a chat request',
+                        : AppLocalizations.of(context).sentChatRequest,
                     style: const TextStyle(
                       fontSize: 14,
                       color: Color(0xFF999999),
@@ -1131,9 +1131,9 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                 color: Colors.red,
                 size: 20,
               ),
-              title: const Text(
-                'Delete Chat',
-                style: TextStyle(
+              title: Text(
+                AppLocalizations.of(context).deleteChat,
+                style: const TextStyle(
                   fontSize: 16,
                   color: Colors.red,
                   fontWeight: FontWeight.w500,
@@ -1161,16 +1161,16 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
         backgroundColor: AppColors.white,
         contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
         actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        title: const Text(
-          'Delete Chat?',
-          style: TextStyle(
+        title: Text(
+          AppLocalizations.of(context).deleteChatQuestion,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
         ),
         content: Text(
-          'Are you sure you want to delete this chat with $recipientName? This action cannot be undone.',
+          AppLocalizations.of(context).deleteChatConfirmation(recipientName),
           style: const TextStyle(
             fontSize: 15,
             color: AppColors.textSecondary,
@@ -1186,9 +1186,9 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
+            child: Text(
+              AppLocalizations.of(context).cancel,
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
@@ -1206,9 +1206,9 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: const Text(
-              'Delete',
-              style: TextStyle(
+            child: Text(
+              AppLocalizations.of(context).delete,
+              style: const TextStyle(
                 color: Colors.red,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -1238,8 +1238,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chat deleted successfully'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).chatDeletedSuccessfully),
             backgroundColor: Colors.green,
           ),
         );
@@ -1248,8 +1248,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
       print('Error deleting chat: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to delete chat. Please try again.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).failedToDeleteChat),
             backgroundColor: Colors.red,
           ),
         );
@@ -1294,7 +1294,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     final unreadCount = conversation['student_unread_count'] ?? 0;
     final lastMessage = conversation['last_message'] ?? '';
     final lastMessageAt = conversation['last_message_at'];
-    final name = otherParty['full_name'] ?? 'User';
+    final name = otherParty['full_name'] ?? AppLocalizations.of(context).user;
     final avatarUrl = otherParty['avatar_url'];
 
     final userKey = '$otherPartyId-$otherPartyType';
@@ -1502,7 +1502,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
               ),
               const SizedBox(height: 20),
               Text(
-                'No teachers available',
+                AppLocalizations.of(context).noTeachersAvailable,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -1511,7 +1511,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
               ),
               const SizedBox(height: 8),
               Text(
-                'Subscribe to a course to chat with teachers',
+                AppLocalizations.of(context).subscribeToChatWithTeachers,
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary.withOpacity(0.5),
@@ -1534,7 +1534,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
         final unreadCount = teacher['unread_count'] ?? 0;
         final userKey = '${teacher['id']}-teacher';
         final isOnline = _onlineStatus[userKey] ?? false;
-        final name = teacher['full_name'] ?? 'Teacher';
+        final name = teacher['full_name'] ?? AppLocalizations.of(context).teacherNamePlaceholder;
         final avatarUrl = teacher['avatar_url'];
 
         return GestureDetector(
@@ -1562,8 +1562,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
               _loadData(forceRefresh: true);
             } else if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Unable to start chat. Please try again.'),
+                SnackBar(
+                  content: Text(AppLocalizations.of(context).unableToStartChat),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -1650,7 +1650,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        teacher['bio'] ?? teacher['email'] ?? 'Teacher',
+                        teacher['bio'] ?? teacher['email'] ?? AppLocalizations.of(context).teacherNamePlaceholder,
                         style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF999999),
@@ -1713,13 +1713,13 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     if (hasAttachment && lastMessage.isEmpty) {
       switch (attachmentType) {
         case 'image':
-          return '🖼️ Image';
+          return AppLocalizations.of(context).imageAttachment;
         case 'voice':
-          return '🎤 Voice message';
+          return AppLocalizations.of(context).voiceMessage;
         case 'file':
-          return '📎 File';
+          return AppLocalizations.of(context).fileAttachment;
         default:
-          return '📎 Attachment';
+          return AppLocalizations.of(context).attachmentGeneric;
       }
     }
     
@@ -1729,7 +1729,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     }
     
     // No message and no attachment
-    return 'Start chatting...';
+    return AppLocalizations.of(context).startChatting;
   }
   
   bool _isImageType(String? fileType) {

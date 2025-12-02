@@ -95,7 +95,35 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get forgotPassword => '¿Olvidaste tu contraseña?';
   @override
+  String get forgotPasswordTitle => 'OLVIDÉ MI CONTRASEÑA';
+  @override
+  String get forgotPasswordDescription => 'Ingresa tu dirección de correo electrónico y te enviaremos un código de verificación para restablecer tu contraseña';
+  @override
+  String get pleaseEnterYourEmail => 'Por favor ingresa tu correo electrónico';
+  @override
+  String get verificationCodeSentToEmail => 'Código de verificación enviado a tu correo electrónico';
+  @override
+  String get failedToSendCode => 'Error al enviar código';
+  @override
+  String get sendCode => 'ENVIAR CÓDIGO';
+  @override
   String get resetPassword => 'Restablecer Contraseña';
+  @override
+  String get resetPasswordTitle => 'RESTABLECER CONTRASEÑA';
+  @override
+  String get resetPasswordDescription => 'Ingresa tu nueva contraseña a continuación';
+  @override
+  String get enterNewPasswordBelow => 'Ingresa tu nueva contraseña a continuación';
+  @override
+  String get newPassword => 'Nueva Contraseña';
+  @override
+  String get confirmNewPassword => 'Confirmar Nueva Contraseña';
+  @override
+  String get passwordResetSuccessfully => '¡Contraseña restablecida exitosamente!';
+  @override
+  String get failedToResetPassword => 'Error al restablecer contraseña';
+  @override
+  String get userNotLoggedIn => 'Usuario no ha iniciado sesión';
   @override
   String get dontHaveAccount => '¿No tienes una cuenta?';
   @override
@@ -170,6 +198,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get security => 'Seguridad';
   @override
   String get changePassword => 'Cambiar Contraseña';
+  @override
+  String get changePasswordTitle => 'CAMBIAR CONTRASEÑA';
+  @override
+  String changePasswordDescription(String email) => 'Para cambiar tu contraseña, necesitamos verificar tu identidad. Enviaremos un código de verificación a $email';
+  @override
+  String get sendVerificationCode => 'ENVIAR CÓDIGO DE VERIFICACIÓN';
   @override
   String get updatePassword => 'Actualiza tu contraseña';
   @override
@@ -358,8 +392,6 @@ class AppLocalizationsEs extends AppLocalizations {
   // Teachers
   @override
   String get teachersList => 'PROFESORES';
-  @override
-  String get noTeachersAvailable => 'No Hay Profesores Disponibles';
   @override
   String get noTeachersForLanguage => 'No se encontraron profesores para';
   @override
@@ -625,13 +657,7 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get pleaseTryAgain => 'Por favor intenta de nuevo';
   @override
-  String get justNow => 'Ahora mismo';
-  @override
-  String get minutesAgo => 'hace m';
-  @override
   String get hoursAgo => 'hace h';
-  @override
-  String get daysAgo => 'hace d';
   
   // AI Voice Practice
   @override
@@ -804,6 +830,28 @@ class AppLocalizationsEs extends AppLocalizations {
   // Profile additional
   @override
   String get activateOnThisDevice => 'Activar en este dispositivo';
+  @override
+  String get blockedUsers => 'Usuarios Bloqueados';
+  @override
+  String get manageBlockedUsers => 'Administra tus usuarios bloqueados';
+  @override
+  String get studentPlaceholder => 'Estudiante';
+  @override
+  String get editProfileButton => 'Editar Perfil';
+  @override
+  String get proActiveOnAnotherDevice => 'Pro activo en otro dispositivo';
+  @override
+  String get proSubscriptionActiveMessage => 'Tu suscripción PRO está actualmente activa en otro dispositivo. Actívala aquí para usar las funciones PRO.';
+  @override
+  String get proFeaturesActivated => '✅ ¡Funciones PRO activadas en este dispositivo!';
+  @override
+  String get failedToActivate => '❌ Error al activar';
+  @override
+  String get errorActivation => '❌ Error';
+  @override
+  String get unknownError => 'Error desconocido';
+  @override
+  String get logoutFailed => 'Error al cerrar sesión';
   
   // Classes additional
   @override
@@ -936,5 +984,65 @@ class AppLocalizationsEs extends AppLocalizations {
   String get failedToUnsendMessage => 'Error al cancelar el envío del mensaje. Por favor intenta de nuevo.';
   @override
   String get failedToBlockUserTryAgain => 'Error al bloquear usuario. Por favor intenta de nuevo.';
+  
+  // Chat list screen
+  @override
+  String get messagesTitle => 'MENSAJES';
+  @override
+  String get showConversations => 'Mostrar Conversaciones';
+  @override
+  String get startNewChat => 'Iniciar Nuevo Chat';
+  @override
+  String get requestAccepted => '¡Solicitud aceptada!';
+  @override
+  String get failedToAcceptRequest => 'Error al aceptar solicitud';
+  @override
+  String get requestRejected => 'Solicitud rechazada';
+  @override
+  String get failedToRejectRequest => 'Error al rechazar solicitud';
+  @override
+  String get justNow => 'ahora';
+  @override
+  String minutesAgo(int minutes) => 'hace ${minutes}m';
+  @override
+  String get oneDayAgo => 'hace 1d';
+  @override
+  String daysAgo(int days) => 'hace ${days}d';
+  @override
+  String get noResultsFound => 'No se encontraron resultados';
+  @override
+  String get noMessagesYet => 'No hay mensajes aún';
+  @override
+  String get tryDifferentKeywords => 'Intenta buscar con diferentes palabras clave';
+  @override
+  String get startConversationWithTeachers => 'Inicia una conversación con tus profesores';
+  @override
+  String get chatRequestTitle => 'Solicitud de Chat';
+  @override
+  String get noMessageProvided => 'No se proporcionó mensaje';
+  @override
+  String get sentChatRequest => 'Envió una solicitud de chat';
+  @override
+  String get deleteChat => 'Eliminar Chat';
+  @override
+  String get deleteChatQuestion => '¿Eliminar Chat?';
+  @override
+  String deleteChatConfirmation(String name) => '¿Estás seguro de que quieres eliminar este chat con $name? Esta acción no se puede deshacer.';
+  @override
+  String get noTeachersAvailable => 'No hay profesores disponibles';
+  @override
+  String get subscribeToChatWithTeachers => 'Suscríbete a un curso para chatear con profesores';
+  @override
+  String get imageAttachment => '🖼️ Imagen';
+  @override
+  String get voiceMessage => '🎤 Mensaje de voz';
+  @override
+  String get fileAttachment => '📎 Archivo';
+  @override
+  String get attachmentGeneric => '📎 Adjunto';
+  @override
+  String get startChatting => 'Comienza a chatear...';
+  @override
+  String get user => 'Usuario';
 }
 
