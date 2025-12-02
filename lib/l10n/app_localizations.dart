@@ -264,6 +264,13 @@ abstract class AppLocalizations {
   String get friday;
   String get saturday;
   String get sunday;
+  String get mon;
+  String get tue;
+  String get wed;
+  String get thu;
+  String get fri;
+  String get sat;
+  String get sun;
   
   // Months
   String get january;
@@ -313,6 +320,209 @@ abstract class AppLocalizations {
   String get pleaseSelectProvince;
   String get fillAllFields;
   String get confirmAccount;
+  
+  // Quiz Practice
+  String get languageQuiz;
+  String get yourStatistics;
+  String get quizzes;
+  String get points;
+  String get recentQuizzes;
+  String get proSubscriptionRequired;
+  String get languageQuizProOnly;
+  String get goBack;
+  String get levelElementary;
+  String get levelPreIntermediate;
+  String get levelUpperIntermediate;
+  String get startNewQuiz;
+  String get questionNumber;
+  String get exitQuiz;
+  String get exitQuizMessage;
+  String get exit;
+  String get quizComplete;
+  String get score;
+  String get reviewAnswers;
+  String get back;
+  String get retryQuiz;
+  String get totalQuestions;
+  String get timePerQuestion;
+  String get pointsAvailable;
+  String get quizInstructions;
+  String get startQuiz;
+  String get correct;
+  String get yourAnswer;
+  String get noAnswerTimeout;
+  String get correctAnswer;
+  String get failedToGenerateQuiz;
+  String get pleaseTryAgain;
+  String get justNow;
+  String get minutesAgo;
+  String get hoursAgo;
+  String get daysAgo;
+  
+  // AI Voice Practice
+  String get aiVoicePractice;
+  String get voiceSettings;
+  String get voice;
+  String get speed;
+  String get start;
+  String get stop;
+  String get sessionNumber;
+  String get timesUp;
+  String get sessionEndedMessage;
+  String get gotIt;
+  String get greatJob;
+  String get practicedForMinutes;
+  String get sessionsRemaining;
+  String get awesome;
+  String get sessionLimitReached;
+  String get notConnected;
+  String get preparingVoiceSession;
+  String get listening;
+  String get pleaseLoginToUseAI;
+  String get microphonePermissionRequired;
+  String get failedToStartSession;
+  String get connectionError;
+  String get recorderPermissionDenied;
+  String get failedToStart;
+  String get proFeaturesActiveOnAnotherDevice;
+  String get activateInProfile;
+  
+  // Reading
+  String get readings;
+  String get yourProgress;
+  String get completed;
+  String get allReadings;
+  String get completePreviousToUnlock;
+  String get noReadingsAvailable;
+  String get checkBackLater;
+  String get completePreviousReading;
+  String get errorLoadingReadings;
+  String get errorLoadingQuestions;
+  String get readingProgress;
+  String get completedReadings;
+  String get totalReadings;
+  String get percentComplete;
+  
+  // OTP Verification
+  String get verificationCode;
+  String get otpSentToEmail;
+  String get otpSentToEmailPasswordReset;
+  String get confirm;
+  String get resend;
+  String get resendWithTimer;
+  String get codeResentSuccessfully;
+  String get failedToResendCode;
+  String get enterCompleteCode;
+  String get verificationFailed;
+  
+  // Chat
+  String get today;
+  String get yesterday;
+  String get blockUser;
+  String get tapToRetry;
+  String get failedToLoadImage;
+  String get couldNotPlayAudio;
+  String get downloading;
+  String get downloadedTo;
+  String get downloadFailed;
+  String get failedToSendMessage;
+  String get errorSendingMessage;
+  String get failedToCaptureImage;
+  String get failedToPickImage;
+  String get failedToStartRecording;
+  String get checkMicrophonePermissions;
+  String get failedToSendVoiceMessage;
+  String get errorSendingVoiceMessage;
+  
+  // Common additional
+  String get level;
+  String get pts;
+  String get session;
+  String get sessions;
+  String get minute;
+  String get minutesPlural;
+  String get loginRequired;
+  
+  // Chat additional
+  String get chatDeletedSuccessfully;
+  String get failedToDeleteChat;
+  String get messageUnsent;
+  String get downloadedToUnableToOpen;
+  
+  // Profile additional
+  String get activateOnThisDevice;
+  
+  // Classes additional
+  String get errorLoadingSessions;
+  String get errorJoiningSession;
+  String get teacherInformationNotAvailable;
+  String get unableToStartChat;
+  String get errorOpeningChat;
+  String get unableToLoadTeacherDetails;
+  String get myClasses;
+  String get noUpcomingClasses;
+  String get noFinishedClasses;
+  String get subscribeToSeeClasses;
+  String get pullDownToRefresh;
+  String get makeupClass;
+  String get cancelled;
+  String get extraClass;
+  String get liveNow;
+  String get languageClass;
+  String get teacherNamePlaceholder;
+  String get yourTime;
+  String get classDuration;
+  String get join;
+  String get waitingForMeetingLink;
+  String get waitingForTeacherToStart;
+  String get startsIn;
+  String get classWasCancelled;
+  String get tapToViewTeacherAndRate;
+  String get min;
+  
+  // Quiz additional
+  String get questionCounter;
+  String get accuracyPercentage;
+  String get correctCheck;
+  String get answerEachQuestionWithinSeconds;
+  String get questionsAutoAdvance;
+  String get yourProgressWillBeLost;
+  String get sec;
+  String get ten;
+  String get fifteenSec;
+  String get loginRequiredQuizPractice;
+  
+  // Profile/Edit Profile
+  String get editProfileTitle;
+  String get photoAddedSuccessfully;
+  String get failedToUploadPhoto;
+  String get mainPhotoUpdated;
+  String get failedToSetMainPhoto;
+  String get photoDeleted;
+  String get failedToDeletePhoto;
+  String get profileUpdatedSuccessfully;
+  String get failedToUpdateProfile;
+  String get pleaseEnterYourName;
+  String get tellUsAboutYourself;
+  
+  // Blocked Users
+  String get blockedUsersTitle;
+  String get unblockUser;
+  String get unblockUserConfirm;
+  String get unblockUserMessage;
+  String get noBlockedUsers;
+  String get noBlockedUsersMessage;
+  String get failedToLoadBlockedUsers;
+  String get userHasBeenUnblocked;
+  String get failedToUnblockUser;
+  
+  // Search/Input hints
+  String get searchMessages;
+  String get messageHint;
+  
+  // Chat errors
+  String get failedToUnsendMessage;
+  String get failedToBlockUserTryAgain;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

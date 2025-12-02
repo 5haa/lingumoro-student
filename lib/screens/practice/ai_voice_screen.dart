@@ -20,6 +20,7 @@ import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as kStatus;
+import '../../l10n/app_localizations.dart';
 
 enum AppStatus {
   disconnected,
@@ -146,10 +147,10 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Pro features are active on another device. Activate in Profile to use.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).proFeaturesActiveOnAnotherDevice),
             backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -242,9 +243,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               const SizedBox(height: 24),
               
               // Title
-              const Text(
-                'Time\'s Up!',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context).timesUp,
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -255,7 +256,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               
               // Message
               Text(
-                'Your $_maxSessionDurationMinutes-minute session has ended. Great job practicing!',
+                AppLocalizations.of(context).sessionEndedMessage.replaceAll('{minutes}', _maxSessionDurationMinutes.toString()),
                 style: const TextStyle(
                   color: Colors.black54,
                   fontSize: 15,
@@ -279,9 +280,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  child: const Text(
-                    'Got it',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  child: Text(
+                    AppLocalizations.of(context).gotIt,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -330,18 +331,18 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Voice Settings",
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context).voiceSettings,
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    "Voice",
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context).voice,
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
@@ -387,9 +388,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        "Speed",
-                        style: TextStyle(
+                      Text(
+                        AppLocalizations.of(context).speed,
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
@@ -494,7 +495,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
     setState(() {
       _status = AppStatus.disconnected;
-      _statusMessage = "Not connected";
+      _statusMessage = AppLocalizations.of(context).notConnected;
     });
   }
 
@@ -527,9 +528,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               const SizedBox(height: 24),
               
               // Title
-              const Text(
-                'Great Job!',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context).greatJob,
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -540,7 +541,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               
               // Message
               Text(
-                'You practiced for $minutes minute${minutes != 1 ? 's' : ''}!',
+                AppLocalizations.of(context).practicedForMinutes.replaceAll('{minutes}', minutes.toString()).replaceAll('{plural}', minutes != 1 ? 's' : ''),
                 style: const TextStyle(
                   color: Colors.black54,
                   fontSize: 15,
@@ -563,7 +564,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                     const Text('⭐', style: TextStyle(fontSize: 28)),
                     const SizedBox(width: 8),
                     Text(
-                      '+$points Points',
+                      '+$points ${AppLocalizations.of(context).points}',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -577,7 +578,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               
               // Remaining sessions
               Text(
-                'Sessions remaining: $_remainingSessions',
+                '${AppLocalizations.of(context).sessionsRemaining} $_remainingSessions',
                 style: const TextStyle(
                   color: Colors.black54,
                   fontSize: 13,
@@ -599,9 +600,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  child: const Text(
-                    'Awesome!',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  child: Text(
+                    AppLocalizations.of(context).awesome,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -616,7 +617,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     // Check session availability
     final user = _authService.currentUser;
     if (user == null) {
-      _showError("Please log in to use AI Voice Practice");
+      _showError(AppLocalizations.of(context).pleaseLoginToUseAI);
       return;
     }
 
@@ -630,7 +631,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     // Request permissions
     var status = await Permission.microphone.request();
     if (status != PermissionStatus.granted) {
-      _showError("Microphone permission required");
+      _showError(AppLocalizations.of(context).microphonePermissionRequired);
       return;
     }
 
@@ -639,7 +640,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
     setState(() {
       _status = AppStatus.connecting;
-      _statusMessage = "⏳ Preparing voice session...";
+      _statusMessage = AppLocalizations.of(context).preparingVoiceSession;
       _isWarmingUp = true;
       _messages.clear();
       _currentTranscript = "";
@@ -649,7 +650,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       // Start session in database
       final sessionId = await _sessionService.startSession(user.id);
       if (sessionId == null) {
-        _showError("Failed to start session");
+        _showError(AppLocalizations.of(context).failedToStartSession);
         return;
       }
 
@@ -669,7 +670,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
         },
         onError: (error) {
           debugPrint("WebSocket error: $error");
-          _showError("Connection error: $error");
+          _showError("${AppLocalizations.of(context).connectionError} $error");
           _disconnect();
         },
         onDone: () {
@@ -681,14 +682,14 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       // Start Recording
       final hasNativePermission = await _audioRecorder.hasPermission();
       if (!hasNativePermission) {
-        _showError("Recorder permission denied");
+        _showError(AppLocalizations.of(context).recorderPermissionDenied);
         await _disconnect();
         return;
       }
 
     } catch (e) {
       debugPrint("Error starting conversation: $e");
-      _showError("Failed to start: $e");
+      _showError("${AppLocalizations.of(context).failedToStart} $e");
       _disconnect();
     }
   }
@@ -724,9 +725,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               const SizedBox(height: 24),
               
               // Title
-              const Text(
-                'Session Limit Reached',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context).sessionLimitReached,
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -761,9 +762,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  child: const Text(
-                    'Got it',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  child: Text(
+                    AppLocalizations.of(context).gotIt,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -874,7 +875,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     _isWarmingUp = false;
     setState(() {
       _status = AppStatus.listening;
-      _statusMessage = "🎙️ Listening...";
+      _statusMessage = AppLocalizations.of(context).listening;
     });
     unawaited(_startRecorderStream());
   }
@@ -986,7 +987,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                   ),
                 ),
                 child: Text(
-                  _status == AppStatus.disconnected ? "Start" : "Stop",
+                  _status == AppStatus.disconnected ? AppLocalizations.of(context).start : AppLocalizations.of(context).stop,
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1048,11 +1049,11 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       child: Row(
         children: [
           const CustomBackButton(),
-          const Expanded(
+                  Expanded(
             child: Center(
               child: Text(
-                'AI VOICE PRACTICE',
-                style: TextStyle(
+                AppLocalizations.of(context).aiVoicePractice,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -1116,7 +1117,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                 const Icon(Icons.event_note, size: 14, color: Colors.black54),
                 const SizedBox(width: 6),
                 Text(
-                  'Session $currentSession/$_maxSessions',
+                  '${AppLocalizations.of(context).sessionNumber} $currentSession/$_maxSessions',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,

@@ -7,6 +7,7 @@ import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/screens/practice/quiz_session_screen.dart';
 import 'package:student/config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class QuizPracticeScreen extends StatefulWidget {
   const QuizPracticeScreen({super.key});
@@ -53,10 +54,13 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     try {
       final user = _authService.currentUser;
       if (user == null) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Please log in to access quiz practice';
-        });
+        if (mounted) {
+          final l10n = AppLocalizations.of(context);
+          setState(() {
+            _isLoading = false;
+            _errorMessage = l10n.loginRequired;
+          });
+        }
         return;
       }
 
@@ -65,11 +69,14 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       // Check PRO subscription
       final hasPro = await _proService.hasActivePro(_studentId!);
       if (!hasPro) {
-        setState(() {
-          _isLoading = false;
-          _hasProSubscription = false;
-          _errorMessage = 'PRO subscription required';
-        });
+        if (mounted) {
+          final l10n = AppLocalizations.of(context);
+          setState(() {
+            _isLoading = false;
+            _hasProSubscription = false;
+            _errorMessage = l10n.proSubscriptionRequired;
+          });
+        }
         return;
       }
 
@@ -89,10 +96,13 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load data: ${e.toString()}';
-      });
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _isLoading = false;
+          _errorMessage = '${l10n.errorLoadingData}: ${e.toString()}';
+        });
+      }
     }
   }
 
@@ -153,16 +163,17 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildTopBar() {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
           const CustomBackButton(),
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
-                'LANGUAGE QUIZ',
-                style: TextStyle(
+                l10n.languageQuiz,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -178,6 +189,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildHeader() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -203,9 +215,9 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Language Quiz',
-                  style: TextStyle(
+                Text(
+                  l10n.quizPractice,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -213,7 +225,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Level $_studentLevel • ${_getDifficultyText()}',
+                  '${l10n.level} $_studentLevel • ${_getDifficultyText(l10n)}',
                   style: const TextStyle(
                     fontSize: 14,
                     color: Colors.white,
@@ -229,6 +241,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildStatisticsCard() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -245,9 +258,9 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Your Statistics',
-            style: TextStyle(
+          Text(
+            l10n.yourStatistics,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
@@ -258,19 +271,19 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildStatItem(
-                'Quizzes',
+                l10n.quizzes,
                 _statistics['total_sessions'].toString(),
                 FontAwesomeIcons.clipboardList,
                 Colors.blue.shade400,
               ),
               _buildStatItem(
-                'Accuracy',
+                l10n.accuracy,
                 '${_statistics['accuracy'].toStringAsFixed(0)}%',
                 FontAwesomeIcons.chartLine,
                 Colors.orange.shade400,
               ),
               _buildStatItem(
-                'Points',
+                l10n.points,
                 _statistics['total_points_earned'].toString(),
                 FontAwesomeIcons.star,
                 Colors.amber.shade600,
@@ -308,6 +321,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildStartButton() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       height: 56,
       decoration: BoxDecoration(
@@ -330,14 +344,14 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FaIcon(FontAwesomeIcons.play, size: 18, color: Colors.white),
-            SizedBox(width: 12),
+            const FaIcon(FontAwesomeIcons.play, size: 18, color: Colors.white),
+            const SizedBox(width: 12),
             Text(
-              'START NEW QUIZ',
-              style: TextStyle(
+              l10n.startNewQuiz,
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -351,6 +365,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildRecentSessions() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -369,9 +384,9 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Recent Quizzes',
-              style: TextStyle(
+            Text(
+              l10n.recentQuizzes,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
@@ -389,6 +404,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildSessionCard(Map<String, dynamic> session) {
+    final l10n = AppLocalizations.of(context);
     final correctAnswers = session['correct_answers'] as int? ?? 0;
     final totalQuestions = session['total_questions'] as int? ?? 10;
     final scorePercentage = session['score_percentage'] as num? ?? 0;
@@ -428,7 +444,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${scorePercentage.toStringAsFixed(0)}% Score',
+                  '${scorePercentage.toStringAsFixed(0)}% ${l10n.score}',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -437,7 +453,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  completedAt != null ? _formatDate(completedAt) : 'Just now',
+                  completedAt != null ? _formatDate(completedAt, l10n) : l10n.justNow,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -473,7 +489,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     );
   }
 
-  String _formatDate(String dateStr) {
+  String _formatDate(String dateStr, AppLocalizations l10n) {
     try {
       final date = DateTime.parse(dateStr);
       final now = DateTime.now();
@@ -482,15 +498,15 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       if (difference.inDays == 0) {
         if (difference.inHours == 0) {
           if (difference.inMinutes == 0) {
-            return 'Just now';
+            return l10n.justNow;
           }
-          return '${difference.inMinutes}m ago';
+          return '${difference.inMinutes}${l10n.minutesAgo}';
         }
-        return '${difference.inHours}h ago';
+        return '${difference.inHours}${l10n.hoursAgo}';
       } else if (difference.inDays < 7) {
-        return '${difference.inDays}d ago';
+        return '${difference.inDays}${l10n.daysAgo}';
       } else {
-        return '${difference.inDays}d ago';
+        return '${difference.inDays}${l10n.daysAgo}';
       }
     } catch (e) {
       return '';
@@ -498,6 +514,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildProRequiredMessage() {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -517,9 +534,9 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'PRO Subscription Required',
-              style: TextStyle(
+            Text(
+              l10n.proSubscriptionRequired,
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
@@ -527,9 +544,9 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Language Quiz is available for PRO members only.',
-              style: TextStyle(
+            Text(
+              l10n.languageQuizProOnly,
+              style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
               ),
@@ -539,7 +556,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
             ElevatedButton.icon(
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.arrow_back),
-              label: const Text('Go Back'),
+              label: Text(l10n.goBack),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -555,12 +572,12 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     );
   }
 
-  String _getDifficultyText() {
-    if (_studentLevel <= 10) return 'Beginner';
-    if (_studentLevel <= 25) return 'Elementary';
-    if (_studentLevel <= 40) return 'Pre-Intermediate';
-    if (_studentLevel <= 60) return 'Intermediate';
-    if (_studentLevel <= 80) return 'Upper-Intermediate';
-    return 'Advanced';
+  String _getDifficultyText(AppLocalizations l10n) {
+    if (_studentLevel <= 10) return l10n.levelBeginner;
+    if (_studentLevel <= 25) return l10n.levelElementary;
+    if (_studentLevel <= 40) return l10n.levelPreIntermediate;
+    if (_studentLevel <= 60) return l10n.levelIntermediate;
+    if (_studentLevel <= 80) return l10n.levelUpperIntermediate;
+    return l10n.levelAdvanced;
   }
 }

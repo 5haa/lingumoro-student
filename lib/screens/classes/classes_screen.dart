@@ -10,6 +10,7 @@ import '../../services/chat_service.dart';
 import '../../services/preload_service.dart';
 import '../chat/chat_conversation_screen.dart';
 import '../teachers/teacher_detail_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 class ClassesScreen extends StatefulWidget {
   const ClassesScreen({Key? key}) : super(key: key);
@@ -211,7 +212,7 @@ class _ClassesScreenState extends State<ClassesScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading sessions: $e'),
+            content: Text('${AppLocalizations.of(context).errorLoadingSessions} $e'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -226,8 +227,8 @@ class _ClassesScreenState extends State<ClassesScreen>
     if (meetingLink == null || meetingLink.toString().isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Meeting link not available yet. Please wait for the teacher to set it up.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).meetingLinkNotAvailable),
             backgroundColor: Colors.orange,
           ),
         );
@@ -255,7 +256,7 @@ class _ClassesScreenState extends State<ClassesScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error joining session: ${e.toString()}'),
+            content: Text('${AppLocalizations.of(context).errorJoiningSession} ${e.toString()}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -270,8 +271,8 @@ class _ClassesScreenState extends State<ClassesScreen>
       if (teacher == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Teacher information not available'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context).teacherInformationNotAvailable),
               backgroundColor: Colors.red,
             ),
           );
@@ -300,8 +301,8 @@ class _ClassesScreenState extends State<ClassesScreen>
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to start chat. Please try again.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).unableToStartChat),
             backgroundColor: Colors.red,
           ),
         );
@@ -310,7 +311,7 @@ class _ClassesScreenState extends State<ClassesScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error opening chat: ${e.toString()}'),
+            content: Text('${AppLocalizations.of(context).errorOpeningChat} ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -357,11 +358,11 @@ class _ClassesScreenState extends State<ClassesScreen>
                       },
                     ),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'MY CLASSES',
-                        style: TextStyle(
+                        AppLocalizations.of(context).myClasses,
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -392,9 +393,9 @@ class _ClassesScreenState extends State<ClassesScreen>
                 ),
                 indicatorColor: AppColors.primary,
                 indicatorWeight: 3,
-                tabs: const [
-                  Tab(text: 'Upcoming'),
-                  Tab(text: 'Finished'),
+                tabs: [
+                  Tab(text: AppLocalizations.of(context).upcoming),
+                  Tab(text: AppLocalizations.of(context).finished),
                 ],
               ),
             ),
@@ -451,7 +452,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    isUpcoming ? 'No upcoming classes' : 'No finished classes',
+                    isUpcoming ? AppLocalizations.of(context).noUpcomingClasses : AppLocalizations.of(context).noFinishedClasses,
                     style: TextStyle(
                       fontSize: 16,
                       color: AppColors.textSecondary.withOpacity(0.6),
@@ -460,7 +461,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                   if (isUpcoming) ...[
                     const SizedBox(height: 10),
                     Text(
-                      'Subscribe to a teacher to see your classes here',
+                      AppLocalizations.of(context).subscribeToSeeClasses,
                       style: TextStyle(
                         fontSize: 14,
                         color: AppColors.textSecondary.withOpacity(0.5),
@@ -475,7 +476,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Pull down to refresh',
+                      AppLocalizations.of(context).pullDownToRefresh,
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary.withOpacity(0.4),
@@ -524,13 +525,13 @@ class _ClassesScreenState extends State<ClassesScreen>
     // Calculate duration
     final startTime = session['scheduled_start_time'];
     final endTime = session['scheduled_end_time'];
-    String duration = '45 min'; // default
+    String duration = '45 ${AppLocalizations.of(context).min}'; // default
     if (startTime != null && endTime != null) {
       try {
         final start = DateTime.parse('2000-01-01 $startTime');
         final end = DateTime.parse('2000-01-01 $endTime');
         final diff = end.difference(start).inMinutes;
-        duration = '$diff min';
+        duration = '$diff ${AppLocalizations.of(context).min}';
       } catch (e) {
         // Keep default
       }
@@ -581,7 +582,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'MAKEUP CLASS',
+                    AppLocalizations.of(context).makeupClass,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -613,7 +614,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'CANCELLED',
+                    AppLocalizations.of(context).cancelled,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -645,7 +646,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'EXTRA CLASS',
+                    AppLocalizations.of(context).extraClass,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -680,7 +681,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'LIVE NOW',
+                    AppLocalizations.of(context).liveNow,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -767,7 +768,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                 ),
               const SizedBox(width: 12),
               Text(
-                '${language['name'] ?? 'Language'} Class',
+                '${language['name'] ?? 'Language'} ${AppLocalizations.of(context).languageClass}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -841,7 +842,7 @@ class _ClassesScreenState extends State<ClassesScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  teacher['full_name'] ?? 'Teacher name Here',
+                  teacher['full_name'] ?? AppLocalizations.of(context).teacherNamePlaceholder,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -935,7 +936,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Your time', // You can add timezone logic here
+                        AppLocalizations.of(context).yourTime, // You can add timezone logic here
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
@@ -969,9 +970,9 @@ class _ClassesScreenState extends State<ClassesScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Class Duration ',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context).classDuration,
+                style: const TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                 ),
@@ -1003,18 +1004,18 @@ class _ClassesScreenState extends State<ClassesScreen>
                     ),
                     elevation: 0,
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      FaIcon(
+                      const FaIcon(
                         FontAwesomeIcons.link,
                         size: 16,
                         color: Colors.white,
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
-                        'JOIN',
-                        style: TextStyle(
+                        AppLocalizations.of(context).join,
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -1043,7 +1044,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        'Waiting for meeting link',
+                        AppLocalizations.of(context).waitingForMeetingLink,
                         style: TextStyle(
                           color: Colors.orange.shade700,
                           fontSize: 12,
@@ -1079,8 +1080,8 @@ class _ClassesScreenState extends State<ClassesScreen>
                     const SizedBox(width: 8),
                     Text(
                       timeUntil == 'Now' 
-                          ? 'Waiting for teacher to start' 
-                          : 'Starts in $timeUntil',
+                          ? AppLocalizations.of(context).waitingForTeacherToStart 
+                          : '${AppLocalizations.of(context).startsIn} $timeUntil',
                       style: TextStyle(
                         color: timeUntil == 'Now' 
                             ? Colors.green.shade700 
@@ -1113,7 +1114,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                         Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          'This class was cancelled',
+                          AppLocalizations.of(context).classWasCancelled,
                           style: TextStyle(
                             color: Colors.red.shade700,
                             fontSize: 13,
@@ -1166,7 +1167,7 @@ class _ClassesScreenState extends State<ClassesScreen>
                     const Icon(Icons.star, color: Colors.white, size: 18),
                     const SizedBox(width: 8),
                     Text(
-                      'Tap to view teacher & rate',
+                      AppLocalizations.of(context).tapToViewTeacherAndRate,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -1204,8 +1205,8 @@ class _ClassesScreenState extends State<ClassesScreen>
     
     if (teacherId == null || languageId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to load teacher details'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).unableToLoadTeacherDetails),
           backgroundColor: Colors.red,
         ),
       );
@@ -1248,24 +1249,26 @@ class _ClassesScreenState extends State<ClassesScreen>
   }
 
   String _getWeekday(int weekday) {
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final loc = AppLocalizations.of(context);
+    final weekdays = [loc.mon, loc.tue, loc.wed, loc.thu, loc.fri, loc.sat, loc.sun];
     return weekdays[weekday - 1];
   }
 
   String _getMonth(int month) {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December'
+    final loc = AppLocalizations.of(context);
+    final months = [
+      loc.january,
+      loc.february,
+      loc.march,
+      loc.april,
+      loc.may,
+      loc.june,
+      loc.july,
+      loc.august,
+      loc.september,
+      loc.october,
+      loc.november,
+      loc.december
     ];
     return months[month - 1];
   }

@@ -6,6 +6,7 @@ import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/screens/practice/reading_detail_screen.dart';
 import '../../widgets/custom_back_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class ReadingScreen extends StatefulWidget {
   const ReadingScreen({super.key});
@@ -48,10 +49,10 @@ class _ReadingScreenState extends State<ReadingScreen> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Pro features are active on another device. Activate in Profile to use.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).proFeaturesActiveOnAnotherDevice),
             backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -86,7 +87,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading readings: $e'),
+            content: Text('${AppLocalizations.of(context).errorLoadingReadings} $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -115,8 +116,8 @@ class _ReadingScreenState extends State<ReadingScreen> {
     
     if (!isUnlocked) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Complete the previous reading to unlock this one'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).completePreviousReading),
           backgroundColor: Colors.orange,
         ),
       );
@@ -176,11 +177,11 @@ class _ReadingScreenState extends State<ReadingScreen> {
       child: Row(
         children: [
           const CustomBackButton(),
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
-                'READINGS',
-                style: TextStyle(
+                AppLocalizations.of(context).readings,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -204,9 +205,9 @@ class _ReadingScreenState extends State<ReadingScreen> {
         children: [
           _buildProgressCard(),
           const SizedBox(height: 20),
-          const Text(
-            'All Readings',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context).allReadings,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
@@ -222,6 +223,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
   }
 
   Widget _buildProgressCard() {
+    final l10n = AppLocalizations.of(context);
     final percentage = _totalCount > 0 
         ? (_completedCount / _totalCount * 100).toInt() 
         : 0;
@@ -262,9 +264,9 @@ class _ReadingScreenState extends State<ReadingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Your Progress',
-                  style: TextStyle(
+                Text(
+                  l10n.yourProgress,
+                  style: const TextStyle(
                     fontSize: 16,
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
@@ -272,7 +274,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$_completedCount / $_totalCount Completed',
+                  '$_completedCount / $_totalCount ${l10n.completed}',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -291,7 +293,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$percentage% Complete',
+                  '$percentage% ${l10n.percentComplete}',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.white.withOpacity(0.9),
@@ -426,7 +428,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                           if (isLocked) ...[
                             const SizedBox(height: 4),
                             Text(
-                              'Complete previous reading to unlock',
+                              AppLocalizations.of(context).completePreviousToUnlock,
                               style: TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textSecondary.withOpacity(0.7),
@@ -449,7 +451,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                           border: Border.all(color: Colors.green.shade200),
                         ),
                         child: Text(
-                          'Completed',
+                          AppLocalizations.of(context).completed,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -495,7 +497,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'No readings available',
+              AppLocalizations.of(context).noReadingsAvailable,
               style: TextStyle(
                 fontSize: 20,
                 color: AppColors.textSecondary.withOpacity(0.6),
@@ -504,7 +506,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Check back later for new reading content',
+              AppLocalizations.of(context).checkBackLater,
               style: TextStyle(
                 color: AppColors.textSecondary.withOpacity(0.5),
                 fontSize: 14,

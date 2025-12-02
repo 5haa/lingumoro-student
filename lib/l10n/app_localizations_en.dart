@@ -460,6 +460,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saturday => 'Saturday';
   @override
   String get sunday => 'Sunday';
+  @override
+  String get mon => 'Mon';
+  @override
+  String get tue => 'Tue';
+  @override
+  String get wed => 'Wed';
+  @override
+  String get thu => 'Thu';
+  @override
+  String get fri => 'Fri';
+  @override
+  String get sat => 'Sat';
+  @override
+  String get sun => 'Sun';
   
   // Months
   @override
@@ -544,5 +558,383 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fillAllFields => 'Please fill in all required fields';
   @override
   String get confirmAccount => 'CONFIRM ACCOUNT';
+  
+  // Quiz Practice
+  @override
+  String get languageQuiz => 'LANGUAGE QUIZ';
+  @override
+  String get yourStatistics => 'Your Statistics';
+  @override
+  String get quizzes => 'Quizzes';
+  @override
+  String get points => 'Points';
+  @override
+  String get recentQuizzes => 'Recent Quizzes';
+  @override
+  String get proSubscriptionRequired => 'PRO Subscription Required';
+  @override
+  String get languageQuizProOnly => 'Language Quiz is available for PRO members only.';
+  @override
+  String get goBack => 'Go Back';
+  @override
+  String get levelElementary => 'Elementary';
+  @override
+  String get levelPreIntermediate => 'Pre-Intermediate';
+  @override
+  String get levelUpperIntermediate => 'Upper-Intermediate';
+  @override
+  String get startNewQuiz => 'START NEW QUIZ';
+  @override
+  String get questionNumber => 'Question';
+  @override
+  String get exitQuiz => 'Exit Quiz?';
+  @override
+  String get exitQuizMessage => 'Your progress will be lost. Are you sure?';
+  @override
+  String get exit => 'Exit';
+  @override
+  String get quizComplete => 'Quiz Complete!';
+  @override
+  String get score => 'Score';
+  @override
+  String get reviewAnswers => 'Review Answers';
+  @override
+  String get back => 'BACK';
+  @override
+  String get retryQuiz => 'RETRY QUIZ';
+  @override
+  String get totalQuestions => 'Total Questions';
+  @override
+  String get timePerQuestion => 'Time per Question';
+  @override
+  String get pointsAvailable => 'Points Available';
+  @override
+  String get quizInstructions => 'Answer each question within 15 seconds. Questions auto-advance when time runs out!';
+  @override
+  String get startQuiz => 'START QUIZ';
+  @override
+  String get correct => 'Correct! ✓';
+  @override
+  String get yourAnswer => 'Your answer:';
+  @override
+  String get noAnswerTimeout => 'No answer (timeout)';
+  @override
+  String get correctAnswer => 'Correct:';
+  @override
+  String get failedToGenerateQuiz => 'Failed to generate quiz. Please try again.';
+  @override
+  String get pleaseTryAgain => 'Please try again';
+  @override
+  String get justNow => 'Just now';
+  @override
+  String get minutesAgo => 'm ago';
+  @override
+  String get hoursAgo => 'h ago';
+  @override
+  String get daysAgo => 'd ago';
+  
+  // AI Voice Practice
+  @override
+  String get aiVoicePractice => 'AI VOICE PRACTICE';
+  @override
+  String get voiceSettings => 'Voice Settings';
+  @override
+  String get voice => 'Voice';
+  @override
+  String get speed => 'Speed';
+  @override
+  String get start => 'Start';
+  @override
+  String get stop => 'Stop';
+  @override
+  String get sessionNumber => 'Session';
+  @override
+  String get timesUp => 'Time\'s Up!';
+  @override
+  String get sessionEndedMessage => 'Your {minutes}-minute session has ended. Great job practicing!';
+  @override
+  String get gotIt => 'Got it';
+  @override
+  String get greatJob => 'Great Job!';
+  @override
+  String get practicedForMinutes => 'You practiced for {minutes} minute{plural}!';
+  @override
+  String get sessionsRemaining => 'Sessions remaining:';
+  @override
+  String get awesome => 'Awesome!';
+  @override
+  String get sessionLimitReached => 'Session Limit Reached';
+  @override
+  String get notConnected => 'Not connected';
+  @override
+  String get preparingVoiceSession => '⏳ Preparing voice session...';
+  @override
+  String get listening => '🎙️ Listening...';
+  @override
+  String get pleaseLoginToUseAI => 'Please log in to use AI Voice Practice';
+  @override
+  String get microphonePermissionRequired => 'Microphone permission required';
+  @override
+  String get failedToStartSession => 'Failed to start session';
+  @override
+  String get connectionError => 'Connection error:';
+  @override
+  String get recorderPermissionDenied => 'Recorder permission denied';
+  @override
+  String get failedToStart => 'Failed to start:';
+  @override
+  String get proFeaturesActiveOnAnotherDevice => '⚠️ Pro features are active on another device. Activate in Profile to use.';
+  @override
+  String get activateInProfile => 'Activate in Profile';
+  
+  // Reading
+  @override
+  String get readings => 'READINGS';
+  @override
+  String get yourProgress => 'Your Progress';
+  @override
+  String get completed => 'Completed';
+  @override
+  String get allReadings => 'All Readings';
+  @override
+  String get completePreviousToUnlock => 'Complete previous reading to unlock';
+  @override
+  String get noReadingsAvailable => 'No readings available';
+  @override
+  String get checkBackLater => 'Check back later for new reading content';
+  @override
+  String get completePreviousReading => 'Complete the previous reading to unlock this one';
+  @override
+  String get errorLoadingReadings => 'Error loading readings:';
+  @override
+  String get errorLoadingQuestions => 'Error loading questions:';
+  @override
+  String get readingProgress => 'Your Progress';
+  @override
+  String get completedReadings => 'Completed';
+  @override
+  String get totalReadings => 'Total';
+  @override
+  String get percentComplete => 'Complete';
+  
+  // OTP Verification
+  @override
+  String get verificationCode => 'VERIFICATION CODE';
+  @override
+  String get otpSentToEmail => 'A verification code was sent to your MAIL enter the code to verify your account';
+  @override
+  String get otpSentToEmailPasswordReset => 'A verification code was sent to your MAIL enter the code to be able to change the password';
+  @override
+  String get confirm => 'CONFIRM';
+  @override
+  String get resend => 'RESEND';
+  @override
+  String get resendWithTimer => 'RESEND ({time})';
+  @override
+  String get codeResentSuccessfully => 'Code resent successfully';
+  @override
+  String get failedToResendCode => 'Failed to resend code:';
+  @override
+  String get enterCompleteCode => 'Please enter the complete verification code';
+  @override
+  String get verificationFailed => 'Verification failed:';
+  
+  // Chat
+  @override
+  String get today => 'Today';
+  @override
+  String get yesterday => 'Yesterday';
+  @override
+  String get blockUser => 'Block User';
+  @override
+  String get tapToRetry => 'Tap to retry';
+  @override
+  String get failedToLoadImage => 'Failed to load image';
+  @override
+  String get couldNotPlayAudio => 'Could not play audio';
+  @override
+  String get downloading => 'Downloading';
+  @override
+  String get downloadedTo => 'Downloaded to:';
+  @override
+  String get downloadFailed => 'Download failed:';
+  @override
+  String get failedToSendMessage => 'Failed to send message';
+  @override
+  String get errorSendingMessage => 'Error sending message:';
+  @override
+  String get failedToCaptureImage => 'Failed to capture image:';
+  @override
+  String get failedToPickImage => 'Failed to pick image:';
+  @override
+  String get failedToStartRecording => 'Failed to start recording. Please check microphone permissions.';
+  @override
+  String get checkMicrophonePermissions => 'Please check microphone permissions';
+  @override
+  String get failedToSendVoiceMessage => 'Failed to send voice message';
+  @override
+  String get errorSendingVoiceMessage => 'Error sending voice message:';
+  
+  // Common additional
+  @override
+  String get level => 'Level';
+  @override
+  String get pts => 'pts';
+  @override
+  String get session => 'Session';
+  @override
+  String get sessions => 'Sessions';
+  @override
+  String get minute => 'minute';
+  @override
+  String get minutesPlural => 'minutes';
+  @override
+  String get loginRequired => 'Please log in to access quiz practice';
+  
+  // Chat additional
+  @override
+  String get chatDeletedSuccessfully => 'Chat deleted successfully';
+  @override
+  String get failedToDeleteChat => 'Failed to delete chat. Please try again.';
+  @override
+  String get messageUnsent => 'Message unsent';
+  @override
+  String get downloadedToUnableToOpen => 'Downloaded to: {filePath}\nUnable to open file: {message}';
+  
+  // Profile additional
+  @override
+  String get activateOnThisDevice => 'Activate on This Device';
+  
+  // Classes additional
+  @override
+  String get errorLoadingSessions => 'Error loading sessions:';
+  @override
+  String get errorJoiningSession => 'Error joining session:';
+  @override
+  String get teacherInformationNotAvailable => 'Teacher information not available';
+  @override
+  String get unableToStartChat => 'Unable to start chat. Please try again.';
+  @override
+  String get errorOpeningChat => 'Error opening chat:';
+  @override
+  String get unableToLoadTeacherDetails => 'Unable to load teacher details';
+  @override
+  String get myClasses => 'MY CLASSES';
+  @override
+  String get noUpcomingClasses => 'No upcoming classes';
+  @override
+  String get noFinishedClasses => 'No finished classes';
+  @override
+  String get subscribeToSeeClasses => 'Subscribe to a teacher to see your classes here';
+  @override
+  String get pullDownToRefresh => 'Pull down to refresh';
+  @override
+  String get makeupClass => 'MAKEUP CLASS';
+  @override
+  String get cancelled => 'CANCELLED';
+  @override
+  String get extraClass => 'EXTRA CLASS';
+  @override
+  String get liveNow => 'LIVE NOW';
+  @override
+  String get languageClass => 'Class';
+  @override
+  String get teacherNamePlaceholder => 'Teacher';
+  @override
+  String get yourTime => 'Your time';
+  @override
+  String get classDuration => 'Class Duration';
+  @override
+  String get join => 'JOIN';
+  @override
+  String get waitingForMeetingLink => 'Waiting for meeting link';
+  @override
+  String get waitingForTeacherToStart => 'Waiting for teacher to start';
+  @override
+  String get startsIn => 'Starts in';
+  @override
+  String get classWasCancelled => 'This class was cancelled';
+  @override
+  String get tapToViewTeacherAndRate => 'Tap to view teacher & rate';
+  @override
+  String get min => 'min';
+  
+  // Quiz additional
+  @override
+  String get questionCounter => 'Question {current}/{total}';
+  @override
+  String get accuracyPercentage => '{accuracy}% Accuracy';
+  @override
+  String get correctCheck => 'Correct! ✓';
+  @override
+  String get answerEachQuestionWithinSeconds => 'Answer each question within 15 seconds. Questions auto-advance when time runs out!';
+  @override
+  String get questionsAutoAdvance => 'Questions auto-advance when time runs out!';
+  @override
+  String get yourProgressWillBeLost => 'Your progress will be lost. Are you sure?';
+  @override
+  String get sec => 'sec';
+  @override
+  String get ten => '10';
+  @override
+  String get fifteenSec => '15 sec';
+  @override
+  String get loginRequiredQuizPractice => 'Please log in to access quiz practice';
+  
+  // Profile/Edit Profile
+  @override
+  String get editProfileTitle => 'EDIT PROFILE';
+  @override
+  String get photoAddedSuccessfully => 'Photo added successfully!';
+  @override
+  String get failedToUploadPhoto => 'Failed to upload photo:';
+  @override
+  String get mainPhotoUpdated => 'Main photo updated!';
+  @override
+  String get failedToSetMainPhoto => 'Failed to set main photo:';
+  @override
+  String get photoDeleted => 'Photo deleted!';
+  @override
+  String get failedToDeletePhoto => 'Failed to delete photo:';
+  @override
+  String get profileUpdatedSuccessfully => 'Profile updated successfully!';
+  @override
+  String get failedToUpdateProfile => 'Failed to update profile:';
+  @override
+  String get pleaseEnterYourName => 'Please enter your name';
+  @override
+  String get tellUsAboutYourself => 'Tell us about yourself...';
+  
+  // Blocked Users
+  @override
+  String get blockedUsersTitle => 'BLOCKED USERS';
+  @override
+  String get unblockUser => 'Unblock User';
+  @override
+  String get unblockUserConfirm => 'Unblock';
+  @override
+  String get unblockUserMessage => 'Are you sure you want to unblock {name}? You will be able to see each other again.';
+  @override
+  String get noBlockedUsers => 'No Blocked Users';
+  @override
+  String get noBlockedUsersMessage => 'You haven\'t blocked anyone yet';
+  @override
+  String get failedToLoadBlockedUsers => 'Failed to load blocked users:';
+  @override
+  String get userHasBeenUnblocked => '{name} has been unblocked';
+  @override
+  String get failedToUnblockUser => 'Failed to unblock user';
+  
+  // Search/Input hints
+  @override
+  String get searchMessages => 'Search messages...';
+  @override
+  String get messageHint => 'Message';
+  
+  // Chat errors
+  @override
+  String get failedToUnsendMessage => 'Failed to unsend message. Please try again.';
+  @override
+  String get failedToBlockUserTryAgain => 'Failed to block user. Please try again.';
 }
 

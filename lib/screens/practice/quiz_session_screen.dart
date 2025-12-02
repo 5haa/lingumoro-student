@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../services/level_service.dart';
 import '../../services/points_notification_service.dart';
 import '../../widgets/custom_back_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class QuizSessionScreen extends StatefulWidget {
   final int studentLevel;
@@ -76,8 +77,8 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
         setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to generate quiz. Please try again.'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context).failedToGenerateQuiz),
               backgroundColor: Colors.red,
             ),
           );
@@ -89,7 +90,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text('${AppLocalizations.of(context).error}: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -186,10 +187,11 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
       
       // Show points notification if points were earned
       if (_totalPoints > 0 && mounted) {
+        final l10n = AppLocalizations.of(context);
         _pointsNotificationService.showPointsEarnedNotification(
           context: context,
           pointsGained: _totalPoints,
-          message: 'Quiz complete! +$_totalPoints points earned!',
+          message: '${l10n.quizComplete} +$_totalPoints ${l10n.points} ${l10n.success.toLowerCase()}!',
         );
       }
     }
@@ -225,19 +227,20 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
     return WillPopScope(
       onWillPop: () async {
         if (_quizStarted && !_quizCompleted) {
+          final l10n = AppLocalizations.of(context);
           final shouldExit = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('Exit Quiz?'),
-              content: const Text('Your progress will be lost. Are you sure?'),
+              title: Text(l10n.exitQuiz),
+              content: Text(l10n.exitQuizMessage),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
+                  child: Text(l10n.cancel),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Exit', style: TextStyle(color: Colors.red)),
+                  child: Text(l10n.exit, style: const TextStyle(color: Colors.red)),
                 ),
               ],
             ),
@@ -298,9 +301,9 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                         style: TextStyle(fontSize: 64),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Language Quiz',
-                        style: TextStyle(
+                      Text(
+                        AppLocalizations.of(context).quizPractice,
+                        style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -308,7 +311,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Level ${widget.studentLevel} • ${_getDifficultyText()}',
+                        '${AppLocalizations.of(context).level} ${widget.studentLevel} • ${_getDifficultyText()}',
                         style: const TextStyle(
                           fontSize: 16,
                           color: Colors.white,
@@ -339,21 +342,21 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                     children: [
                       _buildInfoRow(
                         icon: FontAwesomeIcons.clipboardQuestion,
-                        label: 'Total Questions',
+                        label: AppLocalizations.of(context).totalQuestions,
                         value: '10',
                         color: Colors.blue,
                       ),
                       const SizedBox(height: 16),
                       _buildInfoRow(
                         icon: FontAwesomeIcons.clock,
-                        label: 'Time per Question',
+                        label: AppLocalizations.of(context).timePerQuestion,
                         value: '15 sec',
                         color: Colors.orange,
                       ),
                       const SizedBox(height: 16),
                       _buildInfoRow(
                         icon: FontAwesomeIcons.star,
-                        label: 'Points Available',
+                        label: AppLocalizations.of(context).pointsAvailable,
                         value: '${(5 + (widget.studentLevel ~/ 10)) * 10}',
                         color: Colors.amber,
                       ),
@@ -375,10 +378,10 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                     children: [
                       Icon(Icons.info_outline, color: Colors.blue.shade700),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Answer each question within 15 seconds. Questions auto-advance when time runs out!',
-                          style: TextStyle(
+                          AppLocalizations.of(context).quizInstructions,
+                          style: const TextStyle(
                             fontSize: 13,
                             color: AppColors.textPrimary,
                           ),
@@ -413,14 +416,14 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        FaIcon(FontAwesomeIcons.play, size: 18, color: Colors.white),
-                        SizedBox(width: 12),
+                        const FaIcon(FontAwesomeIcons.play, size: 18, color: Colors.white),
+                        const SizedBox(width: 12),
                         Text(
-                          'START QUIZ',
-                          style: TextStyle(
+                          AppLocalizations.of(context).startQuiz,
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -462,19 +465,20 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
             children: [
               CustomBackButton(
                 onPressed: () async {
+                  final l10n = AppLocalizations.of(context);
                   final shouldExit = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: const Text('Exit Quiz?'),
-                      content: const Text('Your progress will be lost. Are you sure?'),
+                      title: Text(l10n.exitQuiz),
+                      content: Text(l10n.exitQuizMessage),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
+                          child: Text(l10n.cancel),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Exit', style: TextStyle(color: Colors.red)),
+                          child: Text(l10n.exit, style: const TextStyle(color: Colors.red)),
                         ),
                       ],
                     ),
@@ -489,7 +493,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
               // Question counter
               Expanded(
                 child: Text(
-                  'Question ${_currentQuestionIndex + 1}/10',
+                  '${AppLocalizations.of(context).questionNumber} ${_currentQuestionIndex + 1}/10',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -739,9 +743,9 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                         style: const TextStyle(fontSize: 64),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Quiz Complete!',
-                        style: TextStyle(
+                      Text(
+                        AppLocalizations.of(context).quizComplete,
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -759,7 +763,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '$accuracy% Accuracy',
+                        '$accuracy% ${AppLocalizations.of(context).accuracy}',
                         style: TextStyle(
                           fontSize: 18,
                           color: Colors.white.withOpacity(0.9),
@@ -779,7 +783,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                             const Icon(Icons.star, color: Colors.white, size: 24),
                             const SizedBox(width: 8),
                             Text(
-                              '+$_totalPoints Points',
+                              '+$_totalPoints ${AppLocalizations.of(context).points}',
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -827,9 +831,9 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
-                            'Review Answers',
-                            style: TextStyle(
+                          Text(
+                            AppLocalizations.of(context).reviewAnswers,
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
@@ -861,9 +865,9 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'BACK',
-                          style: TextStyle(
+                        child: Text(
+                          AppLocalizations.of(context).back,
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -894,9 +898,9 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'RETRY QUIZ',
-                            style: TextStyle(
+                          child: Text(
+                            AppLocalizations.of(context).retryQuiz,
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -967,8 +971,8 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                     if (!isCorrect) ...[
                       Text(
                         studentAnswer != null 
-                            ? 'Your answer: $studentAnswer'
-                            : 'No answer (timeout)',
+                            ? '${AppLocalizations.of(context).yourAnswer} $studentAnswer'
+                            : AppLocalizations.of(context).noAnswerTimeout,
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.red,
@@ -976,7 +980,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Correct: $correctAnswer',
+                        '${AppLocalizations.of(context).correctAnswer} $correctAnswer',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.green,
@@ -985,7 +989,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
                       ),
                     ] else
                       Text(
-                        'Correct! ✓',
+                        AppLocalizations.of(context).correct,
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.green.shade700,
@@ -1034,11 +1038,11 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
       child: Row(
         children: [
           CustomBackButton(onPressed: () => Navigator.pop(context)),
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
-                'LANGUAGE QUIZ',
-                style: TextStyle(
+                AppLocalizations.of(context).languageQuiz,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -1092,12 +1096,13 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
   }
 
   String _getDifficultyText() {
-    if (widget.studentLevel <= 10) return 'Beginner';
-    if (widget.studentLevel <= 25) return 'Elementary';
-    if (widget.studentLevel <= 40) return 'Pre-Intermediate';
-    if (widget.studentLevel <= 60) return 'Intermediate';
-    if (widget.studentLevel <= 80) return 'Upper-Intermediate';
-    return 'Advanced';
+    final l10n = AppLocalizations.of(context);
+    if (widget.studentLevel <= 10) return l10n.levelBeginner;
+    if (widget.studentLevel <= 25) return l10n.levelElementary;
+    if (widget.studentLevel <= 40) return l10n.levelPreIntermediate;
+    if (widget.studentLevel <= 60) return l10n.levelIntermediate;
+    if (widget.studentLevel <= 80) return l10n.levelUpperIntermediate;
+    return l10n.levelAdvanced;
   }
 }
 

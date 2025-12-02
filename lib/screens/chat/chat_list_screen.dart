@@ -9,6 +9,7 @@ import 'package:student/screens/chat/chat_conversation_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
+import '../../l10n/app_localizations.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -608,8 +609,8 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                                   Expanded(
                                     child: TextField(
                                       controller: _searchController,
-                                      decoration: const InputDecoration(
-                                        hintText: 'Search messages...',
+                                      decoration: InputDecoration(
+                                        hintText: AppLocalizations.of(context).searchMessages,
                                         hintStyle: TextStyle(
                                           color: Color(0xFF999999),
                                           fontSize: 15,

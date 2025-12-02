@@ -10,6 +10,7 @@ import '../../config/app_colors.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_back_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> profile;
@@ -116,8 +117,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await _clearOldPhotosCache();
         await _loadPhotos(); // Reload photos
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Photo added successfully!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).photoAddedSuccessfully),
             backgroundColor: Colors.green,
           ),
         );
@@ -129,7 +130,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         setState(() => _isUploadingPhoto = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to upload photo: $e'),
+            content: Text('${AppLocalizations.of(context).failedToUploadPhoto} $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -148,8 +149,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await _clearOldPhotosCache();
         await _loadPhotos();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Main photo updated!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).mainPhotoUpdated),
             backgroundColor: Colors.green,
           ),
         );
@@ -158,7 +159,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to set main photo: $e'),
+            content: Text('${AppLocalizations.of(context).failedToSetMainPhoto} $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -179,8 +180,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (success && mounted) {
         await _loadPhotos();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Photo deleted!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).photoDeleted),
             backgroundColor: Colors.green,
           ),
         );
@@ -189,7 +190,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to delete photo: $e'),
+            content: Text('${AppLocalizations.of(context).failedToDeletePhoto} $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -210,8 +211,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).profileUpdatedSuccessfully),
             backgroundColor: Colors.green,
           ),
         );
@@ -221,7 +222,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update profile: $e'),
+            content: Text('${AppLocalizations.of(context).failedToUpdateProfile} $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -304,8 +305,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   children: [
                     // Full Name
                     CustomTextField(
-                      labelText: 'Full Name',
-                      hintText: 'Enter your full name',
+                      labelText: AppLocalizations.of(context).fullName,
+                      hintText: AppLocalizations.of(context).enterFullName,
                       controller: _nameController,
                       prefixIcon: const Icon(
                         FontAwesomeIcons.user,
@@ -314,7 +315,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your name';
+                          return AppLocalizations.of(context).pleaseEnterYourName;
                         }
                         return null;
                       },
@@ -323,8 +324,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // Email
                     CustomTextField(
-                      labelText: 'Email',
-                      hintText: 'Enter your email',
+                      labelText: AppLocalizations.of(context).email,
+                      hintText: AppLocalizations.of(context).enterEmail,
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       enabled: false,
@@ -338,8 +339,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // Bio
                     CustomTextField(
-                      labelText: 'Bio',
-                      hintText: 'Tell us about yourself...',
+                      labelText: AppLocalizations.of(context).bio,
+                      hintText: AppLocalizations.of(context).tellUsAboutYourself,
                       controller: _bioController,
                       maxLines: 4,
                       prefixIcon: const Icon(
@@ -352,7 +353,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // Save Button
                     CustomButton(
-                      text: 'SAVE CHANGES',
+                      text: AppLocalizations.of(context).save.toUpperCase(),
                       onPressed: _isLoading ? () {} : _saveProfile,
                       isLoading: _isLoading,
                     ),

@@ -4,6 +4,7 @@ import 'package:student/services/blocking_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key});
@@ -38,7 +39,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load blocked users: $e'),
+            content: Text('${AppLocalizations.of(context).failedToLoadBlockedUsers} $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -51,23 +52,23 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Unblock User',
-          style: TextStyle(
+        title: Text(
+          AppLocalizations.of(context).unblockUser,
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
           ),
         ),
         content: Text(
-          'Are you sure you want to unblock $name? You will be able to see each other again.',
+          AppLocalizations.of(context).unblockUserMessage.replaceAll('{name}', name),
           style: const TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.grey),
+            child: Text(
+              AppLocalizations.of(context).cancel,
+              style: const TextStyle(color: AppColors.grey),
             ),
           ),
           ElevatedButton(
@@ -78,7 +79,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Unblock'),
+            child: Text(AppLocalizations.of(context).unblockUserConfirm),
           ),
         ],
       ),
@@ -90,15 +91,15 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$name has been unblocked'),
+              content: Text(AppLocalizations.of(context).userHasBeenUnblocked.replaceAll('{name}', name)),
               backgroundColor: Colors.green,
             ),
           );
           _loadBlockedUsers();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to unblock user'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context).failedToUnblockUser),
               backgroundColor: Colors.red,
             ),
           );
@@ -121,10 +122,10 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                 children: [
                   const CustomBackButton(),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'BLOCKED USERS',
-                      style: TextStyle(
+                      AppLocalizations.of(context).blockedUsersTitle,
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -164,9 +165,9 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                                 ),
                               ),
                               const SizedBox(height: 24),
-                              const Text(
-                                'No Blocked Users',
-                                style: TextStyle(
+                              Text(
+                                AppLocalizations.of(context).noBlockedUsers,
+                                style: const TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.textPrimary,
@@ -174,8 +175,8 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'You haven\'t blocked anyone yet',
-                                style: TextStyle(
+                                AppLocalizations.of(context).noBlockedUsersMessage,
+                                style: const TextStyle(
                                   fontSize: 15,
                                   color: AppColors.textSecondary,
                                 ),
@@ -263,9 +264,9 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                                       ),
                                       elevation: 0,
                                     ),
-                                    child: const Text(
-                                      'Unblock',
-                                      style: TextStyle(
+                                    child: Text(
+                                      AppLocalizations.of(context).unblockUserConfirm,
+                                      style: const TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
                                       ),

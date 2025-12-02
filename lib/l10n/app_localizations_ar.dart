@@ -460,6 +460,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get saturday => 'السبت';
   @override
   String get sunday => 'الأحد';
+  @override
+  String get mon => 'إثنين';
+  @override
+  String get tue => 'ثلاثاء';
+  @override
+  String get wed => 'أربعاء';
+  @override
+  String get thu => 'خميس';
+  @override
+  String get fri => 'جمعة';
+  @override
+  String get sat => 'سبت';
+  @override
+  String get sun => 'أحد';
   
   // Months
   @override
@@ -544,5 +558,383 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fillAllFields => 'الرجاء ملء جميع الحقول المطلوبة';
   @override
   String get confirmAccount => 'تأكيد الحساب';
+  
+  // Quiz Practice
+  @override
+  String get languageQuiz => 'اختبار اللغة';
+  @override
+  String get yourStatistics => 'إحصائياتك';
+  @override
+  String get quizzes => 'الاختبارات';
+  @override
+  String get points => 'النقاط';
+  @override
+  String get recentQuizzes => 'الاختبارات الأخيرة';
+  @override
+  String get proSubscriptionRequired => 'الاشتراك المحترف مطلوب';
+  @override
+  String get languageQuizProOnly => 'اختبار اللغة متاح لأعضاء المحترفين فقط.';
+  @override
+  String get goBack => 'العودة';
+  @override
+  String get levelElementary => 'ابتدائي';
+  @override
+  String get levelPreIntermediate => 'ما قبل المتوسط';
+  @override
+  String get levelUpperIntermediate => 'فوق المتوسط';
+  @override
+  String get startNewQuiz => 'بدء اختبار جديد';
+  @override
+  String get questionNumber => 'السؤال';
+  @override
+  String get exitQuiz => 'الخروج من الاختبار؟';
+  @override
+  String get exitQuizMessage => 'سيتم فقدان تقدمك. هل أنت متأكد؟';
+  @override
+  String get exit => 'خروج';
+  @override
+  String get quizComplete => 'اكتمل الاختبار!';
+  @override
+  String get score => 'النتيجة';
+  @override
+  String get reviewAnswers => 'مراجعة الإجابات';
+  @override
+  String get back => 'رجوع';
+  @override
+  String get retryQuiz => 'إعادة الاختبار';
+  @override
+  String get totalQuestions => 'إجمالي الأسئلة';
+  @override
+  String get timePerQuestion => 'الوقت لكل سؤال';
+  @override
+  String get pointsAvailable => 'النقاط المتاحة';
+  @override
+  String get quizInstructions => 'أجب على كل سؤال خلال 15 ثانية. تنتقل الأسئلة تلقائياً عند انتهاء الوقت!';
+  @override
+  String get startQuiz => 'بدء الاختبار';
+  @override
+  String get correct => 'صحيح! ✓';
+  @override
+  String get yourAnswer => 'إجابتك:';
+  @override
+  String get noAnswerTimeout => 'لا توجد إجابة (انتهى الوقت)';
+  @override
+  String get correctAnswer => 'الصحيح:';
+  @override
+  String get failedToGenerateQuiz => 'فشل إنشاء الاختبار. الرجاء المحاولة مرة أخرى.';
+  @override
+  String get pleaseTryAgain => 'الرجاء المحاولة مرة أخرى';
+  @override
+  String get justNow => 'الآن';
+  @override
+  String get minutesAgo => 'دقيقة مضت';
+  @override
+  String get hoursAgo => 'ساعة مضت';
+  @override
+  String get daysAgo => 'يوم مضى';
+  
+  // AI Voice Practice
+  @override
+  String get aiVoicePractice => 'تمرين الصوت بالذكاء الاصطناعي';
+  @override
+  String get voiceSettings => 'إعدادات الصوت';
+  @override
+  String get voice => 'الصوت';
+  @override
+  String get speed => 'السرعة';
+  @override
+  String get start => 'بدء';
+  @override
+  String get stop => 'إيقاف';
+  @override
+  String get sessionNumber => 'الجلسة';
+  @override
+  String get timesUp => 'انتهى الوقت!';
+  @override
+  String get sessionEndedMessage => 'انتهت جلستك التي مدتها {minutes} دقيقة. عمل رائع!';
+  @override
+  String get gotIt => 'حسناً';
+  @override
+  String get greatJob => 'عمل رائع!';
+  @override
+  String get practicedForMinutes => 'لقد تمرنت لمدة {minutes} دقيقة{plural}!';
+  @override
+  String get sessionsRemaining => 'الجلسات المتبقية:';
+  @override
+  String get awesome => 'رائع!';
+  @override
+  String get sessionLimitReached => 'تم الوصول إلى حد الجلسات';
+  @override
+  String get notConnected => 'غير متصل';
+  @override
+  String get preparingVoiceSession => '⏳ جاري إعداد جلسة الصوت...';
+  @override
+  String get listening => '🎙️ جاري الاستماع...';
+  @override
+  String get pleaseLoginToUseAI => 'الرجاء تسجيل الدخول لاستخدام تمرين الصوت بالذكاء الاصطناعي';
+  @override
+  String get microphonePermissionRequired => 'إذن الميكروفون مطلوب';
+  @override
+  String get failedToStartSession => 'فشل بدء الجلسة';
+  @override
+  String get connectionError => 'خطأ في الاتصال:';
+  @override
+  String get recorderPermissionDenied => 'تم رفض إذن المسجل';
+  @override
+  String get failedToStart => 'فشل البدء:';
+  @override
+  String get proFeaturesActiveOnAnotherDevice => '⚠️ الميزات المحترفة نشطة على جهاز آخر. قم بالتفعيل في الملف الشخصي للاستخدام.';
+  @override
+  String get activateInProfile => 'التفعيل في الملف الشخصي';
+  
+  // Reading
+  @override
+  String get readings => 'القراءات';
+  @override
+  String get yourProgress => 'تقدمك';
+  @override
+  String get completed => 'مكتمل';
+  @override
+  String get allReadings => 'جميع القراءات';
+  @override
+  String get completePreviousToUnlock => 'أكمل القراءة السابقة لفتحها';
+  @override
+  String get noReadingsAvailable => 'لا توجد قراءات متاحة';
+  @override
+  String get checkBackLater => 'تحقق لاحقاً للحصول على محتوى قراءة جديد';
+  @override
+  String get completePreviousReading => 'أكمل القراءة السابقة لفتح هذه';
+  @override
+  String get errorLoadingReadings => 'خطأ في تحميل القراءات:';
+  @override
+  String get errorLoadingQuestions => 'خطأ في تحميل الأسئلة:';
+  @override
+  String get readingProgress => 'تقدمك';
+  @override
+  String get completedReadings => 'مكتمل';
+  @override
+  String get totalReadings => 'الإجمالي';
+  @override
+  String get percentComplete => 'مكتمل';
+  
+  // OTP Verification
+  @override
+  String get verificationCode => 'رمز التحقق';
+  @override
+  String get otpSentToEmail => 'تم إرسال رمز التحقق إلى بريدك الإلكتروني أدخل الرمز للتحقق من حسابك';
+  @override
+  String get otpSentToEmailPasswordReset => 'تم إرسال رمز التحقق إلى بريدك الإلكتروني أدخل الرمز لتتمكن من تغيير كلمة المرور';
+  @override
+  String get confirm => 'تأكيد';
+  @override
+  String get resend => 'إعادة الإرسال';
+  @override
+  String get resendWithTimer => 'إعادة الإرسال ({time})';
+  @override
+  String get codeResentSuccessfully => 'تم إعادة إرسال الرمز بنجاح';
+  @override
+  String get failedToResendCode => 'فشل إعادة إرسال الرمز:';
+  @override
+  String get enterCompleteCode => 'الرجاء إدخال رمز التحقق الكامل';
+  @override
+  String get verificationFailed => 'فشل التحقق:';
+  
+  // Chat
+  @override
+  String get today => 'اليوم';
+  @override
+  String get yesterday => 'أمس';
+  @override
+  String get blockUser => 'حظر المستخدم';
+  @override
+  String get tapToRetry => 'اضغط لإعادة المحاولة';
+  @override
+  String get failedToLoadImage => 'فشل تحميل الصورة';
+  @override
+  String get couldNotPlayAudio => 'تعذر تشغيل الصوت';
+  @override
+  String get downloading => 'جاري التنزيل';
+  @override
+  String get downloadedTo => 'تم التنزيل إلى:';
+  @override
+  String get downloadFailed => 'فشل التنزيل:';
+  @override
+  String get failedToSendMessage => 'فشل إرسال الرسالة';
+  @override
+  String get errorSendingMessage => 'خطأ في إرسال الرسالة:';
+  @override
+  String get failedToCaptureImage => 'فشل التقاط الصورة:';
+  @override
+  String get failedToPickImage => 'فشل اختيار الصورة:';
+  @override
+  String get failedToStartRecording => 'فشل بدء التسجيل. الرجاء التحقق من أذونات الميكروفون.';
+  @override
+  String get checkMicrophonePermissions => 'الرجاء التحقق من أذونات الميكروفون';
+  @override
+  String get failedToSendVoiceMessage => 'فشل إرسال رسالة الصوت';
+  @override
+  String get errorSendingVoiceMessage => 'خطأ في إرسال رسالة الصوت:';
+  
+  // Common additional
+  @override
+  String get level => 'المستوى';
+  @override
+  String get pts => 'نقطة';
+  @override
+  String get session => 'جلسة';
+  @override
+  String get sessions => 'جلسات';
+  @override
+  String get minute => 'دقيقة';
+  @override
+  String get minutesPlural => 'دقائق';
+  @override
+  String get loginRequired => 'الرجاء تسجيل الدخول للوصول إلى تمرين الاختبار';
+  
+  // Chat additional
+  @override
+  String get chatDeletedSuccessfully => 'تم حذف المحادثة بنجاح';
+  @override
+  String get failedToDeleteChat => 'فشل حذف المحادثة. يرجى المحاولة مرة أخرى.';
+  @override
+  String get messageUnsent => 'تم إلغاء إرسال الرسالة';
+  @override
+  String get downloadedToUnableToOpen => 'تم التنزيل إلى: {filePath}\nتعذر فتح الملف: {message}';
+  
+  // Profile additional
+  @override
+  String get activateOnThisDevice => 'تفعيل على هذا الجهاز';
+  
+  // Classes additional
+  @override
+  String get errorLoadingSessions => 'خطأ في تحميل الجلسات:';
+  @override
+  String get errorJoiningSession => 'خطأ في الانضمام إلى الجلسة:';
+  @override
+  String get teacherInformationNotAvailable => 'معلومات المعلم غير متاحة';
+  @override
+  String get unableToStartChat => 'تعذر بدء المحادثة. يرجى المحاولة مرة أخرى.';
+  @override
+  String get errorOpeningChat => 'خطأ في فتح المحادثة:';
+  @override
+  String get unableToLoadTeacherDetails => 'تعذر تحميل تفاصيل المعلم';
+  @override
+  String get myClasses => 'فصولي';
+  @override
+  String get noUpcomingClasses => 'لا توجد فصول قادمة';
+  @override
+  String get noFinishedClasses => 'لا توجد فصول منتهية';
+  @override
+  String get subscribeToSeeClasses => 'اشترك مع معلم لترى فصولك هنا';
+  @override
+  String get pullDownToRefresh => 'اسحب لأسفل للتحديث';
+  @override
+  String get makeupClass => 'فصل تعويضي';
+  @override
+  String get cancelled => 'ملغى';
+  @override
+  String get extraClass => 'فصل إضافي';
+  @override
+  String get liveNow => 'مباشر الآن';
+  @override
+  String get languageClass => 'فصل';
+  @override
+  String get teacherNamePlaceholder => 'المعلم';
+  @override
+  String get yourTime => 'توقيتك';
+  @override
+  String get classDuration => 'مدة الفصل';
+  @override
+  String get join => 'انضم';
+  @override
+  String get waitingForMeetingLink => 'في انتظار رابط الاجتماع';
+  @override
+  String get waitingForTeacherToStart => 'في انتظار بدء المعلم';
+  @override
+  String get startsIn => 'يبدأ خلال';
+  @override
+  String get classWasCancelled => 'تم إلغاء هذا الفصل';
+  @override
+  String get tapToViewTeacherAndRate => 'اضغط لعرض المعلم والتقييم';
+  @override
+  String get min => 'دقيقة';
+  
+  // Quiz additional
+  @override
+  String get questionCounter => 'السؤال {current}/{total}';
+  @override
+  String get accuracyPercentage => '{accuracy}% دقة';
+  @override
+  String get correctCheck => 'صحيح! ✓';
+  @override
+  String get answerEachQuestionWithinSeconds => 'أجب على كل سؤال خلال 15 ثانية. تتقدم الأسئلة تلقائياً عند انتهاء الوقت!';
+  @override
+  String get questionsAutoAdvance => 'تتقدم الأسئلة تلقائياً عند انتهاء الوقت!';
+  @override
+  String get yourProgressWillBeLost => 'سيتم فقدان تقدمك. هل أنت متأكد؟';
+  @override
+  String get sec => 'ثانية';
+  @override
+  String get ten => '10';
+  @override
+  String get fifteenSec => '15 ثانية';
+  @override
+  String get loginRequiredQuizPractice => 'الرجاء تسجيل الدخول للوصول إلى تمرين الاختبار';
+  
+  // Profile/Edit Profile
+  @override
+  String get editProfileTitle => 'تعديل الملف الشخصي';
+  @override
+  String get photoAddedSuccessfully => 'تمت إضافة الصورة بنجاح!';
+  @override
+  String get failedToUploadPhoto => 'فشل تحميل الصورة:';
+  @override
+  String get mainPhotoUpdated => 'تم تحديث الصورة الرئيسية!';
+  @override
+  String get failedToSetMainPhoto => 'فشل تعيين الصورة الرئيسية:';
+  @override
+  String get photoDeleted => 'تم حذف الصورة!';
+  @override
+  String get failedToDeletePhoto => 'فشل حذف الصورة:';
+  @override
+  String get profileUpdatedSuccessfully => 'تم تحديث الملف الشخصي بنجاح!';
+  @override
+  String get failedToUpdateProfile => 'فشل تحديث الملف الشخصي:';
+  @override
+  String get pleaseEnterYourName => 'الرجاء إدخال اسمك';
+  @override
+  String get tellUsAboutYourself => 'أخبرنا عن نفسك...';
+  
+  // Blocked Users
+  @override
+  String get blockedUsersTitle => 'المستخدمون المحظورون';
+  @override
+  String get unblockUser => 'إلغاء حظر المستخدم';
+  @override
+  String get unblockUserConfirm => 'إلغاء الحظر';
+  @override
+  String get unblockUserMessage => 'هل أنت متأكد أنك تريد إلغاء حظر {name}؟ ستتمكنان من رؤية بعضكما البعض مرة أخرى.';
+  @override
+  String get noBlockedUsers => 'لا يوجد مستخدمون محظورون';
+  @override
+  String get noBlockedUsersMessage => 'لم تحظر أي شخص بعد';
+  @override
+  String get failedToLoadBlockedUsers => 'فشل تحميل المستخدمين المحظورين:';
+  @override
+  String get userHasBeenUnblocked => 'تم إلغاء حظر {name}';
+  @override
+  String get failedToUnblockUser => 'فشل إلغاء حظر المستخدم';
+  
+  // Search/Input hints
+  @override
+  String get searchMessages => 'البحث في الرسائل...';
+  @override
+  String get messageHint => 'رسالة';
+  
+  // Chat errors
+  @override
+  String get failedToUnsendMessage => 'فشل إلغاء إرسال الرسالة. يرجى المحاولة مرة أخرى.';
+  @override
+  String get failedToBlockUserTryAgain => 'فشل حظر المستخدم. يرجى المحاولة مرة أخرى.';
 }
 

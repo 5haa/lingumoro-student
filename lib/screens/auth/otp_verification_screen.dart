@@ -7,6 +7,7 @@ import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'reset_password_screen.dart';
 import '../main_navigation.dart';
+import '../../l10n/app_localizations.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String email;
@@ -88,8 +89,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Code resent successfully'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).codeResentSuccessfully),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -98,7 +99,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to resend code: ${e.toString()}'),
+            content: Text('${AppLocalizations.of(context).failedToResendCode} ${e.toString()}'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -110,8 +111,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     String code = _controllers.map((c) => c.text).join();
     if (code.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the complete verification code'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).enterCompleteCode),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -158,7 +159,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Verification failed: ${e.toString()}'),
+            content: Text('${AppLocalizations.of(context).verificationFailed} ${e.toString()}'),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -214,9 +215,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                 child: Column(
                   children: [
                     // Title
-                    const Text(
-                      'VERIFICATION CODE',
-                      style: TextStyle(
+                    Text(
+                      AppLocalizations.of(context).verificationCode,
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -229,8 +230,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                     // Description
                     Text(
                       widget.isPasswordReset
-                          ? 'A verification code was sent to your MAIL enter the code to be able to change the password'
-                          : 'A verification code was sent to your MAIL enter the code to verify your account',
+                          ? AppLocalizations.of(context).otpSentToEmailPasswordReset
+                          : AppLocalizations.of(context).otpSentToEmail,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 15,
@@ -304,7 +305,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                   children: [
                     // Confirm button
                     CustomButton(
-                      text: 'CONFIRM',
+                      text: AppLocalizations.of(context).confirm,
                       onPressed: _handleVerify,
                       isLoading: _isLoading,
                     ),
@@ -314,8 +315,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                     // Resend button
                     CustomButton(
                       text: _remainingSeconds == 0 
-                          ? 'RESEND' 
-                          : 'RESEND (${_formatTime()})',
+                          ? AppLocalizations.of(context).resend
+                          : AppLocalizations.of(context).resendWithTimer.replaceAll('{time}', _formatTime()),
                       onPressed: _remainingSeconds == 0 ? _handleResendCode : () {},
                       isOutlined: true,
                     ),

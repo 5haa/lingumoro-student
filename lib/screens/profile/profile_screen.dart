@@ -820,7 +820,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
               child: ElevatedButton.icon(
                 onPressed: _activateOnThisDevice,
                 icon: const Icon(Icons.phone_android, size: 18),
-                label: const Text('Activate on This Device'),
+                label: Text(AppLocalizations.of(context).activateOnThisDevice),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
