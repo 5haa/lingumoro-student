@@ -243,6 +243,17 @@ abstract class AppLocalizations {
   String get languages;
   String get hourlyRate;
   String get perSession;
+  // Teacher detail/profile
+  String get teacherNotFoundTitle;
+  String get teacherNotFoundMessage;
+  String get alreadySubscribedMessage;
+  String get needSubscriptionToChat;
+  String get availableSchedulesTitle;
+  String get noScheduleAvailable;
+  String get ratingsAndReviewsTitle;
+  String get noReviewsYet;
+  String get rateButton;
+  String get updateRatingButton;
   
   // Students
   String get studentsList;
@@ -263,6 +274,25 @@ abstract class AppLocalizations {
   String get subscribe;
   String get subscriptionActive;
   String get subscriptionExpired;
+  // Subscription & vouchers
+  String get noPackagesAvailable;
+  String teacherNeedsDaysAvailable(int days);
+  String get selectDays;
+  String get selectTime;
+  String get noCommonTimeSlots;
+  String get selectedPackageLabel;
+  String selectedDaysLabel(int days);
+  String get change;
+  String get yourSchedule;
+  String voucherCodeMustBeLength(int length);
+  String get voucherCodeValidForPackage;
+  String subscriptionActivatedSessions(int sessions);
+  String get redeemingVoucher;
+  String get stepPackage;
+  String get stepDays;
+  String get stepTime;
+  String get perMonth;
+  String get subscribeTo;
   
   // Notifications
   String get notifications;
@@ -580,6 +610,9 @@ abstract class AppLocalizations {
   String get chatRequestTitle;
   String get noMessageProvided;
   String get sentChatRequest;
+  String get chatRequestsReceived;
+  String get chatRequestsSent;
+  String get chatRequestPendingStatus;
   String get deleteChat;
   String get deleteChatQuestion;
   String deleteChatConfirmation(String name);

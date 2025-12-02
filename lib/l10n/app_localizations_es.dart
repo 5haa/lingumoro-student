@@ -426,6 +426,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String get hourlyRate => 'Tarifa por Hora';
   @override
   String get perSession => 'por sesión';
+  // Teacher detail/profile
+  @override
+  String get teacherNotFoundTitle => 'Profesor no encontrado';
+  @override
+  String get teacherNotFoundMessage => 'El profesor que estás buscando no existe';
+  @override
+  String get alreadySubscribedMessage => 'Ya tienes una suscripción activa con este profesor';
+  @override
+  String get needSubscriptionToChat => 'Necesitas suscribirte para chatear con este profesor';
+  @override
+  String get availableSchedulesTitle => 'HORARIOS DISPONIBLES';
+  @override
+  String get noScheduleAvailable => 'No hay horarios disponibles';
+  @override
+  String get ratingsAndReviewsTitle => 'Calificaciones y Reseñas';
+  @override
+  String get noReviewsYet => 'No hay reseñas aún';
+  @override
+  String get rateButton => 'Calificar';
+  @override
+  String get updateRatingButton => 'Actualizar';
   
   // Students
   @override
@@ -462,6 +483,48 @@ class AppLocalizationsEs extends AppLocalizations {
   String get subscriptionActive => 'Suscripción Activa';
   @override
   String get subscriptionExpired => 'Suscripción Expirada';
+  // Subscription & vouchers
+  @override
+  String get noPackagesAvailable => 'No hay paquetes disponibles';
+  @override
+  String teacherNeedsDaysAvailable(int days) =>
+      'El profesor necesita al menos $days días disponibles para este paquete.';
+  @override
+  String get selectDays => 'Seleccionar días';
+  @override
+  String get selectTime => 'Seleccionar horario';
+  @override
+  String get noCommonTimeSlots =>
+      'No hay horarios comunes disponibles para los días seleccionados. Por favor selecciona días diferentes.';
+  @override
+  String get selectedPackageLabel => 'Paquete seleccionado';
+  @override
+  String selectedDaysLabel(int days) => 'Días seleccionados ($days días)';
+  @override
+  String get change => 'Cambiar';
+  @override
+  String get yourSchedule => 'Tu horario';
+  @override
+  String voucherCodeMustBeLength(int length) =>
+      'El código de cupón debe tener $length caracteres';
+  @override
+  String get voucherCodeValidForPackage =>
+      'Asegúrate de que el código de cupón sea válido para el paquete seleccionado.';
+  @override
+  String subscriptionActivatedSessions(int sessions) =>
+      '¡Suscripción activada! Tienes $sessions sesiones.';
+  @override
+  String get redeemingVoucher => 'Canjeando...';
+  @override
+  String get stepPackage => 'Paquete';
+  @override
+  String get stepDays => 'Días';
+  @override
+  String get stepTime => 'Hora';
+  @override
+  String get perMonth => '/mes';
+  @override
+  String get subscribeTo => 'Suscríbete a';
   
   // Notifications
   @override
@@ -1046,6 +1109,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get noMessageProvided => 'No se proporcionó mensaje';
   @override
   String get sentChatRequest => 'Envió una solicitud de chat';
+  @override
+  String get chatRequestsReceived => 'Recibidas';
+  @override
+  String get chatRequestsSent => 'Enviadas';
+  @override
+  String get chatRequestPendingStatus => 'Pendiente';
   @override
   String get deleteChat => 'Eliminar Chat';
   @override

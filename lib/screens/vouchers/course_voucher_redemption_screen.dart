@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:student/services/course_voucher_service.dart';
-import 'package:student/services/auth_service.dart';
-import 'package:student/services/session_update_service.dart';
 import 'package:student/config/app_colors.dart';
+import 'package:student/l10n/app_localizations.dart';
+import 'package:student/services/auth_service.dart';
+import 'package:student/services/course_voucher_service.dart';
+import 'package:student/services/session_update_service.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:student/widgets/custom_button.dart';
 
@@ -47,16 +48,6 @@ class _CourseVoucherRedemptionScreenState
 
   bool _isRedeeming = false;
 
-  final List<String> _dayNames = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-  ];
-
   @override
   void dispose() {
     _voucherController.dispose();
@@ -64,6 +55,7 @@ class _CourseVoucherRedemptionScreenState
   }
 
   Future<void> _redeemVoucher() async {
+    final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -71,7 +63,7 @@ class _CourseVoucherRedemptionScreenState
     final studentId = _authService.currentUser?.id;
     if (studentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Not logged in')),
+        SnackBar(content: Text(l10n.userNotLoggedIn)),
       );
       return;
     }
@@ -99,7 +91,7 @@ class _CourseVoucherRedemptionScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Subscription activated! You have ${result['total_sessions']} sessions.',
+              l10n.subscriptionActivatedSessions(result['total_sessions'] as int),
             ),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 5),
@@ -116,7 +108,7 @@ class _CourseVoucherRedemptionScreenState
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text('${l10n.error}: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -144,8 +136,29 @@ class _CourseVoucherRedemptionScreenState
     return time;
   }
 
+  String _fullDayName(AppLocalizations l10n, int day) {
+    switch (day) {
+      case 0:
+        return l10n.sunday;
+      case 1:
+        return l10n.monday;
+      case 2:
+        return l10n.tuesday;
+      case 3:
+        return l10n.wednesday;
+      case 4:
+        return l10n.thursday;
+      case 5:
+        return l10n.friday;
+      case 6:
+      default:
+        return l10n.saturday;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -158,9 +171,9 @@ class _CourseVoucherRedemptionScreenState
                 children: [
                   const CustomBackButton(),
                   const Spacer(),
-                  const Text(
-                    'REDEEM VOUCHER',
-                    style: TextStyle(
+                  Text(
+                    l10n.redeemVoucher.toUpperCase(),
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -198,9 +211,9 @@ class _CourseVoucherRedemptionScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Subscribe to',
-                    style: TextStyle(
+                  Text(
+                    l10n.subscribeTo,
+                    style: const TextStyle(
                       fontSize: 16,
                       color: Colors.white70,
                     ),
@@ -290,9 +303,9 @@ class _CourseVoucherRedemptionScreenState
                           size: 20,
                         ),
                         const SizedBox(width: 10),
-                        const Text(
-                          'Your Schedule',
-                          style: TextStyle(
+                        Text(
+                          l10n.yourSchedule,
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
@@ -315,7 +328,7 @@ class _CourseVoucherRedemptionScreenState
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            _dayNames[day],
+                            _fullDayName(l10n, day),
                             style: const TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w600,
@@ -359,11 +372,11 @@ class _CourseVoucherRedemptionScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(left: 10, bottom: 10),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10, bottom: 10),
                       child: Text(
-                        'ENTER VOUCHER CODE',
-                        style: TextStyle(
+                        l10n.voucherCode.toUpperCase(),
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textSecondary,
@@ -422,10 +435,10 @@ class _CourseVoucherRedemptionScreenState
                       ],
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Please enter voucher code';
+                          return l10n.enterVoucherCode;
                         }
                         if (value.trim().length != 16) {
-                          return 'Voucher code must be 16 characters';
+                          return l10n.voucherCodeMustBeLength(16);
                         }
                         return null;
                       },
@@ -450,10 +463,10 @@ class _CourseVoucherRedemptionScreenState
                             size: 20,
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Make sure the voucher code is valid for the selected package.',
-                              style: TextStyle(
+                              l10n.voucherCodeValidForPackage,
+                              style: const TextStyle(
                                 fontSize: 13,
                                 color: AppColors.textSecondary,
                                 height: 1.4,
@@ -474,7 +487,7 @@ class _CourseVoucherRedemptionScreenState
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: CustomButton(
-                text: _isRedeeming ? 'Redeeming...' : 'Redeem Voucher',
+                text: _isRedeeming ? l10n.redeemingVoucher : l10n.redeemVoucher,
                 onPressed: () {
                   _redeemVoucher();
                 },

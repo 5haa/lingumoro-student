@@ -426,6 +426,27 @@ class AppLocalizationsAr extends AppLocalizations {
   String get hourlyRate => 'السعر بالساعة';
   @override
   String get perSession => 'لكل جلسة';
+  // Teacher detail/profile
+  @override
+  String get teacherNotFoundTitle => 'المعلم غير موجود';
+  @override
+  String get teacherNotFoundMessage => 'المعلم الذي تبحث عنه غير موجود';
+  @override
+  String get alreadySubscribedMessage => 'لديك بالفعل اشتراك نشط مع هذا المعلم';
+  @override
+  String get needSubscriptionToChat => 'تحتاج إلى الاشتراك للتحدث مع هذا المعلم';
+  @override
+  String get availableSchedulesTitle => 'الجداول المتاحة';
+  @override
+  String get noScheduleAvailable => 'لا توجد جداول متاحة';
+  @override
+  String get ratingsAndReviewsTitle => 'التقييمات والمراجعات';
+  @override
+  String get noReviewsYet => 'لا توجد مراجعات بعد';
+  @override
+  String get rateButton => 'قيّم';
+  @override
+  String get updateRatingButton => 'تحديث';
   
   // Students
   @override
@@ -462,6 +483,48 @@ class AppLocalizationsAr extends AppLocalizations {
   String get subscriptionActive => 'الاشتراك نشط';
   @override
   String get subscriptionExpired => 'انتهى الاشتراك';
+  // Subscription & vouchers
+  @override
+  String get noPackagesAvailable => 'لا توجد باقات متاحة';
+  @override
+  String teacherNeedsDaysAvailable(int days) =>
+      'يحتاج المعلم إلى ما لا يقل عن $days أيام متاحة لهذه الباقة.';
+  @override
+  String get selectDays => 'اختر الأيام';
+  @override
+  String get selectTime => 'اختر الوقت';
+  @override
+  String get noCommonTimeSlots =>
+      'لا توجد أوقات مشتركة متاحة للأيام المحددة. الرجاء اختيار أيام أخرى.';
+  @override
+  String get selectedPackageLabel => 'الباقة المحددة';
+  @override
+  String selectedDaysLabel(int days) => 'الأيام المحددة ($days أيام)';
+  @override
+  String get change => 'تغيير';
+  @override
+  String get yourSchedule => 'جدولك';
+  @override
+  String voucherCodeMustBeLength(int length) =>
+      'يجب أن يتكون رمز القسيمة من $length حرفاً';
+  @override
+  String get voucherCodeValidForPackage =>
+      'تأكد من أن رمز القسيمة صالح للباقة المحددة.';
+  @override
+  String subscriptionActivatedSessions(int sessions) =>
+      'تم تفعيل الاشتراك! لديك $sessions جلسة.';
+  @override
+  String get redeemingVoucher => 'جارٍ استرداد القسيمة...';
+  @override
+  String get stepPackage => 'الباقة';
+  @override
+  String get stepDays => 'الأيام';
+  @override
+  String get stepTime => 'الوقت';
+  @override
+  String get perMonth => '/الشهر';
+  @override
+  String get subscribeTo => 'اشترك مع';
   
   // Notifications
   @override
@@ -1046,6 +1109,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noMessageProvided => 'لم يتم تقديم رسالة';
   @override
   String get sentChatRequest => 'أرسل طلب محادثة';
+  @override
+  String get chatRequestsReceived => 'الواردة';
+  @override
+  String get chatRequestsSent => 'المرسلة';
+  @override
+  String get chatRequestPendingStatus => 'قيد الانتظار';
   @override
   String get deleteChat => 'حذف المحادثة';
   @override

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:student/services/chat_service.dart';
-import 'package:student/config/app_colors.dart';
-import 'package:student/widgets/custom_back_button.dart';
 import 'package:intl/intl.dart';
+import 'package:student/config/app_colors.dart';
+import 'package:student/l10n/app_localizations.dart';
+import 'package:student/services/chat_service.dart';
+import 'package:student/widgets/custom_back_button.dart';
 
 class ChatRequestsScreen extends StatefulWidget {
   const ChatRequestsScreen({super.key});
@@ -59,18 +60,19 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
     final success = await _chatService.acceptChatRequest(requestId);
     
     if (mounted) {
+      final l10n = AppLocalizations.of(context);
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chat request accepted!'),
+          SnackBar(
+            content: Text(l10n.requestAccepted),
             backgroundColor: Colors.green,
           ),
         );
         _loadRequests();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to accept request'),
+          SnackBar(
+            content: Text(l10n.failedToAcceptRequest),
             backgroundColor: Colors.red,
           ),
         );
@@ -82,18 +84,19 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
     final success = await _chatService.rejectChatRequest(requestId);
     
     if (mounted) {
+      final l10n = AppLocalizations.of(context);
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chat request rejected'),
+          SnackBar(
+            content: Text(l10n.requestRejected),
             backgroundColor: Colors.orange,
           ),
         );
         _loadRequests();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to reject request'),
+          SnackBar(
+            content: Text(l10n.failedToRejectRequest),
             backgroundColor: Colors.red,
           ),
         );
@@ -101,7 +104,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
     }
   }
 
-  String _formatTimestamp(String? timestamp) {
+  String _formatTimestamp(AppLocalizations l10n, String? timestamp) {
     if (timestamp == null) return '';
     
     try {
@@ -112,7 +115,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
       if (difference.inDays == 0) {
         return DateFormat.jm().format(date);
       } else if (difference.inDays == 1) {
-        return 'Yesterday';
+        return l10n.yesterday;
       } else if (difference.inDays < 7) {
         return DateFormat.E().format(date);
       } else {
@@ -125,6 +128,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -137,9 +141,9 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
                 children: [
                   const CustomBackButton(),
                   const Spacer(),
-                  const Text(
-                    'CHAT REQUESTS',
-                    style: TextStyle(
+                  Text(
+                    l10n.chatRequests.toUpperCase(),
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -174,7 +178,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
                     Expanded(
                       child: _buildTabButton(
                         0,
-                        'Received',
+                        l10n.chatRequestsReceived,
                         _pendingRequests.length,
                         FontAwesomeIcons.inbox,
                       ),
@@ -187,7 +191,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
                     Expanded(
                       child: _buildTabButton(
                         1,
-                        'Sent',
+                        l10n.chatRequestsSent,
                         _sentRequests.length,
                         FontAwesomeIcons.paperPlane,
                       ),
@@ -211,8 +215,8 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
                       onRefresh: _loadRequests,
                       color: AppColors.primary,
                       child: _selectedTab == 0
-                          ? _buildPendingRequests()
-                          : _buildSentRequests(),
+                          ? _buildPendingRequests(l10n)
+                          : _buildSentRequests(l10n),
                     ),
             ),
           ],
@@ -275,7 +279,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
     );
   }
 
-  Widget _buildPendingRequests() {
+  Widget _buildPendingRequests(AppLocalizations l10n) {
     if (_pendingRequests.isEmpty) {
       return Center(
         child: Column(
@@ -288,7 +292,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'No pending requests',
+              l10n.noChatRequests,
               style: TextStyle(
                 fontSize: 18,
                 color: AppColors.textSecondary,
@@ -297,7 +301,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'You\'ll see requests here when students want to chat',
+              l10n.startConversation,
               style: TextStyle(
                 fontSize: 14,
                 color: AppColors.textSecondary,
@@ -322,7 +326,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
         
         final requester = requesterData as Map<String, dynamic>;
         final message = request['message'] as String?;
-        final requesterName = requester['full_name'] ?? 'Student';
+        final requesterName = requester['full_name'] ?? l10n.studentPlaceholder;
         final initials = requesterName.isNotEmpty
             ? requesterName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
             : 'ST';
@@ -406,7 +410,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _formatTimestamp(request['created_at']),
+                            _formatTimestamp(l10n, request['created_at']),
                             style: TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
@@ -433,10 +437,10 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
                               borderRadius: BorderRadius.circular(8),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: const Center(
+                                child: Center(
                                   child: Text(
-                                    'Accept',
-                                    style: TextStyle(
+                                    l10n.accept,
+                                    style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
@@ -500,7 +504,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
     );
   }
 
-  Widget _buildSentRequests() {
+  Widget _buildSentRequests(AppLocalizations l10n) {
     if (_sentRequests.isEmpty) {
       return Center(
         child: Column(
@@ -513,7 +517,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'No sent requests',
+              l10n.noChatRequests,
               style: TextStyle(
                 fontSize: 18,
                 color: AppColors.textSecondary,
@@ -522,7 +526,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Requests you send will appear here',
+              l10n.startConversation,
               style: TextStyle(
                 fontSize: 14,
                 color: AppColors.textSecondary,
@@ -547,7 +551,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
         
         final recipient = recipientData as Map<String, dynamic>;
         final status = request['status'] as String;
-        final recipientName = recipient['full_name'] ?? 'Student';
+        final recipientName = recipient['full_name'] ?? l10n.studentPlaceholder;
         final initials = recipientName.isNotEmpty
             ? recipientName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
             : 'ST';
@@ -646,7 +650,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _formatTimestamp(request['created_at']),
+                        _formatTimestamp(l10n, request['created_at']),
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -672,7 +676,7 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        status.toUpperCase(),
+                        _statusLabel(l10n, status),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -689,7 +693,16 @@ class _ChatRequestsScreenState extends State<ChatRequestsScreen> {
       },
     );
   }
+
+  String _statusLabel(AppLocalizations l10n, String status) {
+    switch (status) {
+      case 'accepted':
+        return l10n.requestAccepted;
+      case 'rejected':
+        return l10n.requestRejected;
+      default:
+        return l10n.chatRequestPendingStatus;
+    }
+  }
 }
-
-
 

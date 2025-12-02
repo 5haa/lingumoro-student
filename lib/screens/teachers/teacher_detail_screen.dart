@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:student/services/teacher_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/rating_service.dart';
@@ -9,8 +11,7 @@ import 'package:student/screens/teachers/teacher_ratings_screen.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:student/widgets/custom_button.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:student/l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
 
 class TeacherDetailScreen extends StatefulWidget {
@@ -45,16 +46,6 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   bool _isCheckingSubscription = true;
   YoutubePlayerController? _youtubeController;
   bool _isExitingScreen = false;
-
-  final List<String> _dayNames = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-  ];
 
   @override
   void initState() {
@@ -209,11 +200,12 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   }
 
   void _handleSubscribe() {
+    final l10n = AppLocalizations.of(context);
     if (_hasSubscription) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You already have an active subscription with this teacher'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(l10n.alreadySubscribedMessage),
+          duration: const Duration(seconds: 2),
         ),
       );
       return;
@@ -225,7 +217,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       MaterialPageRoute(
         builder: (context) => SubscriptionScreen(
           teacherId: widget.teacherId,
-          teacherName: _teacher?['full_name'] ?? 'Teacher',
+          teacherName: _teacher?['full_name'] ?? l10n.teacherNamePlaceholder,
           languageId: widget.languageId,
           languageName: widget.languageName,
         ),
@@ -234,12 +226,13 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   }
 
   void _navigateToRatingsScreen() {
+    final l10n = AppLocalizations.of(context);
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => TeacherRatingsScreen(
           teacherId: widget.teacherId,
-          teacherName: _teacher?['full_name'] ?? 'Teacher',
+          teacherName: _teacher?['full_name'] ?? l10n.teacherNamePlaceholder,
           teacherAvatar: _teacher?['avatar_url'],
         ),
       ),
@@ -250,17 +243,18 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   }
 
   Future<void> _openChat() async {
+    final l10n = AppLocalizations.of(context);
     if (!_hasSubscription) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You need to subscribe to chat with this teacher'),
+        SnackBar(
+          content: Text(l10n.needSubscriptionToChat),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final teacherName = _teacher?['full_name'] ?? 'Teacher';
+    final teacherName = _teacher?['full_name'] ?? l10n.teacherNamePlaceholder;
     final teacherAvatar = _teacher?['avatar_url'];
     
     // Try to get/create conversation
@@ -280,8 +274,8 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to start chat. Please try again.'),
+        SnackBar(
+          content: Text(l10n.unableToStartChat),
           backgroundColor: Colors.red,
         ),
       );
@@ -290,6 +284,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (_isLoading) {
       return Scaffold(
         backgroundColor: AppColors.background,
@@ -317,9 +312,9 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                   color: AppColors.grey,
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Teacher Not Found',
-                  style: TextStyle(
+                Text(
+                  l10n.teacherNotFoundTitle,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
@@ -327,8 +322,8 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'The teacher you are looking for does not exist',
-                  style: TextStyle(
+                  l10n.teacherNotFoundMessage,
+                  style: const TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
                   ),
@@ -359,7 +354,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Teacher Info Section
-                      _buildTeacherInfo(averageRating),
+                      _buildTeacherInfo(l10n, averageRating),
                       
                       const SizedBox(height: 20),
                       
@@ -370,17 +365,17 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                       ],
                       
                       // Available Schedules Section
-                      _buildSchedulesSection(),
+                      _buildSchedulesSection(l10n),
                       
                       const SizedBox(height: 30),
                       
                       // Subscribe Button
-                      _buildSubscribeButton(),
+                      _buildSubscribeButton(l10n),
                       
                       const SizedBox(height: 24),
                       
                       // Ratings & Reviews Section (clickable)
-                      _buildRatingsSection(averageRating),
+                      _buildRatingsSection(l10n, averageRating),
                       
                       const SizedBox(height: 30),
                     ],
@@ -411,7 +406,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     );
   }
 
-  Widget _buildTeacherInfo(double averageRating) {
+  Widget _buildTeacherInfo(AppLocalizations l10n, double averageRating) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       constraints: const BoxConstraints(
@@ -496,7 +491,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                   children: [
                     // Teacher Name
                     Text(
-                      _teacher!['full_name'] ?? 'Teacher',
+                      _teacher!['full_name'] ?? l10n.teacherNamePlaceholder,
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -597,15 +592,15 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     );
   }
 
-  Widget _buildSchedulesSection() {
+  Widget _buildSchedulesSection(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'AVAILABLE SCHEDULES',
-            style: TextStyle(
+            l10n.availableSchedulesTitle,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
@@ -641,7 +636,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'No schedule available',
+                          l10n.noScheduleAvailable,
                           style: TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 16,
@@ -652,23 +647,25 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                   ),
                 ),
               )
-            : _buildScheduleList(),
+            : _buildScheduleList(l10n),
       ],
     );
   }
 
-  Widget _buildSubscribeButton() {
+  Widget _buildSubscribeButton(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: CustomButton(
-        text: _hasSubscription ? 'ALREADY SUBSCRIBED' : 'SUBSCRIBE',
+        text: _hasSubscription
+            ? l10n.subscriptionActive.toUpperCase()
+            : l10n.subscribe.toUpperCase(),
         onPressed: _isCheckingSubscription ? () {} : _handleSubscribe,
         isLoading: _isCheckingSubscription,
       ),
     );
   }
 
-  Widget _buildScheduleList() {
+  Widget _buildScheduleList(AppLocalizations l10n) {
     // Group schedules by day
     final Map<int, List<String>> schedulesByDay = {};
     for (var schedule in _schedules) {
@@ -684,15 +681,50 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     }
 
     // Create a list of all 7 days, marking which ones have schedules
-    final List<Map<String, dynamic>> calendarDays = [];
-    for (int i = 0; i < 7; i++) {
-      calendarDays.add({
-        'day': i,
-        'name': _dayNames[i],
-        'hasSchedule': schedulesByDay.containsKey(i),
-        'times': schedulesByDay[i] ?? [],
-      });
-    }
+    final List<Map<String, dynamic>> calendarDays = [
+      {
+        'day': 0,
+        'name': l10n.sun,
+        'hasSchedule': schedulesByDay.containsKey(0),
+        'times': schedulesByDay[0] ?? [],
+      },
+      {
+        'day': 1,
+        'name': l10n.mon,
+        'hasSchedule': schedulesByDay.containsKey(1),
+        'times': schedulesByDay[1] ?? [],
+      },
+      {
+        'day': 2,
+        'name': l10n.tue,
+        'hasSchedule': schedulesByDay.containsKey(2),
+        'times': schedulesByDay[2] ?? [],
+      },
+      {
+        'day': 3,
+        'name': l10n.wed,
+        'hasSchedule': schedulesByDay.containsKey(3),
+        'times': schedulesByDay[3] ?? [],
+      },
+      {
+        'day': 4,
+        'name': l10n.thu,
+        'hasSchedule': schedulesByDay.containsKey(4),
+        'times': schedulesByDay[4] ?? [],
+      },
+      {
+        'day': 5,
+        'name': l10n.fri,
+        'hasSchedule': schedulesByDay.containsKey(5),
+        'times': schedulesByDay[5] ?? [],
+      },
+      {
+        'day': 6,
+        'name': l10n.sat,
+        'hasSchedule': schedulesByDay.containsKey(6),
+        'times': schedulesByDay[6] ?? [],
+      },
+    ];
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -734,7 +766,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                           width: 90,
                           child: Center(
                             child: Text(
-                              day['name'].toString().substring(0, 3).toUpperCase(),
+                              (day['name'] as String).toUpperCase(),
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -856,7 +888,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     }
   }
 
-  Widget _buildRatingsSection(double averageRating) {
+  Widget _buildRatingsSection(AppLocalizations l10n, double averageRating) {
     final totalRatings = _ratingStats?['total_ratings'] as int? ?? 0;
     final hasRatings = totalRatings > 0;
 
@@ -903,9 +935,9 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Ratings & Reviews',
-                      style: TextStyle(
+                    Text(
+                      l10n.ratingsAndReviewsTitle,
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -944,9 +976,9 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                         ],
                       )
                     else
-                      const Text(
-                        'No reviews yet',
-                        style: TextStyle(
+                      Text(
+                        l10n.noReviewsYet,
+                        style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                         ),
@@ -976,7 +1008,9 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              _myRating != null ? 'Update' : 'Rate',
+                              _myRating != null
+                                  ? l10n.updateRatingButton
+                                  : l10n.rateButton,
                               style: const TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 11,

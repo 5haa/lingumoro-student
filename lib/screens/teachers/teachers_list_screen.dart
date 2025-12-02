@@ -208,6 +208,7 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
   }
   
   Widget _buildTeacherCard(Map<String, dynamic> teacher) {
+    final l10n = AppLocalizations.of(context);
     final teacherId = teacher['id'] as String?;
     final ratingStats = teacherId != null ? _teacherRatings[teacherId] : null;
     final averageRating = (ratingStats?['average_rating'] as num?)?.toDouble() ?? 0.0;
@@ -303,7 +304,7 @@ class _TeachersListScreenState extends State<TeachersListScreen> {
                   children: [
                     // Teacher Name
                     Text(
-                      teacher['full_name'] ?? 'Teacher',
+                      teacher['full_name'] ?? l10n.teacherNamePlaceholder,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 13,

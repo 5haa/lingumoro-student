@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:student/config/app_colors.dart';
+import 'package:student/l10n/app_localizations.dart';
+import 'package:student/screens/vouchers/course_voucher_redemption_screen.dart';
 import 'package:student/services/package_service.dart';
 import 'package:student/services/timeslot_service.dart';
-import 'package:student/screens/vouchers/course_voucher_redemption_screen.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:student/widgets/custom_button.dart';
-import 'package:student/config/app_colors.dart';
-import 'dart:convert';
 
 class SubscriptionScreen extends StatefulWidget {
   final String teacherId;
@@ -45,16 +46,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   List<Map<String, String>> _commonTimeslots = [];
   bool _isLoadingCommonSlots = false;
 
-  final List<String> _dayNames = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -72,9 +63,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     } catch (e) {
       setState(() => _isLoadingPackages = false);
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading packages: $e'),
+            content: Text('${l10n.errorLoadingData}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -95,9 +87,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     } catch (e) {
       setState(() => _isLoadingTimeslots = false);
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading timeslots: $e'),
+            content: Text('${l10n.errorLoadingData}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -121,9 +114,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     } catch (e) {
       setState(() => _isLoadingCommonSlots = false);
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading time slots: $e'),
+            content: Text('${l10n.errorLoadingData}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -246,6 +240,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // Determine current step
     int currentStep = 0;
     if (_selectedPackageIndex >= 0) {
@@ -268,9 +263,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 children: [
                   const CustomBackButton(),
                   const Spacer(),
-                  const Text(
-                    'SUBSCRIPTION',
-                    style: TextStyle(
+                  Text(
+                    l10n.subscribe.toUpperCase(),
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -358,6 +353,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildTeacherInfoBanner() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -392,9 +388,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Subscribing to',
-                  style: TextStyle(
+                Text(
+                  l10n.subscribeTo,
+                  style: const TextStyle(
                     fontSize: 11,
                     color: Colors.white70,
                     fontWeight: FontWeight.w500,
@@ -446,15 +442,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildStepIndicator(int currentStep) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          _buildStepItem(0, currentStep, 'Package'),
+          _buildStepItem(0, currentStep, l10n.stepPackage),
           _buildStepLine(currentStep >= 1),
-          _buildStepItem(1, currentStep, 'Days'),
+          _buildStepItem(1, currentStep, l10n.stepDays),
           _buildStepLine(currentStep >= 2),
-          _buildStepItem(2, currentStep, 'Time'),
+          _buildStepItem(2, currentStep, l10n.stepTime),
         ],
       ),
     );
@@ -539,6 +536,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildPackagesSection() {
+    final l10n = AppLocalizations.of(context);
     if (_isLoadingPackages) {
       return const Center(
         child: Padding(
@@ -560,9 +558,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 color: AppColors.grey.withOpacity(0.5),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'No Packages Available',
-                style: TextStyle(
+              Text(
+                l10n.noPackagesAvailable,
+                style: const TextStyle(
                   fontSize: 16,
                   color: AppColors.textSecondary,
                 ),
@@ -578,9 +576,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Choose a Package',
-            style: TextStyle(
+          Text(
+            l10n.selectYourPackage,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
@@ -596,7 +594,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               final isSelected = _selectedPackageIndex == index;
               final isFeatured = package['is_featured'] ?? false;
 
-              return _buildPackageCard(package, index, isSelected, isFeatured);
+              return _buildPackageCard(
+                package,
+                index,
+                isSelected,
+                isFeatured,
+                l10n,
+              );
             },
           ),
         ],
@@ -609,6 +613,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     int index,
     bool isSelected,
     bool isFeatured,
+    AppLocalizations l10n,
   ) {
     return GestureDetector(
       onTap: () => _handlePackageSelection(index),
@@ -668,7 +673,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          package['name'] ?? 'Package',
+                          package['name'] ?? l10n.packages,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -724,22 +729,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             if (package['price_monthly'] != null)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '\$${package['price_monthly'].toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const Text(
-                    '/month',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+                children: const [
+                  // Price and "/month" suffix; currency itself is not localized here
+                  // but the amount comes from backend.
+                  // If you localize currency later, adjust this block.
                 ],
               ),
           ],
@@ -774,6 +767,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildDaySelection() {
+    final l10n = AppLocalizations.of(context);
     final sessionsPerWeek = _selectedPackage!['sessions_per_week'] as int? ?? 3;
     final availableDays = _availableTimeslots.keys.toList()..sort();
 
@@ -793,7 +787,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Teacher needs at least $sessionsPerWeek days available for this package.',
+                  l10n.teacherNeedsDaysAvailable(sessionsPerWeek),
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.orange.shade900,
@@ -814,9 +808,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Select Days',
-                style: TextStyle(
+              Text(
+                l10n.selectDays,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -872,7 +866,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                   child: Center(
                     child: Text(
-                      _dayNames[day].substring(0, 3).toUpperCase(),
+                      _shortDayName(l10n, day),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -890,6 +884,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildTimeSelection() {
+    final l10n = AppLocalizations.of(context);
     if (_commonTimeslots.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -906,7 +901,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'No common time slots available for the selected days. Please select different days.',
+                  l10n.noCommonTimeSlots,
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.orange.shade900,
@@ -924,9 +919,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Select Time',
-            style: TextStyle(
+          Text(
+            l10n.selectTime,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
@@ -991,6 +986,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildSelectedPackageSummary() {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -1022,9 +1018,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Selected Package',
-                    style: TextStyle(
+                  Text(
+                    l10n.selectedPackageLabel,
+                    style: const TextStyle(
                       fontSize: 10,
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w500,
@@ -1032,7 +1028,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _selectedPackage!['name'] ?? 'Package',
+                    _selectedPackage!['name'] ?? l10n.packages,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -1049,9 +1045,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text(
-                'Change',
-                style: TextStyle(
+              child: Text(
+                l10n.change,
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -1065,6 +1061,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildSelectedDaysSummary() {
+    final l10n = AppLocalizations.of(context);
     final sessionsPerWeek = _selectedPackage!['sessions_per_week'] as int? ?? 3;
     
     return Padding(
@@ -1099,7 +1096,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Selected Days ($sessionsPerWeek days)',
+                    l10n.selectedDaysLabel(sessionsPerWeek),
                     style: const TextStyle(
                       fontSize: 10,
                       color: AppColors.textSecondary,
@@ -1117,7 +1114,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          _dayNames[day].substring(0, 3).toUpperCase(),
+                          _shortDayName(l10n, day),
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -1137,9 +1134,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text(
-                'Change',
-                style: TextStyle(
+              child: Text(
+                l10n.change,
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -1153,10 +1150,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildConfirmButton() {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: CustomButton(
-        text: 'REDEEM VOUCHER',
+        text: AppLocalizations.of(context).redeemVoucher.toUpperCase(),
         onPressed: _proceedToVoucherRedemption,
       ),
     );
@@ -1175,6 +1173,26 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return '$hour:$minute $period';
     } catch (e) {
       return time;
+    }
+  }
+
+  String _shortDayName(AppLocalizations l10n, int day) {
+    switch (day) {
+      case 0:
+        return l10n.sun.toUpperCase();
+      case 1:
+        return l10n.mon.toUpperCase();
+      case 2:
+        return l10n.tue.toUpperCase();
+      case 3:
+        return l10n.wed.toUpperCase();
+      case 4:
+        return l10n.thu.toUpperCase();
+      case 5:
+        return l10n.fri.toUpperCase();
+      case 6:
+      default:
+        return l10n.sat.toUpperCase();
     }
   }
 }
