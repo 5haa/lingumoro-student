@@ -6,7 +6,7 @@ import '../../config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
 import '../../services/notification_service.dart';
 import '../../services/notification_badge_controller.dart';
-import '../../services/notification_badge_controller.dart';
+import '../../l10n/app_localizations.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -117,11 +117,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
       _badgeController.triggerUpdate();
       
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('All notifications marked as read'),
+          SnackBar(
+            content: Text(l10n.allNotificationsMarkedRead),
             backgroundColor: AppColors.primary,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -130,20 +131,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
 
   Future<void> _clearAllNotifications() async {
     // Show confirmation dialog
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear All Notifications'),
-        content: const Text('Are you sure you want to clear all notifications? This action cannot be undone.'),
+        title: Text(l10n.clearAllNotificationsTitle),
+        content: Text(l10n.clearAllNotificationsMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Clear All'),
+            child: Text(l10n.clearAllButton),
           ),
         ],
       ),
@@ -161,9 +163,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
       _badgeController.triggerUpdate();
       
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$count notification${count > 1 ? 's' : ''} cleared'),
+            content: Text(l10n.notificationsCleared(count)),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
@@ -201,19 +204,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
   }
 
   String _getTimeAgo(String? createdAt) {
-    if (createdAt == null) return 'Unknown';
+    final l10n = AppLocalizations.of(context);
+    if (createdAt == null) return l10n.unknownError;
     try {
       final date = DateTime.parse(createdAt);
       final now = DateTime.now();
       final difference = now.difference(date);
 
-      if (difference.inMinutes < 1) return 'Just now';
-      if (difference.inMinutes < 60) return '${difference.inMinutes} min ago';
-      if (difference.inHours < 24) return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-      if (difference.inDays < 7) return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+      if (difference.inMinutes < 1) return l10n.justNow;
+      if (difference.inMinutes < 60) return l10n.minutesAgo(difference.inMinutes);
+      if (difference.inHours < 24) return '${difference.inHours}${l10n.hoursAgo}';
+      if (difference.inDays < 7) return l10n.daysAgo(difference.inDays);
       return DateFormat('MMM d, y').format(date);
     } catch (e) {
-      return 'Unknown';
+      return l10n.unknownError;
     }
   }
 
@@ -236,6 +240,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -248,11 +253,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
                 children: [
                   const CustomBackButton(),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'NOTIFICATIONS',
+                      l10n.notifications,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -271,9 +276,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               minimumSize: const Size(45, 30),
                             ),
-                            child: const Text(
-                              'Read all',
-                              style: TextStyle(
+                            child: Text(
+                              l10n.readAll,
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.primary,
@@ -286,9 +291,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             minimumSize: const Size(45, 30),
                           ),
-                          child: const Text(
-                            'Clear',
-                            style: TextStyle(
+                          child: Text(
+                            l10n.clear,
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: Colors.red,
@@ -329,7 +334,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            'No notifications',
+                            l10n.noNotifications,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -338,7 +343,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'You\'re all caught up!',
+                            l10n.youreAllCaughtUp,
                             style: TextStyle(
                               fontSize: 14,
                               color: AppColors.textSecondary.withOpacity(0.5),

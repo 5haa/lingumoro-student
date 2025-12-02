@@ -250,6 +250,8 @@ abstract class AppLocalizations {
   String get sendChatRequest;
   String get chatRequestSent;
   String get alreadyChatting;
+  String get beFirstInYourLanguage;
+  String get enrollToSeeOtherStudents;
   
   // Packages
   String get packages;
@@ -271,6 +273,15 @@ abstract class AppLocalizations {
   String get sessionReminders;
   String get chatMessages;
   String get practiceReminders;
+  // Notifications - additional
+  String get allNotificationsMarkedRead;
+  String get clearAllNotificationsTitle;
+  String get clearAllNotificationsMessage;
+  String get clearAllButton;
+  String notificationsCleared(int count);
+  String get readAll;
+  String get clear;
+  String get youreAllCaughtUp;
   
   // Days of week
   String get monday;
@@ -539,6 +550,8 @@ abstract class AppLocalizations {
   String get failedToLoadBlockedUsers;
   String get userHasBeenUnblocked;
   String get failedToUnblockUser;
+  String get blockUserMessage;
+  String get userBlocked;
   
   // Search/Input hints
   String get searchMessages;

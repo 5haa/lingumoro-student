@@ -438,6 +438,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatRequestSent => 'Chat request sent';
   @override
   String get alreadyChatting => 'Already chatting';
+   @override
+  String get beFirstInYourLanguage => 'Be the first in your language!';
+  @override
+  String get enrollToSeeOtherStudents => 'You need to enroll in a course to see other students';
   
   // Packages
   @override
@@ -476,6 +480,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessages => 'Chat Messages';
   @override
   String get practiceReminders => 'Practice Reminders';
+  @override
+  String get allNotificationsMarkedRead => 'All notifications marked as read';
+  @override
+  String get clearAllNotificationsTitle => 'Clear All Notifications';
+  @override
+  String get clearAllNotificationsMessage => 'Are you sure you want to clear all notifications? This action cannot be undone.';
+  @override
+  String get clearAllButton => 'Clear All';
+  @override
+  String notificationsCleared(int count) => '$count notification${count == 1 ? '' : 's'} cleared';
+  @override
+  String get readAll => 'Read all';
+  @override
+  String get clear => 'Clear';
+  @override
+  String get youreAllCaughtUp => "You're all caught up!";
   
   // Days of week
   @override
@@ -972,6 +992,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get userHasBeenUnblocked => '{name} has been unblocked';
   @override
   String get failedToUnblockUser => 'Failed to unblock user';
+  @override
+  String get blockUserMessage => 'Blocking this user will hide their profile and prevent them from contacting you.';
+  @override
+  String get userBlocked => 'User blocked';
   
   // Search/Input hints
   @override

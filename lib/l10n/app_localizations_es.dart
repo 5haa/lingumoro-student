@@ -438,6 +438,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatRequestSent => 'Solicitud de chat enviada';
   @override
   String get alreadyChatting => 'Ya estás chateando';
+  @override
+  String get beFirstInYourLanguage => '¡Sé el primero en tu idioma!';
+  @override
+  String get enrollToSeeOtherStudents => 'Necesitas inscribirte en un curso para ver a otros estudiantes';
   
   // Packages
   @override
@@ -476,6 +480,22 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatMessages => 'Mensajes de Chat';
   @override
   String get practiceReminders => 'Recordatorios de Práctica';
+  @override
+  String get allNotificationsMarkedRead => 'Todas las notificaciones marcadas como leídas';
+  @override
+  String get clearAllNotificationsTitle => 'Borrar Todas las Notificaciones';
+  @override
+  String get clearAllNotificationsMessage => '¿Estás seguro de que quieres borrar todas las notificaciones? Esta acción no se puede deshacer.';
+  @override
+  String get clearAllButton => 'Borrar Todo';
+  @override
+  String notificationsCleared(int count) => 'Se borraron $count notificaciones';
+  @override
+  String get readAll => 'Leer todo';
+  @override
+  String get clear => 'Borrar';
+  @override
+  String get youreAllCaughtUp => '¡Ya estás al día!';
   
   // Days of week
   @override
@@ -972,6 +992,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get userHasBeenUnblocked => '{name} ha sido desbloqueado';
   @override
   String get failedToUnblockUser => 'Error al desbloquear usuario';
+  @override
+  String get blockUserMessage => 'Bloquear a este usuario ocultará su perfil e impedirá que se comunique contigo.';
+  @override
+  String get userBlocked => 'Usuario bloqueado';
   
   // Search/Input hints
   @override

@@ -10,6 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/screens/students/student_public_profile_screen.dart';
 import 'package:student/screens/chat/chat_requests_screen.dart';
 import 'package:student/screens/chat/chat_conversation_screen.dart';
+import 'package:student/l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
 
@@ -307,6 +308,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   
   Future<void> _sendChatRequest(String recipientId, String recipientName) async {
     final messageController = TextEditingController();
+    final l = AppLocalizations.of(context);
     final result = await showDialog<String>(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
@@ -360,9 +362,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Send Message Request',
-                            style: TextStyle(
+                          Text(
+                            l.chatRequestTitle,
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -370,7 +372,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'To $recipientName',
+                            recipientName,
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.white.withOpacity(0.9),
@@ -391,9 +393,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Message (Optional)',
-                      style: TextStyle(
+                    Text(
+                      l.messageHint,
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -405,7 +407,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                       maxLines: 3,
                       maxLength: 200,
                       decoration: InputDecoration(
-                        hintText: 'Hi! I\'d love to practice together...',
+                        hintText: l.messageHint,
                         hintStyle: TextStyle(
                           color: AppColors.textHint,
                           fontSize: 14,
@@ -442,9 +444,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                 ),
                               ),
                             ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(
+                            child: Text(
+                              l.cancel,
+                              style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textSecondary,
@@ -467,9 +469,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text(
-                              'Send',
-                              style: TextStyle(
+                            child: Text(
+                              l.sendMessage,
+                              style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -489,21 +491,24 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
 
     if (result == null) return;
 
-    final success = await _chatService.sendChatRequest(recipientId, message: result.isEmpty ? null : result);
+    final success = await _chatService.sendChatRequest(
+      recipientId,
+      message: result.isEmpty ? null : result,
+    );
 
     if (mounted) {
       if (success != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chat request sent!'),
+          SnackBar(
+            content: Text(l.chatRequestSent),
             backgroundColor: Colors.green,
           ),
         );
         _loadStudents();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to send request'),
+          SnackBar(
+            content: Text(l.failedToSendMessage),
             backgroundColor: Colors.red,
           ),
         );
@@ -519,14 +524,15 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     final success = await _chatService.acceptChatRequest(requestId);
 
     if (mounted) {
+      final l = AppLocalizations.of(context);
       if (success) {
         // Refresh status and open chat
         await _loadStudents();
         _openChat(studentId, studentName);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to accept request'),
+          SnackBar(
+            content: Text(l.failedToAcceptRequest),
             backgroundColor: Colors.red,
           ),
         );
@@ -551,9 +557,10 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
         ),
       );
     } else if (mounted) {
+      final l = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to start chat. Make sure request is accepted.'),
+        SnackBar(
+          content: Text(l.unableToStartChat),
           backgroundColor: Colors.orange,
         ),
       );
@@ -562,6 +569,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -574,9 +582,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                 children: [
                   const CustomBackButton(),
                   const Spacer(),
-                  const Text(
-                    'STUDENTS',
-                    style: TextStyle(
+                  Text(
+                    l.studentsList,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -600,7 +608,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                       );
                       _loadStudents();
                     },
-                    tooltip: 'Chat Requests',
+                    tooltip: l.chatRequests,
                   ),
                 ],
               ),
@@ -630,7 +638,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'No other students found',
+                                    l.noStudentsFound,
                                     style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
@@ -639,7 +647,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Be the first in your language!',
+                                    l.beFirstInYourLanguage,
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: AppColors.textSecondary,
@@ -676,6 +684,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   Widget _buildErrorState() {
     // Check if it's a PRO subscription error
     if (_errorMessage == 'PRO subscription required') {
+      final l = AppLocalizations.of(context);
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -695,9 +704,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'PRO Subscription Required',
-                style: TextStyle(
+              Text(
+                l.proSubscriptionRequired,
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -706,8 +715,8 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Connect with fellow students with a PRO subscription',
-                style: TextStyle(
+                l.upgradeToAccess,
+                style: const TextStyle(
                   fontSize: 16,
                   color: AppColors.textSecondary,
                 ),
@@ -720,6 +729,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     }
 
     // Regular error state
+    final l = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -733,7 +743,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              _errorMessage ?? 'Error loading students',
+              _errorMessage == 'You need to enroll in a course to see other students'
+                  ? l.enrollToSeeOtherStudents
+                  : l.errorLoadingData,
               style: TextStyle(
                 fontSize: 18,
                 color: AppColors.textSecondary,
@@ -748,7 +760,8 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   
   Widget _buildStudentCard(Map<String, dynamic> student) {
     final studentId = student['id'] as String;
-    final studentName = student['full_name'] ?? 'Student';
+    final l = AppLocalizations.of(context);
+    final studentName = student['full_name'] ?? l.studentPlaceholder;
     final status = _chatRequestStatus[studentId];
     
     // Calculate level from languages or use default
@@ -866,7 +879,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      'Lvl $level',
+                      '${l.level} $level',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/services/photo_service.dart';
 import 'package:student/services/blocking_service.dart';
+import 'package:student/l10n/app_localizations.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import '../../config/app_colors.dart';
 
@@ -69,6 +70,8 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
   }
 
   Future<void> _toggleBlock() async {
+    final l = AppLocalizations.of(context);
+    final fullName = widget.studentData['full_name'] ?? l.user;
     final shouldBlock = !_isBlocked;
     
     final confirmed = await showDialog<bool>(
@@ -76,7 +79,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          shouldBlock ? 'Block User?' : 'Unblock User?',
+          shouldBlock ? l.blockUser : l.unblockUser,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
@@ -84,14 +87,14 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
         ),
         content: Text(
           shouldBlock
-              ? 'Blocking this user will hide their profile and prevent them from contacting you.'
-              : 'This user will be able to see your profile and contact you again.',
+              ? l.blockUserMessage
+              : l.unblockUserMessage.replaceAll('{name}', fullName),
           style: const TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.grey)),
+            child: Text(l.cancel, style: const TextStyle(color: AppColors.grey)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -101,7 +104,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            child: Text(shouldBlock ? 'Block' : 'Unblock'),
+            child: Text(shouldBlock ? l.block : l.unblock),
           ),
         ],
       ),
@@ -119,7 +122,11 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
           setState(() => _isBlocked = shouldBlock);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(shouldBlock ? 'User blocked' : 'User unblocked'),
+              content: Text(
+                shouldBlock
+                    ? l.userBlocked
+                    : l.userHasBeenUnblocked.replaceAll('{name}', fullName),
+              ),
               backgroundColor: shouldBlock ? Colors.red : Colors.green,
             ),
           );
@@ -130,7 +137,11 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to ${shouldBlock ? 'block' : 'unblock'} user'),
+              content: Text(
+                shouldBlock
+                    ? l.failedToBlockUserTryAgain
+                    : l.failedToUnblockUser,
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -140,7 +151,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text('${l.error}: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -150,10 +161,11 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final languages = widget.studentData['languages'] as List<Map<String, dynamic>>? ?? [];
     final province = widget.studentData['province'] as Map<String, dynamic>?;
     final bio = widget.studentData['bio'] as String?;
-    final fullName = widget.studentData['full_name'] ?? 'Unknown';
+    final fullName = widget.studentData['full_name'] ?? l.studentPlaceholder;
     final email = widget.studentData['email'] ?? '';
     final level = languages.isNotEmpty ? languages.length : 1;
     final initials = fullName.isNotEmpty
@@ -212,7 +224,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        'Level $level',
+                                        '${l.level} $level',
                                         style: const TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.bold,
@@ -324,7 +336,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                   if (bio != null && bio.isNotEmpty)
                     _buildInfoCard(
                       icon: FontAwesomeIcons.circleInfo,
-                      title: 'About',
+                      title: l.about,
                       child: Text(
                         bio,
                         style: const TextStyle(
@@ -340,7 +352,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                   if (languages.isNotEmpty)
                     _buildInfoCard(
                       icon: FontAwesomeIcons.language,
-                      title: 'Learning Languages',
+                      title: l.languages,
                       child: Wrap(
                         spacing: 10,
                         runSpacing: 10,
@@ -682,7 +694,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
         builder: (context) => _FullScreenPhotoViewer(
           photos: _photos,
           initialIndex: _currentPhotoIndex,
-          studentName: widget.studentData['full_name'] ?? 'Student',
+          studentName: widget.studentData['full_name'] ?? AppLocalizations.of(context).studentPlaceholder,
         ),
       ),
     );

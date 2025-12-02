@@ -438,6 +438,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatRequestSent => 'تم إرسال طلب المحادثة';
   @override
   String get alreadyChatting => 'محادثة جارية بالفعل';
+  @override
+  String get beFirstInYourLanguage => 'كن الأول في لغتك!';
+  @override
+  String get enrollToSeeOtherStudents => 'تحتاج إلى التسجيل في دورة لرؤية الطلاب الآخرين';
   
   // Packages
   @override
@@ -476,6 +480,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatMessages => 'رسائل المحادثة';
   @override
   String get practiceReminders => 'تذكيرات التمرين';
+  @override
+  String get allNotificationsMarkedRead => 'تم وضع علامة مقروء على جميع الإشعارات';
+  @override
+  String get clearAllNotificationsTitle => 'مسح جميع الإشعارات';
+  @override
+  String get clearAllNotificationsMessage => 'هل أنت متأكد من مسح جميع الإشعارات؟ لا يمكن التراجع عن هذا الإجراء.';
+  @override
+  String get clearAllButton => 'مسح الكل';
+  @override
+  String notificationsCleared(int count) => 'تم مسح $count من الإشعارات';
+  @override
+  String get readAll => 'قراءة الكل';
+  @override
+  String get clear => 'مسح';
+  @override
+  String get youreAllCaughtUp => 'لقد اطلعت على كل شيء!';
   
   // Days of week
   @override
@@ -972,6 +992,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get userHasBeenUnblocked => 'تم إلغاء حظر {name}';
   @override
   String get failedToUnblockUser => 'فشل إلغاء حظر المستخدم';
+  @override
+  String get blockUserMessage => 'سيؤدي حظر هذا المستخدم إلى إخفاء ملفه الشخصي ومنعه من التواصل معك.';
+  @override
+  String get userBlocked => 'تم حظر المستخدم';
   
   // Search/Input hints
   @override

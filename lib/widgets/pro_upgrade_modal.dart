@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/config/app_colors.dart';
+import 'package:student/l10n/app_localizations.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/preload_service.dart';
@@ -32,6 +33,7 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
@@ -77,22 +79,22 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Column(
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Upgrade to PRO',
-                                  style: TextStyle(
+                                  l.upgradeToPro,
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
-                                SizedBox(height: 2),
+                                const SizedBox(height: 2),
                                 Text(
-                                  'Redeem your voucher code',
-                                  style: TextStyle(
+                                  l.redeemVoucher,
+                                  style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.white,
                                     fontWeight: FontWeight.w500,
@@ -124,9 +126,9 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'PRO Benefits',
-                      style: TextStyle(
+                    Text(
+                      l.proBenefits,
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -135,27 +137,27 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
                     const SizedBox(height: 10),
                     _buildBenefitItem(
                       FontAwesomeIcons.infinity,
-                      'Unlimited Access',
-                      'Access all features without restrictions',
+                      l.unlimitedAccess,
+                      l.unlimitedAccessDesc,
                     ),
                     const SizedBox(height: 8),
                     _buildBenefitItem(
                       FontAwesomeIcons.users,
-                      'Connect with Students',
-                      'Chat and connect with other language learners',
+                      l.connectWithStudents,
+                      l.connectWithStudentsDesc,
                     ),
                     const SizedBox(height: 8),
                     _buildBenefitItem(
                       FontAwesomeIcons.robot,
-                      'Practice with AI',
-                      'Interactive AI-powered language practice sessions',
+                      l.practiceWithAI,
+                      l.practiceWithAIDesc,
                     ),
                     const SizedBox(height: 16),
                     
                     // Voucher Input with Redeem Button
-                    const Text(
-                      'Voucher Code',
-                      style: TextStyle(
+                    Text(
+                      l.voucherCode,
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -196,8 +198,8 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
                                 color: AppColors.textPrimary,
                               ),
                               decoration: InputDecoration(
-                                hintText: 'Enter code here',
-                                hintStyle: TextStyle(
+                                hintText: l.enterCodeHere,
+                                hintStyle: const TextStyle(
                                   color: AppColors.textHint,
                                   letterSpacing: 0,
                                   fontWeight: FontWeight.normal,
@@ -252,7 +254,7 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
                                 if (code.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: const Text('Please enter a voucher code'),
+                                      content: Text(l.enterVoucherCode),
                                       backgroundColor: AppColors.primary,
                                       behavior: SnackBarBehavior.floating,
                                       shape: RoundedRectangleBorder(
@@ -344,6 +346,8 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
       ),
     );
 
+    final l = AppLocalizations.of(context);
+
     try {
       final studentId = _authService.currentUser?.id;
       if (studentId == null) {
@@ -358,7 +362,9 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('PRO subscription activated! +${result['days_added']} days'),
+              content: Text(
+                '${l.voucherRedeemed} +${result['days_added']} ${l.voucherRedeemedDesc}',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -379,7 +385,7 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text('${l.error}: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
