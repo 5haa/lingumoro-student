@@ -39,6 +39,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   bool _hasProSubscription = false;
   String? _errorMessage;
   String? _studentId;
+  bool _isInitialLoadDone = false;
   
   // Statistics for cards
   Map<String, dynamic> _quizStats = {
@@ -55,14 +56,18 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   @override
   void initState() {
     super.initState();
-    _loadDataFromCache();
+    // Defer loading to after initState completes to avoid context access issues
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDataFromCache();
+      _isInitialLoadDone = true;
+    });
   }
   
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload data when returning to this screen (e.g., after activation in Profile)
-    if (mounted && !_isLoading) {
+    // Only reload data after initial load is complete (to avoid double-loading)
+    if (_isInitialLoadDone && mounted && !_isLoading) {
       _loadDataFromCache();
     }
   }

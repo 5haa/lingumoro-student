@@ -3,7 +3,7 @@ import 'app_localizations.dart';
 class AppLocalizationsEs extends AppLocalizations {
   // Common
   @override
-  String get appName => 'Lingumoro';
+  String get appName => 'LinguMoro';
   @override
   String get ok => 'OK';
   @override

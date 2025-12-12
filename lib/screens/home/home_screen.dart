@@ -329,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           Expanded(
             child: Center(
               child: Text(
-                AppLocalizations.of(context).appName.toUpperCase(),
+                AppLocalizations.of(context).appName,
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -661,8 +661,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   // Title text
                   Positioned(
                     top: padding,
-                    left: imageOnRight ? padding : null,
-                    right: imageOnRight ? null : padding,
+                    left: padding,
                     child: Text(
                       title,
                       style: TextStyle(
