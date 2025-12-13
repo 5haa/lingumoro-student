@@ -9,6 +9,8 @@ import 'package:student/services/ai_story_service.dart';
 import 'package:student/services/reading_service.dart';
 import 'package:student/services/preload_service.dart';
 import 'package:student/services/points_notification_service.dart';
+import 'package:student/services/daily_limit_service.dart';
+import 'package:student/models/difficulty_level.dart';
 import 'package:student/screens/practice/reading_screen.dart';
 import 'package:student/screens/practice/quiz_practice_screen.dart';
 import 'package:student/screens/practice/ai_voice_screen.dart';
@@ -32,6 +34,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   final _aiStoryService = AIStoryService();
   final _readingService = ReadingService();
   final _preloadService = PreloadService();
+  final _dailyLimitService = DailyLimitService();
   
   List<Map<String, dynamic>> _videos = [];
   Map<String, bool> _watchedVideos = {};
@@ -40,6 +43,13 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   String? _errorMessage;
   String? _studentId;
   bool _isInitialLoadDone = false;
+  
+  // Daily limit status
+  Map<String, bool> _dailyLimitStatus = {
+    'quiz_completed': false,
+    'video_completed': false,
+    'reading_completed': false,
+  };
   
   // Statistics for cards
   Map<String, dynamic> _quizStats = {
@@ -164,6 +174,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
         _loadVideosData(),
         _loadQuizStats(),
         _loadReadingStats(),
+        _loadDailyLimitStatus(),
       ]);
 
       // Cache the practice data
@@ -232,6 +243,18 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     }
   }
 
+  Future<void> _loadDailyLimitStatus() async {
+    try {
+      if (_studentId == null) return;
+      final status = await _dailyLimitService.getDailyLimitStatus(_studentId!);
+      setState(() {
+        _dailyLimitStatus = status;
+      });
+    } catch (e) {
+      print('Error loading daily limit status: $e');
+    }
+  }
+
   bool _canWatchVideo(int index) {
     if (index == 0) return true; // First video can always be watched
     
@@ -290,6 +313,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           onTap: () => _navigateToQuiz(),
                           isLocked: false,
                           showProgress: false,
+                          dailyLimitReached: _dailyLimitStatus['quiz_completed'],
                         ),
                         const SizedBox(height: 12),
 
@@ -324,6 +348,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           onTap: () => _navigateToReading(),
                           isLocked: false,
                           showProgress: false,
+                          dailyLimitReached: _dailyLimitStatus['reading_completed'],
                         ),
                         const SizedBox(height: 12),
 
@@ -344,6 +369,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           progressValue: _videos.isNotEmpty
                               ? ((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt()
                               : 0,
+                          dailyLimitReached: _dailyLimitStatus['video_completed'],
                         ),
                                 const SizedBox(height: 16),
                               ],
@@ -422,6 +448,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     required LinearGradient gradient,
     bool showProgress = false,
     int? progressValue,
+    bool? dailyLimitReached,
   }) {
     final l10n = AppLocalizations.of(context);
     return GestureDetector(
@@ -473,10 +500,15 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
               // Badges row
               Wrap(
                 spacing: 6,
+                runSpacing: 6,
                 children: [
                   _buildBadge(stat2Label, color),
                   if (isLocked)
                     _buildBadge(l10n.proFeature, Colors.amber.shade700),
+                  if (dailyLimitReached == true)
+                    _buildBadge('✓ Today', Colors.green.shade700),
+                  if (dailyLimitReached == false && !isLocked)
+                    _buildBadge('Available', Colors.blue.shade700),
                 ],
               ),
               
@@ -762,18 +794,39 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
   final _practiceService = PracticeService();
   final _authService = AuthService();
   final _proService = ProSubscriptionService();
+  final _dailyLimitService = DailyLimitService();
   
-  List<Map<String, dynamic>> _videos = [];
+  List<Map<String, dynamic>> _currentLevelVideos = [];
   Map<String, bool> _watchedVideos = {};
   bool _isLoading = true;
   bool _hasProSubscription = false;
   String? _errorMessage;
   String? _studentId;
+  
+  int _selectedDifficulty = 1;
+  int _highestUnlockedLevel = 1;
+  bool _canWatchToday = true;
+  String _timeUntilReset = '';
+  Map<int, Map<String, dynamic>> _progressByLevel = {};
 
   @override
   void initState() {
     super.initState();
     _loadPracticeVideos();
+    _startResetTimer();
+  }
+
+  void _startResetTimer() {
+    Future.doWhile(() async {
+      if (!mounted) return false;
+      await Future.delayed(const Duration(seconds: 60));
+      if (mounted) {
+        setState(() {
+          _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
+        });
+      }
+      return mounted;
+    });
   }
 
   Future<void> _loadPracticeVideos() async {
@@ -808,16 +861,18 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
         _hasProSubscription = true;
       });
 
-      final videos = await _practiceService.getPracticeVideos(null);
-      
-      // OPTIMIZATION: Batch query for watched status
-      final videoIds = videos.map((v) => v['id'] as String).toList();
-      final watchedStatus = await _practiceService.getWatchedStatusBatch(_studentId!, videoIds);
+      // Load data
+      await Future.wait([
+        _loadHighestUnlockedLevel(),
+        _loadProgressForAllLevels(),
+        _checkDailyLimit(),
+      ]);
+
+      await _loadVideosForLevel(_selectedDifficulty);
 
       setState(() {
-        _videos = videos;
-        _watchedVideos = watchedStatus;
         _isLoading = false;
+        _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
       });
     } catch (e) {
       setState(() {
@@ -827,10 +882,78 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     }
   }
 
+  Future<void> _loadHighestUnlockedLevel() async {
+    int unlockedLevel = 1;
+    
+    for (int level = 1; level <= 4; level++) {
+      if (level == 1) {
+        unlockedLevel = 1;
+        continue;
+      }
+
+      final canUnlock = await _practiceService.canUnlockNextLevel(_studentId!, level - 1);
+      if (canUnlock) {
+        unlockedLevel = level;
+      } else {
+        break;
+      }
+    }
+
+    setState(() {
+      _highestUnlockedLevel = unlockedLevel;
+    });
+  }
+
+  Future<void> _loadProgressForAllLevels() async {
+    for (int level = 1; level <= 4; level++) {
+      final videos = await _practiceService.getPracticeVideos(_studentId!, difficultyLevel: level);
+      final videoIds = videos.map((v) => v['id'] as String).toList();
+      final watchedStatus = await _practiceService.getWatchedStatusBatch(_studentId!, videoIds);
+      
+      int completed = watchedStatus.values.where((w) => w).length;
+
+      _progressByLevel[level] = {
+        'total': videos.length,
+        'completed': completed,
+        'percentage': videos.isEmpty ? 0.0 : (completed / videos.length * 100),
+      };
+    }
+    setState(() {});
+  }
+
+  Future<void> _checkDailyLimit() async {
+    final canWatch = await _practiceService.canWatchVideoToday(_studentId!);
+    setState(() {
+      _canWatchToday = canWatch;
+    });
+  }
+
+  Future<void> _loadVideosForLevel(int level) async {
+    final videos = await _practiceService.getPracticeVideos(_studentId!, difficultyLevel: level);
+    final videoIds = videos.map((v) => v['id'] as String).toList();
+    final watchedStatus = await _practiceService.getWatchedStatusBatch(_studentId!, videoIds);
+
+    setState(() {
+      _currentLevelVideos = videos;
+      _watchedVideos = watchedStatus;
+    });
+  }
+
+  void _onDifficultyChanged(int level) async {
+    setState(() {
+      _selectedDifficulty = level;
+      _isLoading = true;
+    });
+    await _loadVideosForLevel(level);
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
   bool _canWatchVideo(int index) {
     if (index == 0) return true;
     if (index > 0) {
-      final previousVideo = _videos[index - 1];
+      final previousVideo = _currentLevelVideos[index - 1];
       return _watchedVideos[previousVideo['id']] ?? false;
     }
     return false;
@@ -857,9 +980,28 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
                     )
                   : _errorMessage != null
                       ? _buildErrorState(l10n)
-                      : _videos.isEmpty
-                          ? _buildEmptyState()
-                          : _buildVideoList(),
+                      : RefreshIndicator(
+                          onRefresh: _loadPracticeVideos,
+                          color: AppColors.primary,
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildHeader(l10n),
+                                const SizedBox(height: 20),
+                                _buildDailyLimitCard(l10n),
+                                const SizedBox(height: 20),
+                                _buildDifficultySelector(l10n),
+                                const SizedBox(height: 20),
+                                _buildProgressCard(l10n),
+                                const SizedBox(height: 20),
+                                _buildVideosList(l10n),
+                              ],
+                            ),
+                          ),
+                        ),
             ),
           ],
         ),
@@ -893,6 +1035,321 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
           const SizedBox(width: 40),
         ],
       ),
+    );
+  }
+
+  Widget _buildHeader(AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFED4264), Color(0xFFFFEDBC)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Text('📹', style: TextStyle(fontSize: 48)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.videos,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Practice Videos • 4 Levels',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyLimitCard(AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _canWatchToday ? Colors.green.shade50 : Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _canWatchToday ? Colors.green.shade200 : Colors.red.shade200,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _canWatchToday ? Icons.check_circle : Icons.timer,
+            color: _canWatchToday ? Colors.green.shade700 : Colors.red.shade700,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _canWatchToday ? 'Video Available Today' : 'Daily Limit Reached',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: _canWatchToday ? Colors.green.shade900 : Colors.red.shade900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _canWatchToday
+                      ? 'You can watch 1 video today'
+                      : 'Resets in $_timeUntilReset',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _canWatchToday ? Colors.green.shade700 : Colors.red.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDifficultySelector(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Select Difficulty Level',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: DifficultyLevel.values.map((level) {
+            final isSelected = level.value == _selectedDifficulty;
+            final isLocked = level.value > _highestUnlockedLevel;
+            
+            return Expanded(
+              child: GestureDetector(
+                onTap: isLocked ? null : () => _onDifficultyChanged(level.value),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isLocked
+                        ? Colors.grey.shade200
+                        : isSelected
+                            ? AppColors.primary
+                            : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isLocked
+                          ? Colors.grey.shade300
+                          : isSelected
+                              ? AppColors.primary
+                              : AppColors.border,
+                      width: 2,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      if (isLocked)
+                        Icon(Icons.lock, size: 16, color: Colors.grey.shade600)
+                      else
+                        Text(
+                          '${level.value}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        level.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isLocked
+                              ? Colors.grey.shade600
+                              : isSelected
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressCard(AppLocalizations l10n) {
+    final progress = _progressByLevel[_selectedDifficulty];
+    final total = progress?['total'] ?? 0;
+    final completed = progress?['completed'] ?? 0;
+    final percentage = progress?['percentage'] ?? 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Level $_selectedDifficulty Progress',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                '$completed / $total',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: total > 0 ? completed / total : 0.0,
+              minHeight: 8,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${percentage.toStringAsFixed(0)}% Complete',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          if (completed == total && total > 0 && !DifficultyLevel.fromValue(_selectedDifficulty).isLastLevel)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.emoji_events, color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Level completed! Next level unlocked.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideosList(AppLocalizations l10n) {
+    if (_currentLevelVideos.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.info_outline, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'No videos available for this level yet.',
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Videos (${_currentLevelVideos.length})',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...List.generate(
+          _currentLevelVideos.length,
+          (index) => _buildVideoCard(_currentLevelVideos[index], index, l10n),
+        ),
+      ],
     );
   }
 
@@ -995,256 +1452,10 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.red.shade50, Colors.red.shade100],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.red.withOpacity(0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: FaIcon(
-                FontAwesomeIcons.video,
-                size: 60,
-                color: Colors.red.shade400,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Text(
-              l10n.noVideosYet,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.videosComingSoon,
-              style: TextStyle(
-                fontSize: 15,
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: AppColors.primary,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'New videos coming soon',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVideoList() {
-    final l10n = AppLocalizations.of(context);
-    return RefreshIndicator(
-      onRefresh: _loadPracticeVideos,
-      color: AppColors.primary,
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Hero Header with Gradient
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFED4264), Color(0xFFFFEDBC)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.red.withOpacity(0.3),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text('📹', style: TextStyle(fontSize: 48)),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.videoPracticeTitle,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black26,
-                                  offset: Offset(0, 2),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${l10n.videos} ${_videos.length}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white.withOpacity(0.95),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Progress Bar
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          l10n.overallProgress,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          '${_watchedVideos.values.where((w) => w).length}/${_videos.length} ${l10n.completed}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white.withOpacity(0.95),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: _videos.isNotEmpty 
-                            ? _watchedVideos.values.where((w) => w).length / _videos.length 
-                            : 0,
-                        backgroundColor: Colors.white.withOpacity(0.3),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                        minHeight: 10,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_videos.isNotEmpty ? ((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt() : 0}% ${l10n.completed}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.9),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Section Title
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: FaIcon(
-                  FontAwesomeIcons.listUl,
-                  color: Colors.red.shade600,
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                l10n.lessonPlaylist,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Videos List
-          ...List.generate(_videos.length, (index) {
-            final video = _videos[index];
-            final isWatched = _watchedVideos[video['id']] ?? false;
-            final canWatch = _canWatchVideo(index);
-            
-            return _buildVideoCard(video, index + 1, isWatched, canWatch);
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVideoCard(
-    Map<String, dynamic> video,
-    int number,
-    bool isWatched,
-    bool canWatch,
-  ) {
+  Widget _buildVideoCard(Map<String, dynamic> video, int index, AppLocalizations l10n) {
+    final isWatched = _watchedVideos[video['id']] ?? false;
+    final canWatch = _canWatchVideo(index);
+    final number = index + 1;
     final l10n = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

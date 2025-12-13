@@ -1,0 +1,195 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Service for managing daily practice limits (1 quiz + 1 video + 1 reading per day)
+class DailyLimitService {
+  final _supabase = Supabase.instance.client;
+
+  /// Practice types for daily limits
+  static const String practiceTypeQuiz = 'quiz';
+  static const String practiceTypeVideo = 'video';
+  static const String practiceTypeReading = 'reading';
+
+  /// Check if student can practice a specific type today
+  /// Returns true if limit not reached, false if already completed today
+  Future<bool> checkDailyLimit(String studentId, String practiceType) async {
+    try {
+      final today = DateTime.now().toUtc();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final todayDateString = todayDate.toIso8601String().split('T')[0];
+
+      final response = await _supabase
+          .from('daily_practice_limits')
+          .select('quiz_completed, video_completed, reading_completed')
+          .eq('student_id', studentId)
+          .eq('practice_date', todayDateString)
+          .maybeSingle();
+
+      if (response == null) {
+        // No record for today, all limits available
+        return true;
+      }
+
+      // Check specific practice type
+      switch (practiceType) {
+        case practiceTypeQuiz:
+          return response['quiz_completed'] != true;
+        case practiceTypeVideo:
+          return response['video_completed'] != true;
+        case practiceTypeReading:
+          return response['reading_completed'] != true;
+        default:
+          return false;
+      }
+    } catch (e) {
+      print('Error checking daily limit: $e');
+      return false;
+    }
+  }
+
+  /// Record practice completion for today
+  Future<bool> recordPracticeCompletion(
+      String studentId, String practiceType) async {
+    try {
+      final today = DateTime.now().toUtc();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final todayDateString = todayDate.toIso8601String().split('T')[0];
+      final now = DateTime.now().toIso8601String();
+
+      // Check if record exists for today
+      final existing = await _supabase
+          .from('daily_practice_limits')
+          .select('id, quiz_completed, video_completed, reading_completed')
+          .eq('student_id', studentId)
+          .eq('practice_date', todayDateString)
+          .maybeSingle();
+
+      Map<String, dynamic> updateData = {
+        'updated_at': now,
+      };
+
+      switch (practiceType) {
+        case practiceTypeQuiz:
+          updateData['quiz_completed'] = true;
+          updateData['quiz_completed_at'] = now;
+          break;
+        case practiceTypeVideo:
+          updateData['video_completed'] = true;
+          updateData['video_completed_at'] = now;
+          break;
+        case practiceTypeReading:
+          updateData['reading_completed'] = true;
+          updateData['reading_completed_at'] = now;
+          break;
+      }
+
+      if (existing != null) {
+        // Update existing record
+        await _supabase
+            .from('daily_practice_limits')
+            .update(updateData)
+            .eq('student_id', studentId)
+            .eq('practice_date', todayDateString);
+      } else {
+        // Create new record
+        updateData.addAll({
+          'student_id': studentId,
+          'practice_date': todayDateString,
+          'quiz_completed': practiceType == practiceTypeQuiz,
+          'video_completed': practiceType == practiceTypeVideo,
+          'reading_completed': practiceType == practiceTypeReading,
+          'created_at': now,
+        });
+
+        await _supabase.from('daily_practice_limits').insert(updateData);
+      }
+
+      return true;
+    } catch (e) {
+      print('Error recording practice completion: $e');
+      return false;
+    }
+  }
+
+  /// Get today's practice status for all types
+  /// Returns map with keys: quiz_completed, video_completed, reading_completed
+  Future<Map<String, bool>> getDailyLimitStatus(String studentId) async {
+    try {
+      final today = DateTime.now().toUtc();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final todayDateString = todayDate.toIso8601String().split('T')[0];
+
+      final response = await _supabase
+          .from('daily_practice_limits')
+          .select('quiz_completed, video_completed, reading_completed')
+          .eq('student_id', studentId)
+          .eq('practice_date', todayDateString)
+          .maybeSingle();
+
+      if (response == null) {
+        return {
+          'quiz_completed': false,
+          'video_completed': false,
+          'reading_completed': false,
+        };
+      }
+
+      return {
+        'quiz_completed': response['quiz_completed'] == true,
+        'video_completed': response['video_completed'] == true,
+        'reading_completed': response['reading_completed'] == true,
+      };
+    } catch (e) {
+      print('Error getting daily limit status: $e');
+      return {
+        'quiz_completed': false,
+        'video_completed': false,
+        'reading_completed': false,
+      };
+    }
+  }
+
+  /// Calculate time until daily reset (midnight UTC)
+  Duration getTimeUntilReset() {
+    final now = DateTime.now().toUtc();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    return tomorrow.difference(now);
+  }
+
+  /// Get time until reset as a formatted string (e.g., "5h 23m")
+  String getTimeUntilResetFormatted() {
+    final duration = getTimeUntilReset();
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else {
+      return '${minutes}m';
+    }
+  }
+
+  /// Check if all three practice types have been completed today
+  Future<bool> allPracticesCompletedToday(String studentId) async {
+    final status = await getDailyLimitStatus(studentId);
+    return status['quiz_completed']! &&
+        status['video_completed']! &&
+        status['reading_completed']!;
+  }
+
+  /// Get count of completed practices today (0-3)
+  Future<int> getCompletedCountToday(String studentId) async {
+    final status = await getDailyLimitStatus(studentId);
+    int count = 0;
+    if (status['quiz_completed']!) count++;
+    if (status['video_completed']!) count++;
+    if (status['reading_completed']!) count++;
+    return count;
+  }
+
+  /// Check if student can practice any type today
+  Future<bool> canPracticeAnyTypeToday(String studentId) async {
+    final completed = await allPracticesCompletedToday(studentId);
+    return !completed;
+  }
+}
+

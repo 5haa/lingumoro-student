@@ -1,10 +1,15 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:student/services/daily_limit_service.dart';
+import 'package:student/services/level_service.dart';
 
 class PracticeService {
   final _supabase = Supabase.instance.client;
+  final _dailyLimitService = DailyLimitService();
+  final _levelService = LevelService();
 
-  /// Get all practice videos for a specific language
-  Future<List<Map<String, dynamic>>> getPracticeVideos(String? languageId) async {
+  /// Get all practice videos for a specific language and difficulty level
+  Future<List<Map<String, dynamic>>> getPracticeVideos(
+      String? languageId, {int? difficultyLevel}) async {
     try {
       PostgrestFilterBuilder query = _supabase
           .from('practice_videos')
@@ -15,12 +20,22 @@ class PracticeService {
         query = query.eq('language_id', languageId);
       }
 
+      if (difficultyLevel != null) {
+        query = query.eq('difficulty_level', difficultyLevel);
+      }
+
       final response = await query.order('order_index', ascending: true);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       print('Error fetching practice videos: $e');
       rethrow;
     }
+  }
+
+  /// Get videos for a specific difficulty level
+  Future<List<Map<String, dynamic>>> getVideosForDifficulty(
+      int difficultyLevel) async {
+    return getPracticeVideos(null, difficultyLevel: difficultyLevel);
   }
 
   /// Get student's video progress
@@ -84,8 +99,15 @@ class PracticeService {
     }
   }
 
-  /// Mark video as watched
-  Future<void> markVideoAsWatched(String studentId, String videoId) async {
+  /// Check if student can watch a video today (daily limit)
+  Future<bool> canWatchVideoToday(String studentId) async {
+    return await _dailyLimitService.checkDailyLimit(
+        studentId, DailyLimitService.practiceTypeVideo);
+  }
+
+  /// Mark video as watched and record daily limit
+  Future<void> markVideoAsWatched(String studentId, String videoId,
+      {int? pointsReward}) async {
     try {
       final existing = await _supabase
           .from('student_video_progress')
@@ -114,7 +136,16 @@ class PracticeService {
           'watch_percentage': 100,
           'completed_at': DateTime.now().toIso8601String(),
         });
+
+        // Award points on first completion
+        if (pointsReward != null && pointsReward > 0) {
+          await _levelService.awardPoints(studentId, pointsReward);
+        }
       }
+
+      // Record daily limit
+      await _dailyLimitService.recordPracticeCompletion(
+          studentId, DailyLimitService.practiceTypeVideo);
     } catch (e) {
       print('Error marking video as watched: $e');
       rethrow;
@@ -206,6 +237,40 @@ class PracticeService {
       print('Error checking if can watch video: $e');
       return false;
     }
+  }
+
+  /// Get video progress for a difficulty level
+  Future<Map<String, int>> getVideoProgressForLevel(
+      String studentId, int difficultyLevel) async {
+    try {
+      final videos = await getVideosForDifficulty(difficultyLevel);
+      final totalVideos = videos.length;
+
+      if (totalVideos == 0) {
+        return {'total': 0, 'completed': 0};
+      }
+
+      final videoIds = videos.map((v) => v['id'] as String).toList();
+      final watchedMap =
+          await getWatchedStatusBatch(studentId, videoIds);
+
+      final completedCount =
+          watchedMap.values.where((watched) => watched).length;
+
+      return {'total': totalVideos, 'completed': completedCount};
+    } catch (e) {
+      print('Error getting video progress for level: $e');
+      return {'total': 0, 'completed': 0};
+    }
+  }
+
+  /// Check if student can unlock next difficulty level for videos
+  Future<bool> canUnlockNextLevel(String studentId, int currentLevel) async {
+    if (currentLevel >= 4) return false; // Already at max level
+
+    final progress = await getVideoProgressForLevel(studentId, currentLevel);
+    return progress['completed'] == progress['total'] &&
+        progress['total']! > 0;
   }
 }
 

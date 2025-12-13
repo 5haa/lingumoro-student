@@ -1,9 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/level_service.dart';
+import 'package:student/services/daily_limit_service.dart';
 
 class ReadingService {
   final _supabase = Supabase.instance.client;
   final _levelService = LevelService();
+  final _dailyLimitService = DailyLimitService();
 
   /// Fetch all readings ordered by sequence
   Future<List<Map<String, dynamic>>> getAllReadings() async {
@@ -11,11 +13,29 @@ class ReadingService {
       final response = await _supabase
           .from('readings')
           .select('*')
+          .order('difficulty_level', ascending: true)
           .order('order', ascending: true);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       print('Error fetching readings: $e');
+      rethrow;
+    }
+  }
+
+  /// Get readings by difficulty level
+  Future<List<Map<String, dynamic>>> getReadingsByDifficulty(
+      int difficultyLevel) async {
+    try {
+      final response = await _supabase
+          .from('readings')
+          .select('*')
+          .eq('difficulty_level', difficultyLevel)
+          .order('order', ascending: true);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching readings by difficulty: $e');
       rethrow;
     }
   }
@@ -104,6 +124,12 @@ class ReadingService {
     return previousCompleted;
   }
 
+  /// Check if student can read today (daily limit)
+  Future<bool> canReadToday(String studentId) async {
+    return await _dailyLimitService.checkDailyLimit(
+        studentId, DailyLimitService.practiceTypeReading);
+  }
+
   /// Submit answers and calculate score
   /// Returns a map with:
   /// - 'score': number of correct answers
@@ -169,6 +195,10 @@ class ReadingService {
               .eq('student_id', studentId)
               .eq('reading_id', readingId);
         }
+
+        // Record daily limit
+        await _dailyLimitService.recordPracticeCompletion(
+            studentId, DailyLimitService.practiceTypeReading);
       }
 
       return {
@@ -211,5 +241,40 @@ class ReadingService {
       return 0;
     }
   }
+
+  /// Get reading progress for a difficulty level
+  Future<Map<String, int>> getReadingProgressForLevel(
+      String studentId, int difficultyLevel) async {
+    try {
+      final readings = await getReadingsByDifficulty(difficultyLevel);
+      final totalReadings = readings.length;
+
+      if (totalReadings == 0) {
+        return {'total': 0, 'completed': 0};
+      }
+
+      final readingIds = readings.map((r) => r['id'] as String).toList();
+      final progressMap = await getStudentProgress(studentId);
+
+      final completedCount = readingIds
+          .where((id) => progressMap[id] == true)
+          .length;
+
+      return {'total': totalReadings, 'completed': completedCount};
+    } catch (e) {
+      print('Error getting reading progress for level: $e');
+      return {'total': 0, 'completed': 0};
+    }
+  }
+
+  /// Check if student can unlock next difficulty level for readings
+  Future<bool> canUnlockNextLevel(String studentId, int currentLevel) async {
+    if (currentLevel >= 4) return false; // Already at max level
+
+    final progress = await getReadingProgressForLevel(studentId, currentLevel);
+    return progress['completed'] == progress['total'] &&
+        progress['total']! > 0;
+  }
 }
+
 

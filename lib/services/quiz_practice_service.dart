@@ -1,271 +1,260 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/level_service.dart';
+import 'package:student/services/daily_limit_service.dart';
+import 'package:student/models/quiz_question.dart';
+import 'package:student/models/difficulty_level.dart';
 
 class QuizPracticeService {
   final _supabase = Supabase.instance.client;
   final _levelService = LevelService();
-  
-  // AI server URL configuration
-  static const String _serverUrl = 'https://lingumoroai-production.up.railway.app';
+  final _dailyLimitService = DailyLimitService();
 
-  /// Generate a single quiz question
-  Future<Map<String, dynamic>?> generateQuestion({
-    required int level,
-    String language = 'English',
-  }) async {
+  /// Get all quiz questions for a specific difficulty level
+  Future<List<QuizQuestion>> getQuizQuestionsByDifficulty(
+      int difficultyLevel) async {
     try {
-      print('Generating quiz question for level $level...');
-      
-      final response = await http.post(
-        Uri.parse('$_serverUrl/api/quiz/question'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'level': level,
-          'language': language,
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await _supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('difficulty_level', difficultyLevel)
+          .eq('is_active', true)
+          .order('order_index', ascending: true);
 
-      print('Quiz question response: ${response.statusCode}');
+      final questions = (response as List)
+          .map((json) => QuizQuestion.fromJson(json))
+          .toList();
 
-      if (response.statusCode != 200) {
-        final errorData = jsonDecode(response.body);
-        final errorMessage = errorData['error'] ?? 'Failed to generate question';
-        print('Error generating question: $errorMessage');
-        return null;
-      }
-
-      final data = jsonDecode(response.body);
-      
-      if (data['success'] == true && data['question'] != null) {
-        return data['question'];
-      }
-      
-      return null;
+      return questions;
     } catch (e) {
-      print('Error generating quiz question: $e');
-      return null;
-    }
-  }
-
-  /// Generate multiple quiz questions
-  Future<List<Map<String, dynamic>>?> generateQuestions({
-    required int level,
-    int count = 5,
-    String language = 'English',
-  }) async {
-    try {
-      print('Generating $count quiz questions for level $level...');
-      
-      final response = await http.post(
-        Uri.parse('$_serverUrl/api/quiz/questions'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'level': level,
-          'count': count,
-          'language': language,
-        }),
-      ).timeout(const Duration(seconds: 60));
-
-      print('Quiz questions response: ${response.statusCode}');
-
-      if (response.statusCode != 200) {
-        final errorData = jsonDecode(response.body);
-        final errorMessage = errorData['error'] ?? 'Failed to generate questions';
-        print('Error generating questions: $errorMessage');
-        return null;
-      }
-
-      final data = jsonDecode(response.body);
-      
-      if (data['success'] == true && data['questions'] != null) {
-        return List<Map<String, dynamic>>.from(data['questions']);
-      }
-      
-      return null;
-    } catch (e) {
-      print('Error generating quiz questions: $e');
-      return null;
-    }
-  }
-
-  /// Generate a new quiz session with 10 questions
-  Future<List<Map<String, dynamic>>?> generateQuizSession({
-    required int level,
-    String language = 'English',
-  }) async {
-    return generateQuestions(level: level, count: 10, language: language);
-  }
-
-  /// Save a complete quiz session with all results
-  Future<String?> saveQuizSession({
-    required String studentId,
-    required int level,
-    required List<Map<String, dynamic>> questions,
-    required List<String?> studentAnswers,
-    required int durationSeconds,
-  }) async {
-    try {
-      // Calculate results
-      int correctCount = 0;
-      int totalPoints = 0;
-
-      for (int i = 0; i < questions.length; i++) {
-        final question = questions[i];
-        final studentAnswer = studentAnswers[i];
-        final correctAnswer = question['correct_answer'];
-        final isCorrect = studentAnswer != null && studentAnswer == correctAnswer;
-
-        if (isCorrect) {
-          correctCount++;
-          // Award more points for higher levels
-          final pointsForQuestion = 5 + (level ~/ 10);
-          totalPoints += pointsForQuestion;
-        }
-      }
-
-      final scorePercentage = (correctCount / questions.length * 100).toStringAsFixed(2);
-
-      // Create quiz session
-      final sessionResponse = await _supabase
-          .from('quiz_sessions')
-          .insert({
-            'student_id': studentId,
-            'total_questions': questions.length,
-            'correct_answers': correctCount,
-            'score_percentage': double.parse(scorePercentage),
-            'points_earned': totalPoints,
-            'duration_seconds': durationSeconds,
-          })
-          .select()
-          .single();
-
-      final sessionId = sessionResponse['id'] as String;
-
-      // Save individual question results
-      final results = <Map<String, dynamic>>[];
-      for (int i = 0; i < questions.length; i++) {
-        final question = questions[i];
-        final studentAnswer = studentAnswers[i];
-        final correctAnswer = question['correct_answer'];
-        final isCorrect = studentAnswer != null && studentAnswer == correctAnswer;
-        final pointsForQuestion = isCorrect ? (5 + (level ~/ 10)) : 0;
-
-        results.add({
-          'session_id': sessionId,
-          'student_id': studentId,
-          'level': level,
-          'question': question['question'],
-          'options': jsonEncode(question['options']),
-          'correct_answer': correctAnswer,
-          'student_answer': studentAnswer ?? '',
-          'is_correct': isCorrect,
-          'points_awarded': pointsForQuestion,
-        });
-      }
-
-      await _supabase.from('quiz_practice_results').insert(results);
-
-      // Award total points to student
-      if (totalPoints > 0) {
-        await _levelService.awardPoints(studentId, totalPoints);
-      }
-
-      return sessionId;
-    } catch (e) {
-      print('Error saving quiz session: $e');
-      return null;
-    }
-  }
-
-  /// Get quiz session history
-  Future<List<Map<String, dynamic>>> getQuizSessionHistory(String studentId) async {
-    try {
-      final sessions = await _supabase
-          .from('quiz_sessions')
-          .select()
-          .eq('student_id', studentId)
-          .order('completed_at', ascending: false)
-          .limit(20);
-
-      return List<Map<String, dynamic>>.from(sessions);
-    } catch (e) {
-      print('Error getting quiz session history: $e');
+      print('Error fetching quiz questions: $e');
       return [];
     }
   }
 
-  /// Get quiz session with all questions
-  Future<Map<String, dynamic>?> getQuizSession(String sessionId) async {
+  /// Get the next uncompleted quiz question for a student in a difficulty level
+  Future<QuizQuestion?> getNextUncompletedQuiz(
+      String studentId, int difficultyLevel) async {
     try {
-      final session = await _supabase
-          .from('quiz_sessions')
-          .select()
-          .eq('id', sessionId)
-          .single();
+      // Get all questions for this difficulty level
+      final allQuestions = await getQuizQuestionsByDifficulty(difficultyLevel);
 
-      final results = await _supabase
-          .from('quiz_practice_results')
-          .select()
-          .eq('session_id', sessionId)
-          .order('created_at', ascending: true);
+      if (allQuestions.isEmpty) return null;
 
-      return {
-        ...session,
-        'questions': List<Map<String, dynamic>>.from(results),
-      };
+      // Get student's progress for these questions
+      final questionIds = allQuestions.map((q) => q.id).toList();
+
+      final progressResponse = await _supabase
+          .from('student_quiz_progress')
+          .select('quiz_question_id, completed')
+          .eq('student_id', studentId)
+          .inFilter('quiz_question_id', questionIds);
+
+      final completedIds = <String>{};
+      for (var progress in (progressResponse as List)) {
+        if (progress['completed'] == true) {
+          completedIds.add(progress['quiz_question_id'] as String);
+        }
+      }
+
+      // Find first uncompleted question in order
+      for (var question in allQuestions) {
+        if (!completedIds.contains(question.id)) {
+          return question;
+        }
+      }
+
+      // All questions completed
+      return null;
     } catch (e) {
-      print('Error getting quiz session: $e');
+      print('Error getting next uncompleted quiz: $e');
       return null;
     }
   }
 
-  /// Save a quiz practice result
-  Future<bool> saveResult({
-    required String studentId,
-    required int level,
-    required String question,
-    required List<String> options,
-    required String correctAnswer,
-    required String studentAnswer,
-    required bool isCorrect,
-  }) async {
+  /// Check if student can attempt a quiz today (daily limit not reached)
+  Future<bool> canAttemptQuiz(String studentId) async {
+    return await _dailyLimitService.checkDailyLimit(
+        studentId, DailyLimitService.practiceTypeQuiz);
+  }
+
+  /// Check if a specific quiz question is completed by the student
+  Future<bool> isQuizCompleted(String studentId, String quizQuestionId) async {
     try {
-      // Calculate points awarded
-      int pointsAwarded = 0;
-      if (isCorrect) {
-        // Award more points for higher levels
-        pointsAwarded = 5 + (level ~/ 10); // 5-15 points depending on level
-      }
+      final response = await _supabase
+          .from('student_quiz_progress')
+          .select('completed')
+          .eq('student_id', studentId)
+          .eq('quiz_question_id', quizQuestionId)
+          .maybeSingle();
 
-      await _supabase.from('quiz_practice_results').insert({
-        'student_id': studentId,
-        'level': level,
-        'question': question,
-        'options': jsonEncode(options),
-        'correct_answer': correctAnswer,
-        'student_answer': studentAnswer,
-        'is_correct': isCorrect,
-        'points_awarded': pointsAwarded,
-      });
-
-      // Award points to student if correct
-      if (isCorrect && pointsAwarded > 0) {
-        await _levelService.awardPoints(studentId, pointsAwarded);
-      }
-
-      return true;
+      if (response == null) return false;
+      return response['completed'] == true;
     } catch (e) {
-      print('Error saving quiz result: $e');
+      print('Error checking quiz completion: $e');
       return false;
     }
   }
 
-  /// Get student's quiz practice statistics (based on sessions)
+  /// Submit a quiz answer and record progress
+  /// Returns map with: {isCorrect, pointsAwarded, explanation}
+  Future<Map<String, dynamic>> submitQuizAnswer({
+    required String studentId,
+    required QuizQuestion question,
+    required int studentAnswerIndex,
+  }) async {
+    try {
+      final isCorrect = question.isAnswerCorrect(studentAnswerIndex);
+      final pointsAwarded = isCorrect ? question.pointsReward : 0;
+
+      // Check if progress record exists
+      final existing = await _supabase
+          .from('student_quiz_progress')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('quiz_question_id', question.id)
+          .maybeSingle();
+
+      final now = DateTime.now().toIso8601String();
+
+      if (existing != null) {
+        // Update existing progress
+        await _supabase
+            .from('student_quiz_progress')
+            .update({
+              'completed': true,
+              'student_answer_index': studentAnswerIndex,
+              'is_correct': isCorrect,
+              'completed_at': now,
+              'updated_at': now,
+            })
+            .eq('student_id', studentId)
+            .eq('quiz_question_id', question.id);
+      } else {
+        // Create new progress record
+        await _supabase.from('student_quiz_progress').insert({
+          'student_id': studentId,
+          'quiz_question_id': question.id,
+          'completed': true,
+          'student_answer_index': studentAnswerIndex,
+          'is_correct': isCorrect,
+          'completed_at': now,
+          'created_at': now,
+          'updated_at': now,
+        });
+      }
+
+      // Award points if correct
+      if (isCorrect && pointsAwarded > 0) {
+        await _levelService.awardPoints(studentId, pointsAwarded);
+      }
+
+      // Record daily limit (first quiz completed today)
+      await _dailyLimitService.recordPracticeCompletion(
+          studentId, DailyLimitService.practiceTypeQuiz);
+
+      return {
+        'isCorrect': isCorrect,
+        'pointsAwarded': pointsAwarded,
+        'explanation': question.explanation,
+        'correctAnswer': question.correctAnswer,
+      };
+    } catch (e) {
+      print('Error submitting quiz answer: $e');
+      rethrow;
+    }
+  }
+
+  /// Get quiz progress statistics for a difficulty level
+  Future<Map<String, dynamic>> getQuizProgress(
+      String studentId, int difficultyLevel) async {
+    try {
+      // Get all questions for this level
+      final allQuestions = await getQuizQuestionsByDifficulty(difficultyLevel);
+      final totalQuestions = allQuestions.length;
+
+      if (totalQuestions == 0) {
+        return {
+          'total': 0,
+          'completed': 0,
+          'percentage': 0.0,
+          'canUnlockNext': false,
+        };
+      }
+
+      // Get completion progress
+      final questionIds = allQuestions.map((q) => q.id).toList();
+
+      final progressResponse = await _supabase
+          .from('student_quiz_progress')
+          .select('completed')
+          .eq('student_id', studentId)
+          .eq('completed', true)
+          .inFilter('quiz_question_id', questionIds);
+
+      final completedCount = (progressResponse as List).length;
+      final percentage = (completedCount / totalQuestions * 100).toDouble();
+      final canUnlockNext = completedCount == totalQuestions;
+
+      return {
+        'total': totalQuestions,
+        'completed': completedCount,
+        'percentage': percentage,
+        'canUnlockNext': canUnlockNext,
+      };
+    } catch (e) {
+      print('Error getting quiz progress: $e');
+      return {
+        'total': 0,
+        'completed': 0,
+        'percentage': 0.0,
+        'canUnlockNext': false,
+      };
+    }
+  }
+
+  /// Check if student can unlock the next difficulty level
+  /// (All quizzes in current level must be completed)
+  Future<bool> canUnlockNextLevel(String studentId, int currentLevel) async {
+    if (currentLevel >= 4) return false; // Already at max level
+
+    final progress = await getQuizProgress(studentId, currentLevel);
+    return progress['canUnlockNext'] == true;
+  }
+
+  /// Check if previous quiz in sequence is completed (for sequential unlocking)
+  Future<bool> isPreviousQuizCompleted(
+      String studentId, QuizQuestion currentQuiz) async {
+    try {
+      // If this is the first quiz in the level (order_index = 0), it's always unlocked
+      if (currentQuiz.orderIndex == 0) return true;
+
+      // Get all questions for this level
+      final allQuestions =
+          await getQuizQuestionsByDifficulty(currentQuiz.difficultyLevel);
+
+      // Find previous quiz (orderIndex - 1)
+      final previousQuiz = allQuestions.firstWhere(
+        (q) => q.orderIndex == currentQuiz.orderIndex - 1,
+        orElse: () => currentQuiz, // If not found, allow current
+      );
+
+      if (previousQuiz.id == currentQuiz.id) {
+        // No previous quiz found, allow current
+        return true;
+      }
+
+      // Check if previous quiz is completed
+      return await isQuizCompleted(studentId, previousQuiz.id);
+    } catch (e) {
+      print('Error checking previous quiz completion: $e');
+      return false;
+    }
+  }
+
+  /// Get student's overall quiz statistics (historical data from old AI quiz system)
   Future<Map<String, dynamic>> getStatistics(String studentId) async {
     try {
-      // Get all quiz sessions
+      // Get legacy quiz sessions from old AI system
       final sessions = await _supabase
           .from('quiz_sessions')
           .select()
@@ -273,7 +262,7 @@ class QuizPracticeService {
           .order('completed_at', ascending: false);
 
       final sessionList = List<Map<String, dynamic>>.from(sessions);
-      
+
       if (sessionList.isEmpty) {
         return {
           'total_sessions': 0,
@@ -297,7 +286,7 @@ class QuizPracticeService {
         (sum, s) => sum + ((s['correct_answers'] as int?) ?? 0),
       );
       final incorrectAnswers = totalQuestions - correctAnswers;
-      final accuracy = totalQuestions > 0 
+      final accuracy = totalQuestions > 0
           ? (correctAnswers / totalQuestions * 100).toStringAsFixed(1)
           : '0.0';
       final totalPointsEarned = sessionList.fold<int>(
@@ -305,9 +294,11 @@ class QuizPracticeService {
         (sum, s) => sum + ((s['points_earned'] as int?) ?? 0),
       );
       final averageScore = sessionList.fold<double>(
-        0.0,
-        (sum, s) => sum + ((s['score_percentage'] as num?)?.toDouble() ?? 0.0),
-      ) / totalSessions;
+            0.0,
+            (sum, s) =>
+                sum + ((s['score_percentage'] as num?)?.toDouble() ?? 0.0),
+          ) /
+          totalSessions;
 
       return {
         'total_sessions': totalSessions,
@@ -334,52 +325,47 @@ class QuizPracticeService {
     }
   }
 
-  /// Get student's performance by level
-  Future<Map<int, Map<String, dynamic>>> getPerformanceByLevel(String studentId) async {
-    try {
-      final results = await _supabase
-          .from('quiz_practice_results')
-          .select()
-          .eq('student_id', studentId);
+  /// Get highest unlocked difficulty level for student
+  Future<int> getHighestUnlockedLevel(String studentId) async {
+    // Start from level 1
+    int unlockedLevel = 1;
 
-      final resultList = List<Map<String, dynamic>>.from(results);
-      
-      final performanceByLevel = <int, Map<String, dynamic>>{};
-      
-      for (final result in resultList) {
-        final level = result['level'] as int;
-        
-        if (!performanceByLevel.containsKey(level)) {
-          performanceByLevel[level] = {
-            'total': 0,
-            'correct': 0,
-            'accuracy': 0.0,
-          };
-        }
-        
-        performanceByLevel[level]!['total'] = 
-            (performanceByLevel[level]!['total'] as int) + 1;
-        
-        if (result['is_correct'] == true) {
-          performanceByLevel[level]!['correct'] = 
-              (performanceByLevel[level]!['correct'] as int) + 1;
-        }
+    // Check each level sequentially
+    for (int level = 1; level <= 4; level++) {
+      if (level == 1) {
+        // Level 1 is always unlocked
+        unlockedLevel = 1;
+        continue;
       }
-      
-      // Calculate accuracy for each level
-      performanceByLevel.forEach((level, data) {
-        final total = data['total'] as int;
-        final correct = data['correct'] as int;
-        data['accuracy'] = total > 0 ? (correct / total * 100) : 0.0;
-      });
-      
-      return performanceByLevel;
+
+      // Check if previous level is completed
+      final canUnlock = await canUnlockNextLevel(studentId, level - 1);
+      if (canUnlock) {
+        unlockedLevel = level;
+      } else {
+        break; // Can't unlock this level, stop checking
+      }
+    }
+
+    return unlockedLevel;
+  }
+
+  /// Check if a specific quiz question is completed by the student
+  Future<bool> isQuestionCompleted(String studentId, String questionId) async {
+    try {
+      final response = await _supabase
+          .from('student_quiz_progress')
+          .select('completed')
+          .eq('student_id', studentId)
+          .eq('quiz_question_id', questionId)
+          .maybeSingle();
+
+      if (response == null) return false;
+
+      return response['completed'] == true;
     } catch (e) {
-      print('Error getting performance by level: $e');
-      return {};
+      print('Error checking question completion: $e');
+      return false;
     }
   }
 }
-
-
-
