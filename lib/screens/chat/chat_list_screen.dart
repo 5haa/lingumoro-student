@@ -375,6 +375,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                 recipientId: studentId,
                 recipientName: studentName,
                 recipientAvatar: null,
+                recipientType: 'student',
               ),
             ),
           );
@@ -1310,6 +1311,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
               recipientId: otherPartyId!,
               recipientName: name,
               recipientAvatar: avatarUrl,
+              recipientType: conversation['conversation_type'] == 'student_student' ? 'student' : 'teacher',
             ),
           ),
         );
@@ -1551,6 +1553,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
                     recipientId: teacher['id'],
                     recipientName: name,
                     recipientAvatar: avatarUrl,
+                    recipientType: 'teacher',
                   ),
                 ),
               );

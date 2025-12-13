@@ -17,12 +17,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
+import '../teachers/teacher_detail_screen.dart';
+import '../students/student_public_profile_screen.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final String conversationId;
   final String recipientId;
   final String recipientName;
   final String? recipientAvatar;
+  final String? recipientType; // 'teacher' or 'student'
 
   const ChatConversationScreen({
     super.key,
@@ -30,6 +33,7 @@ class ChatConversationScreen extends StatefulWidget {
     required this.recipientId,
     required this.recipientName,
     this.recipientAvatar,
+    this.recipientType,
   });
 
   @override
@@ -50,6 +54,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
   bool _isTyping = false;
   bool _isOnline = false;
   String? _currentUserId;
+  String? _recipientType; // 'teacher' or 'student'
   File? _selectedFile;
   Timer? _typingTimer;
   Timer? _statusRefreshTimer;
@@ -75,6 +80,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _currentUserId = _chatService.supabase.auth.currentUser?.id;
+    _recipientType = widget.recipientType; // Use provided type or determine later
     _messageController.addListener(() {
       setState(() {}); // Rebuild to show/hide mic button
     });
@@ -86,6 +92,37 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
     _setupRealtimeSubscriptions();
     _markMessagesAsRead();
     _subscribeToOnlineStatus();
+    _determineRecipientType(); // Determine recipient type if not provided
+  }
+
+  Future<void> _determineRecipientType() async {
+    if (_recipientType != null) return; // Already set
+    
+    try {
+      final conversation = await _chatService.supabase
+          .from('chat_conversations')
+          .select('conversation_type, teacher_id')
+          .eq('id', widget.conversationId)
+          .single();
+      
+      if (mounted) {
+        setState(() {
+          if (conversation['conversation_type'] == 'student_student') {
+            _recipientType = 'student';
+          } else {
+            _recipientType = 'teacher';
+          }
+        });
+      }
+    } catch (e) {
+      print('Error determining recipient type: $e');
+      // Default to teacher if we can't determine
+      if (mounted) {
+        setState(() {
+          _recipientType = 'teacher';
+        });
+      }
+    }
   }
 
   void _loadMessagesFromCache() {
@@ -106,25 +143,31 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
   }
 
   void _subscribeToOnlineStatus() {
-    // Subscribe to recipient's online status
-    _presenceService.subscribeToUserStatus(widget.recipientId, 'teacher').listen((isOnline) {
-      if (mounted) {
-        setState(() {
-          _isOnline = isOnline;
-        });
-      }
-    });
-    
-    // Periodically refresh online status (every 30 seconds)
-    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      if (mounted) {
-        final isOnline = await _presenceService.isUserOnline(widget.recipientId, 'teacher');
+    // Wait a moment for recipient type to be determined
+    Future.delayed(const Duration(milliseconds: 500), () {
+      final userType = _recipientType ?? 'teacher';
+      
+      // Subscribe to recipient's online status
+      _presenceService.subscribeToUserStatus(widget.recipientId, userType).listen((isOnline) {
         if (mounted) {
           setState(() {
             _isOnline = isOnline;
           });
         }
-      }
+      });
+      
+      // Periodically refresh online status (every 30 seconds)
+      _statusRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+        if (mounted) {
+          final userType = _recipientType ?? 'teacher';
+          final isOnline = await _presenceService.isUserOnline(widget.recipientId, userType);
+          if (mounted) {
+            setState(() {
+              _isOnline = isOnline;
+            });
+          }
+        }
+      });
     });
   }
 
@@ -132,7 +175,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _chatService.unsubscribeAll();
-    _presenceService.unsubscribeFromUser(widget.recipientId, 'teacher');
+    final userType = _recipientType ?? 'teacher';
+    _presenceService.unsubscribeFromUser(widget.recipientId, userType);
     _presenceService.dispose();
     _messageController.dispose();
     _scrollController.dispose();
@@ -830,97 +874,103 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Stack(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primary.withOpacity(0.1),
+                  GestureDetector(
+                    onTap: _viewRecipientProfile,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.primary.withOpacity(0.1),
+                          ),
+                          child: ClipOval(
+                            child: widget.recipientAvatar != null && widget.recipientAvatar!.isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: widget.recipientAvatar!,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => Center(
+                                      child: Text(
+                                        widget.recipientName[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) => Center(
+                                      child: Text(
+                                        widget.recipientName[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      widget.recipientName[0].toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                          ),
                         ),
-                        child: ClipOval(
-                          child: widget.recipientAvatar != null && widget.recipientAvatar!.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: widget.recipientAvatar!,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => Center(
-                                    child: Text(
-                                      widget.recipientName[0].toUpperCase(),
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                  errorWidget: (context, url, error) => Center(
-                                    child: Text(
-                                      widget.recipientName[0].toUpperCase(),
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : Center(
-                                  child: Text(
-                                    widget.recipientName[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
+                        if (_isOnline)
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 11,
+                              height: 11,
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.white,
+                                  width: 1.5,
                                 ),
-                        ),
-                      ),
-                      if (_isOnline)
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            width: 11,
-                            height: 11,
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.white,
-                                width: 1.5,
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.recipientName,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                    child: GestureDetector(
+                      onTap: _viewRecipientProfile,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.recipientName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          _isTyping ? 'typing...' : (_isOnline ? 'Online' : 'Offline'),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _isTyping 
-                                ? AppColors.primary
-                                : (_isOnline ? Colors.green : AppColors.textSecondary),
-                            fontStyle: _isTyping ? FontStyle.italic : FontStyle.normal,
+                          const SizedBox(height: 1),
+                          Text(
+                            _isTyping ? 'typing...' : (_isOnline ? 'Online' : 'Offline'),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _isTyping 
+                                  ? AppColors.primary
+                                  : (_isOnline ? Colors.green : AppColors.textSecondary),
+                              fontStyle: _isTyping ? FontStyle.italic : FontStyle.normal,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   PopupMenuButton<String>(
@@ -936,6 +986,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
                     color: AppColors.white,
                     elevation: 8,
                     itemBuilder: (context) => [
+                      const PopupMenuItem<String>(
+                        value: 'profile',
+                        child: Row(
+                          children: [
+                            FaIcon(
+                              FontAwesomeIcons.circleInfo,
+                              color: AppColors.primary,
+                              size: 18,
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'View Profile',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const PopupMenuItem<String>(
                         value: 'block',
                         child: Row(
@@ -958,7 +1028,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
                       ),
                     ],
                     onSelected: (value) {
-                      if (value == 'block') {
+                      if (value == 'profile') {
+                        _viewRecipientProfile();
+                      } else if (value == 'block') {
                         _showBlockConfirmation();
                       }
                     },
@@ -1995,6 +2067,175 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
         );
       }
     }
+  }
+
+  Future<void> _viewRecipientProfile() async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+
+      final recipientType = _recipientType ?? 'teacher';
+
+      if (recipientType == 'student') {
+        // Fetch student profile data
+        await _viewStudentProfile();
+      } else {
+        // Fetch teacher profile data
+        await _viewTeacherProfile();
+      }
+    } catch (e) {
+      // Close loading dialog if still showing
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        _showProfileError('Error: $e');
+      }
+    }
+  }
+
+  Future<void> _viewStudentProfile() async {
+    try {
+      // Fetch complete student data
+      final studentData = await _chatService.supabase
+          .from('students')
+          .select('''
+            *,
+            province:province_id (
+              id,
+              name,
+              name_ar
+            )
+          ''')
+          .eq('id', widget.recipientId)
+          .single();
+
+      // Fetch student's languages through subscriptions
+      final subscriptions = await _chatService.supabase
+          .from('student_subscriptions')
+          .select('''
+            language:language_id (
+              id,
+              name,
+              flag_url
+            )
+          ''')
+          .eq('student_id', widget.recipientId)
+          .eq('status', 'active');
+
+      // Transform the data to match expected format
+      final languages = subscriptions
+          .map((sub) {
+            final lang = sub['language'] as Map<String, dynamic>?;
+            if (lang != null) {
+              return {
+                'id': lang['id'],
+                'name': lang['name'],
+                'flag_url': lang['flag_url'],
+              };
+            }
+            return null;
+          })
+          .where((l) => l != null)
+          .cast<Map<String, dynamic>>()
+          .toList();
+
+      final formattedData = {
+        ...studentData,
+        'languages': languages,
+      };
+      
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      // Navigate to profile screen
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StudentPublicProfileScreen(
+              studentId: widget.recipientId,
+              studentData: formattedData,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still showing
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        _showProfileError('Error loading student profile: $e');
+      }
+    }
+  }
+
+  Future<void> _viewTeacherProfile() async {
+    try {
+      // Fetch teacher's language data from teacher_languages table
+      final teacherLanguages = await _chatService.supabase
+          .from('teacher_languages')
+          .select('''
+            language_id,
+            language:language_id (
+              id,
+              name
+            )
+          ''')
+          .eq('teacher_id', widget.recipientId)
+          .limit(1);
+      
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      // Use the first language or a default
+      if (teacherLanguages.isNotEmpty && mounted) {
+        final languageData = teacherLanguages[0]['language'] as Map<String, dynamic>?;
+        if (languageData != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TeacherDetailScreen(
+                teacherId: widget.recipientId,
+                languageId: languageData['id'],
+                languageName: languageData['name'] ?? 'Language',
+              ),
+            ),
+          );
+        } else {
+          _showProfileError('Unable to load teacher profile data');
+        }
+      } else if (mounted) {
+        _showProfileError('Teacher has no available languages');
+      }
+    } catch (e) {
+      // Close loading dialog if still showing
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        _showProfileError('Error loading teacher profile: $e');
+      }
+    }
+  }
+
+  void _showProfileError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   void _showBlockConfirmation() {

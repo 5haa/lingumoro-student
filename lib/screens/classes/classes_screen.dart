@@ -296,6 +296,7 @@ class _ClassesScreenState extends State<ClassesScreen>
               recipientId: teacherId,
               recipientName: teacherName,
               recipientAvatar: teacherAvatar,
+              recipientType: 'teacher',
             ),
           ),
         );

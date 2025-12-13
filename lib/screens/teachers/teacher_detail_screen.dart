@@ -269,6 +269,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             recipientId: widget.teacherId,
             recipientName: teacherName,
             recipientAvatar: teacherAvatar,
+            recipientType: 'teacher',
           ),
         ),
       );

@@ -553,6 +553,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
             recipientId: studentId,
             recipientName: studentName,
             recipientAvatar: null,
+            recipientType: 'student',
           ),
         ),
       );
