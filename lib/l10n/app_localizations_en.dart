@@ -321,7 +321,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get practice => 'PRACTICE';
   @override
-  String get videos => 'Videos';
+  String get videos => 'Practice Listening';
   @override
   String get quizPractice => 'Quiz Practice';
   @override
@@ -696,7 +696,7 @@ class AppLocalizationsEn extends AppLocalizations {
   
   // Quiz Practice
   @override
-  String get languageQuiz => 'LANGUAGE QUIZ';
+  String get languageQuiz => 'Take a Quiz';
   @override
   String get yourStatistics => 'Your Statistics';
   @override
@@ -764,7 +764,7 @@ class AppLocalizationsEn extends AppLocalizations {
   
   // AI Voice Practice
   @override
-  String get aiVoicePractice => 'AI VOICE PRACTICE';
+  String get aiVoicePractice => 'Practice Speaking';
   @override
   String get voiceSettings => 'Voice Settings';
   @override
@@ -818,7 +818,7 @@ class AppLocalizationsEn extends AppLocalizations {
   
   // Reading
   @override
-  String get readings => 'READINGS';
+  String get readings => 'Practice Reading';
   @override
   String get yourProgress => 'Your Progress';
   @override

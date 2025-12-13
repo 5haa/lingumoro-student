@@ -321,7 +321,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get practice => 'التمرين';
   @override
-  String get videos => 'الفيديوهات';
+  String get videos => 'تمرين الاستماع';
   @override
   String get quizPractice => 'تمرين الاختبار';
   @override
@@ -696,7 +696,7 @@ class AppLocalizationsAr extends AppLocalizations {
   
   // Quiz Practice
   @override
-  String get languageQuiz => 'اختبار اللغة';
+  String get languageQuiz => 'اختبار';
   @override
   String get yourStatistics => 'إحصائياتك';
   @override
@@ -764,7 +764,7 @@ class AppLocalizationsAr extends AppLocalizations {
   
   // AI Voice Practice
   @override
-  String get aiVoicePractice => 'تمرين الصوت بالذكاء الاصطناعي';
+  String get aiVoicePractice => 'تمرين التحدث';
   @override
   String get voiceSettings => 'إعدادات الصوت';
   @override
@@ -818,7 +818,7 @@ class AppLocalizationsAr extends AppLocalizations {
   
   // Reading
   @override
-  String get readings => 'القراءات';
+  String get readings => 'تمرين القراءة';
   @override
   String get yourProgress => 'تقدمك';
   @override
