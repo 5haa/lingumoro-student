@@ -468,125 +468,157 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
   
   Widget _buildLanguageCard(String name, String? flagUrl, bool isSelected, int index) {
+    final bool isComingSoon = name == 'Arabic' || name == 'Spanish';
+    
     return GestureDetector(
-      onTap: () {
+      onTap: isComingSoon ? null : () {
         setState(() {
           _selectedLanguageIndex = index;
         });
       },
       child: AspectRatio(
         aspectRatio: 1.0,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 5),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: isSelected ? AppColors.primary : Colors.transparent,
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+        child: Opacity(
+          opacity: isComingSoon ? 0.6 : 1.0,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 5),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: isSelected ? AppColors.primary : Colors.transparent,
+                width: 2,
               ),
-            ],
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final double flagSize = (constraints.maxWidth * 0.5).clamp(45.0, 60.0);
-              final double fontSize = (constraints.maxWidth * 0.16).clamp(12.0, 15.0);
-              final double spacing = (constraints.maxWidth * 0.08).clamp(8.0, 12.0);
-              
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Flag
-                  ClipOval(
-                    child: flagUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: flagUrl,
-                            width: flagSize,
-                            height: flagSize,
-                            fit: BoxFit.cover,
-                            fadeInDuration: Duration.zero, // No fade animation for cached images
-                            fadeOutDuration: Duration.zero,
-                            placeholderFadeInDuration: Duration.zero,
-                            placeholder: (context, url) => Container(
-                              width: flagSize,
-                              height: flagSize,
-                              color: AppColors.lightGrey,
-                              child: Icon(
-                                Icons.language,
-                                size: flagSize * 0.5,
-                                color: AppColors.grey,
-                              ),
-                            ),
-                            errorWidget: (context, url, error) {
-                              // Try to use flag code if available
-                              final flagCode = _languageFlagMap[name];
-                              if (flagCode != null) {
-                                return Flag.fromCode(
-                                  flagCode,
-                                  height: flagSize,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+          child: Stack(
+            children: [
+              Center(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double flagSize = (constraints.maxWidth * 0.5).clamp(45.0, 60.0);
+                    final double fontSize = (constraints.maxWidth * 0.16).clamp(12.0, 15.0);
+                    final double spacing = (constraints.maxWidth * 0.08).clamp(8.0, 12.0);
+                    
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Flag
+                        ClipOval(
+                          child: flagUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: flagUrl,
                                   width: flagSize,
+                                  height: flagSize,
                                   fit: BoxFit.cover,
-                                );
-                              }
-                              return Container(
-                                width: flagSize,
-                                height: flagSize,
-                                color: AppColors.lightGrey,
-                                child: Icon(
-                                  Icons.language,
-                                  size: flagSize * 0.5,
-                                  color: AppColors.grey,
-                                ),
-                              );
-                            },
-                          )
-                        : _languageFlagMap.containsKey(name)
-                            ? Flag.fromCode(
-                                _languageFlagMap[name]!,
-                                height: flagSize,
-                                width: flagSize,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                width: flagSize,
-                                height: flagSize,
-                                decoration: BoxDecoration(
-                                  color: AppColors.lightGrey,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.language,
-                                  size: flagSize * 0.5,
-                                  color: AppColors.grey,
-                                ),
-                              ),
-                  ),
-                  SizedBox(height: spacing),
-                  // Language Name
-                  Flexible(
+                                  fadeInDuration: Duration.zero, // No fade animation for cached images
+                                  fadeOutDuration: Duration.zero,
+                                  placeholderFadeInDuration: Duration.zero,
+                                  placeholder: (context, url) => Container(
+                                    width: flagSize,
+                                    height: flagSize,
+                                    color: AppColors.lightGrey,
+                                    child: Icon(
+                                      Icons.language,
+                                      size: flagSize * 0.5,
+                                      color: AppColors.grey,
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) {
+                                    // Try to use flag code if available
+                                    final flagCode = _languageFlagMap[name];
+                                    if (flagCode != null) {
+                                      return Flag.fromCode(
+                                        flagCode,
+                                        height: flagSize,
+                                        width: flagSize,
+                                        fit: BoxFit.cover,
+                                      );
+                                    }
+                                    return Container(
+                                      width: flagSize,
+                                      height: flagSize,
+                                      color: AppColors.lightGrey,
+                                      child: Icon(
+                                        Icons.language,
+                                        size: flagSize * 0.5,
+                                        color: AppColors.grey,
+                                      ),
+                                    );
+                                  },
+                                )
+                              : _languageFlagMap.containsKey(name)
+                                  ? Flag.fromCode(
+                                      _languageFlagMap[name]!,
+                                      height: flagSize,
+                                      width: flagSize,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      width: flagSize,
+                                      height: flagSize,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.lightGrey,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.language,
+                                        size: flagSize * 0.5,
+                                        color: AppColors.grey,
+                                      ),
+                                    ),
+                        ),
+                        SizedBox(height: spacing),
+                        // Language Name
+                        Flexible(
+                          child: Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                            ),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              // Coming Soon Badge
+              if (isComingSoon)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Text(
-                      name,
-                      style: TextStyle(
-                        fontSize: fontSize,
+                      AppLocalizations.of(context).comingSoon,
+                      style: const TextStyle(
+                        fontSize: 9,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        color: AppColors.white,
                       ),
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
                     ),
                   ),
-                ],
-              );
-            },
+                ),
+            ],
+          ),
           ),
         ),
       ),

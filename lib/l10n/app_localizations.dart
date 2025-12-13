@@ -117,6 +117,7 @@ abstract class AppLocalizations {
   String get teachers;
   String get noLanguagesAvailable;
   String get selectLanguageFirst;
+  String get comingSoon;
   
   // Profile
   String get profile;

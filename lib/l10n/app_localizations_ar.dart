@@ -186,6 +186,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noLanguagesAvailable => 'لا توجد لغات متاحة';
   @override
   String get selectLanguageFirst => 'الرجاء اختيار لغة أولاً';
+  @override
+  String get comingSoon => 'قريباً';
   
   // Profile
   @override

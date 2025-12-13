@@ -186,6 +186,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noLanguagesAvailable => 'No languages available';
   @override
   String get selectLanguageFirst => 'Please select a language first';
+  @override
+  String get comingSoon => 'Soon';
   
   // Profile
   @override
