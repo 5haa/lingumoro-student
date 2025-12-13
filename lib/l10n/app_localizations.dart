@@ -391,6 +391,7 @@ abstract class AppLocalizations {
   // Mother Language selection
   String get selectMotherLanguage;
   String get pleaseSelectMotherLanguage;
+  String get motherLanguage;
   
   // Quiz Practice
   String get languageQuiz;

@@ -699,6 +699,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectMotherLanguage => 'Select Mother Language';
   @override
   String get pleaseSelectMotherLanguage => 'Please select your mother language';
+  @override
+  String get motherLanguage => 'Mother Language';
   
   // Quiz Practice
   @override

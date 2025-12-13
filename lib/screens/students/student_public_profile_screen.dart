@@ -166,7 +166,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
     final province = widget.studentData['province'] as Map<String, dynamic>?;
     final bio = widget.studentData['bio'] as String?;
     final fullName = widget.studentData['full_name'] ?? l.studentPlaceholder;
-    final email = widget.studentData['email'] ?? '';
+    final motherLanguage = widget.studentData['mother_language'] as String?;
     final level = languages.isNotEmpty ? languages.length : 1;
     final initials = fullName.isNotEmpty
         ? fullName.split(' ').map((n) => n[0]).take(2).join().toUpperCase()
@@ -244,93 +244,113 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                   
                   const SizedBox(height: 20),
 
-                  // Email & Province Row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const FaIcon(
-                                      FontAwesomeIcons.envelope,
-                                      size: 14,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      email,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: AppColors.textSecondary,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (province != null) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const FaIcon(
-                                        FontAwesomeIcons.locationDot,
-                                        size: 14,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        '${province['name']} (${province['name_ar']})',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: AppColors.textSecondary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
+                  // Province & Mother Language Row
+                  if (province != null || motherLanguage != null)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
-                            ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (province != null) ...[
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const FaIcon(
+                                          FontAwesomeIcons.locationDot,
+                                          size: 14,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          '${province['name']} (${province['name_ar']})',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: AppColors.textSecondary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                if (motherLanguage != null && province != null)
+                                  const SizedBox(height: 12),
+                                if (motherLanguage != null) ...[
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const FaIcon(
+                                          FontAwesomeIcons.globe,
+                                          size: 14,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              l.motherLanguage,
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: AppColors.grey,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _getLanguageName(motherLanguage),
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.textSecondary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 20),
+                      ],
+                    ),
+                  if (province != null || motherLanguage != null) 
+                    const SizedBox(height: 20)
+                  else
+                    const SizedBox.shrink(),
 
                   // Bio Section
                   if (bio != null && bio.isNotEmpty)
@@ -422,6 +442,47 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
         ),
       ),
     );
+  }
+
+  String _getLanguageName(String code) {
+    const languageMap = {
+      'ar': 'العربية (Arabic)',
+      'en': 'English',
+      'fr': 'Français (French)',
+      'es': 'Español (Spanish)',
+      'de': 'Deutsch (German)',
+      'tr': 'Türkçe (Turkish)',
+      'zh': '中文 (Chinese)',
+      'ja': '日本語 (Japanese)',
+      'ko': '한국어 (Korean)',
+      'ru': 'Русский (Russian)',
+      'it': 'Italiano (Italian)',
+      'pt': 'Português (Portuguese)',
+      'nl': 'Nederlands (Dutch)',
+      'pl': 'Polski (Polish)',
+      'sv': 'Svenska (Swedish)',
+      'da': 'Dansk (Danish)',
+      'fi': 'Suomi (Finnish)',
+      'no': 'Norsk (Norwegian)',
+      'he': 'עברית (Hebrew)',
+      'hi': 'हिन्दी (Hindi)',
+      'ur': 'اردو (Urdu)',
+      'fa': 'فارسی (Persian)',
+      'bn': 'বাংলা (Bengali)',
+      'ta': 'தமிழ் (Tamil)',
+      'te': 'తెలుగు (Telugu)',
+      'th': 'ไทย (Thai)',
+      'vi': 'Tiếng Việt (Vietnamese)',
+      'id': 'Bahasa Indonesia',
+      'ms': 'Bahasa Melayu (Malay)',
+      'el': 'Ελληνικά (Greek)',
+      'cs': 'Čeština (Czech)',
+      'hu': 'Magyar (Hungarian)',
+      'ro': 'Română (Romanian)',
+      'uk': 'Українська (Ukrainian)',
+    };
+    
+    return languageMap[code] ?? code.toUpperCase();
   }
 
   Widget _buildInfoCard({

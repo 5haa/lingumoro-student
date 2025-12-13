@@ -1,22 +1,22 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+
+import 'package:student/services/device_id_service.dart';
 
 class ProSubscriptionService {
   final _supabase = Supabase.instance.client;
+  final _deviceIdService = DeviceIdService();
   
   // Cache for device session validation
   Map<String, dynamic>? _cachedDeviceSession;
   DateTime? _cacheTimestamp;
   static const Duration _cacheValidity = Duration(seconds: 30); // Reduced to 30s for better responsiveness
 
-  /// Get current session token
-  String? getSessionToken() {
+  /// Get stable per-install device identifier (NOT a Supabase access token).
+  Future<String?> getDeviceId() async {
     try {
-      final session = _supabase.auth.currentSession;
-      return session?.accessToken;
+      return await _deviceIdService.getOrCreateDeviceId();
     } catch (e) {
-      print('Error getting session token: $e');
+      print('Error getting device id: $e');
       return null;
     }
   }
@@ -25,21 +25,23 @@ class ProSubscriptionService {
   /// [forceClaim] - If true, will take over session from another device
   Future<Map<String, dynamic>> validateAndUpdateDeviceSession(String studentId, {bool forceClaim = false}) async {
     try {
-      final sessionToken = getSessionToken();
+      final deviceId = await getDeviceId();
       
-      if (sessionToken == null) {
+      if (deviceId == null) {
         return {
           'has_pro': false,
           'is_valid': false,
           'active_on_other_device': false,
           'device_changed': false,
-          'error': 'No session token available',
+          'error': 'No device id available',
         };
       }
 
       final response = await _supabase.rpc('check_pro_device_session', params: {
         'p_student_id': studentId,
-        'p_session_token': sessionToken,
+        // Note: kept as p_session_token for backward-compatible DB RPC naming.
+        // In the DB this is now treated as a stable device identifier.
+        'p_session_token': deviceId,
         'p_force_claim': forceClaim,
       });
 
