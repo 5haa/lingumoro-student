@@ -694,6 +694,12 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get confirmAccount => 'CONFIRMAR CUENTA';
   
+  // Mother Language selection
+  @override
+  String get selectMotherLanguage => 'Seleccionar Idioma Materno';
+  @override
+  String get pleaseSelectMotherLanguage => 'Por favor selecciona tu idioma materno';
+  
   // Quiz Practice
   @override
   String get languageQuiz => 'Tomar Cuestionario';

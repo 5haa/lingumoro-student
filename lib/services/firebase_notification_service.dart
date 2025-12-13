@@ -106,32 +106,16 @@ class FirebaseNotificationService {
 
       _currentToken = token;
 
-      // Check if token already exists
-      final existing = await _supabase
-          .from('device_tokens')
-          .select()
-          .eq('fcm_token', token)
-          .maybeSingle();
-
-      if (existing != null) {
-        // Update existing token
-        await _supabase
-            .from('device_tokens')
-            .update({
-              'is_active': true,
-              'last_used_at': DateTime.now().toIso8601String(),
-            })
-            .eq('fcm_token', token);
-      } else {
-        // Insert new token
-        await _supabase.from('device_tokens').insert({
-          'user_id': userId,
-          'user_type': 'student',
-          'fcm_token': token,
-          'platform': _getPlatform(),
-          'is_active': true,
-        });
-      }
+      // Use upsert to handle both insert and update cases
+      // This handles the case where the token already exists (possibly for another user)
+      await _supabase.from('device_tokens').upsert({
+        'user_id': userId,
+        'user_type': 'student',
+        'fcm_token': token,
+        'platform': _getPlatform(),
+        'is_active': true,
+        'last_used_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'fcm_token');
 
       print('FCM token saved to database');
     } catch (e) {

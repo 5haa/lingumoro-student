@@ -25,6 +25,17 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscureConfirmPassword = true;
   List<Map<String, dynamic>> _provinces = [];
   String? _selectedProvinceId;
+  String? _selectedMotherLanguage;
+  
+  // Common mother languages
+  static const List<Map<String, String>> _motherLanguages = [
+    {'code': 'ar', 'name': 'Arabic'},
+    {'code': 'ku', 'name': 'Kurdish'},
+    {'code': 'en', 'name': 'English'},
+    {'code': 'tr', 'name': 'Turkish'},
+    {'code': 'fa', 'name': 'Persian'},
+    {'code': 'other', 'name': 'Other'},
+  ];
 
   @override
   void initState() {
@@ -80,6 +91,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ? null 
             : _phoneController.text.trim(),
         provinceId: _selectedProvinceId,
+        motherLanguage: _selectedMotherLanguage,
       );
 
       if (mounted) {
@@ -93,6 +105,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ? null 
                   : _phoneController.text.trim(),
               provinceId: _selectedProvinceId,
+              motherLanguage: _selectedMotherLanguage,
             ),
           ),
         );
@@ -274,6 +287,38 @@ class _SignupScreenState extends State<SignupScreen> {
                                   }
                                   return null;
                                 },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Mother Language dropdown
+                        DropdownButtonFormField<String>(
+                          value: _selectedMotherLanguage,
+                          decoration: InputDecoration(
+                            labelText: 'Mother Language',
+                            prefixIcon: const Icon(Icons.language),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                          ),
+                          items: _motherLanguages.map((lang) {
+                            return DropdownMenuItem<String>(
+                              value: lang['code'],
+                              child: Text(lang['name']!),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedMotherLanguage = value;
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please select your mother language';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
 

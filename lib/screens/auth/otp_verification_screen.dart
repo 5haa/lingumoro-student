@@ -14,6 +14,7 @@ class OTPVerificationScreen extends StatefulWidget {
   final String fullName;
   final String? phone;
   final String? provinceId;
+  final String? motherLanguage;
   final bool isPasswordReset;
   
   const OTPVerificationScreen({
@@ -22,6 +23,7 @@ class OTPVerificationScreen extends StatefulWidget {
     required this.fullName,
     this.phone,
     this.provinceId,
+    this.motherLanguage,
     this.isPasswordReset = false,
   });
 
@@ -144,6 +146,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           fullName: widget.fullName,
           phone: widget.phone,
           provinceId: widget.provinceId,
+          motherLanguage: widget.motherLanguage,
         );
         
         // Navigate to home screen after successful verification

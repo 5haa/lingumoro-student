@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/services/auth_service.dart';
+import 'package:student/services/province_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_text_field.dart';
 import 'package:student/l10n/app_localizations.dart';
@@ -19,33 +20,47 @@ class _SignUpContentState extends State<SignUpContent> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   final _authService = AuthService();
+  final _provinceService = ProvinceService();
   
   String? _selectedProvinceId;
   String? _selectedProvinceName;
+  String? _selectedMotherLanguage;
+  String? _selectedMotherLanguageDisplay;
   bool _isLoading = false;
+  bool _isLoadingProvinces = true;
+  List<Map<String, dynamic>> _provinces = [];
   
-  // Hardcoded list of all Iraqi provinces
-  static const List<Map<String, String>> _provinces = [
-    {'id': 'baghdad', 'name': 'Baghdad', 'nameAr': 'بغداد'},
-    {'id': 'basra', 'name': 'Basra', 'nameAr': 'البصرة'},
-    {'id': 'nineveh', 'name': 'Nineveh', 'nameAr': 'نينوى'},
-    {'id': 'erbil', 'name': 'Erbil', 'nameAr': 'أربيل'},
-    {'id': 'sulaymaniyah', 'name': 'Sulaymaniyah', 'nameAr': 'السليمانية'},
-    {'id': 'diyala', 'name': 'Diyala', 'nameAr': 'ديالى'},
-    {'id': 'anbar', 'name': 'Anbar', 'nameAr': 'الأنبار'},
-    {'id': 'kirkuk', 'name': 'Kirkuk', 'nameAr': 'كركوك'},
-    {'id': 'najaf', 'name': 'Najaf', 'nameAr': 'النجف'},
-    {'id': 'karbala', 'name': 'Karbala', 'nameAr': 'كربلاء'},
-    {'id': 'babil', 'name': 'Babil', 'nameAr': 'بابل'},
-    {'id': 'dhi_qar', 'name': 'Dhi Qar', 'nameAr': 'ذي قار'},
-    {'id': 'maysan', 'name': 'Maysan', 'nameAr': 'ميسان'},
-    {'id': 'wasit', 'name': 'Wasit', 'nameAr': 'واسط'},
-    {'id': 'saladin', 'name': 'Saladin', 'nameAr': 'صلاح الدين'},
-    {'id': 'muthanna', 'name': 'Muthanna', 'nameAr': 'المثنى'},
-    {'id': 'qadisiyyah', 'name': 'Qadisiyyah', 'nameAr': 'القادسية'},
-    {'id': 'dohuk', 'name': 'Dohuk', 'nameAr': 'دهوك'},
-    {'id': 'halabja', 'name': 'Halabja', 'nameAr': 'حلبجة'},
+  // Common mother languages
+  static const List<Map<String, String>> _motherLanguages = [
+    {'code': 'ar', 'name': 'Arabic', 'nameAr': 'العربية'},
+    {'code': 'ku', 'name': 'Kurdish', 'nameAr': 'الكردية'},
+    {'code': 'en', 'name': 'English', 'nameAr': 'الإنجليزية'},
+    {'code': 'tr', 'name': 'Turkish', 'nameAr': 'التركية'},
+    {'code': 'fa', 'name': 'Persian', 'nameAr': 'الفارسية'},
+    {'code': 'other', 'name': 'Other', 'nameAr': 'أخرى'},
   ];
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadProvinces();
+  }
+  
+  Future<void> _loadProvinces() async {
+    try {
+      final provinces = await _provinceService.getActiveProvinces();
+      if (mounted) {
+        setState(() {
+          _provinces = provinces;
+          _isLoadingProvinces = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingProvinces = false);
+      }
+    }
+  }
   
   @override
   void dispose() {
@@ -57,6 +72,16 @@ class _SignUpContentState extends State<SignUpContent> {
   }
   
   void _showProvinceBottomSheet() {
+    if (_isLoadingProvinces) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).loading),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+      return;
+    }
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -68,6 +93,25 @@ class _SignUpContentState extends State<SignUpContent> {
           setState(() {
             _selectedProvinceId = provinceId;
             _selectedProvinceName = provinceName;
+          });
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+  
+  void _showMotherLanguageBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _MotherLanguageBottomSheet(
+        languages: _motherLanguages,
+        selectedLanguageCode: _selectedMotherLanguage,
+        onLanguageSelected: (languageCode, languageDisplay) {
+          setState(() {
+            _selectedMotherLanguage = languageCode;
+            _selectedMotherLanguageDisplay = languageDisplay;
           });
           Navigator.pop(context);
         },
@@ -110,6 +154,16 @@ class _SignUpContentState extends State<SignUpContent> {
       return;
     }
     
+    if (_selectedMotherLanguage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.pleaseSelectMotherLanguage),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+      return;
+    }
+    
     setState(() => _isLoading = true);
     
     try {
@@ -119,6 +173,7 @@ class _SignUpContentState extends State<SignUpContent> {
         fullName: _nameController.text.trim(),
         phone: null,
         provinceId: _selectedProvinceId,
+        motherLanguage: _selectedMotherLanguage,
       );
       
       if (mounted) {
@@ -129,6 +184,7 @@ class _SignUpContentState extends State<SignUpContent> {
               fullName: _nameController.text.trim(),
               phone: null,
               provinceId: _selectedProvinceId,
+              motherLanguage: _selectedMotherLanguage,
             ),
           ),
         );
@@ -199,14 +255,74 @@ class _SignUpContentState extends State<SignUpContent> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
+                  child: _isLoadingProvinces 
+                      ? Text(
+                          l10n.loading,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textHint,
+                          ),
+                        )
+                      : Text(
+                          _selectedProvinceName ?? l10n.chooseCity,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: _selectedProvinceId != null 
+                                ? AppColors.textPrimary 
+                                : AppColors.textHint,
+                            fontWeight: _selectedProvinceId != null 
+                                ? FontWeight.w500 
+                                : FontWeight.normal,
+                          ),
+                        ),
+                ),
+                Icon(
+                  Icons.keyboard_arrow_down,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 20),
+        
+        // Mother Language selection field
+        GestureDetector(
+          onTap: _showMotherLanguageBottomSheet,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.language,
+                  color: _selectedMotherLanguage != null 
+                      ? AppColors.primary 
+                      : AppColors.textHint,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Text(
-                    _selectedProvinceName ?? l10n.chooseCity,
+                    _selectedMotherLanguageDisplay ?? l10n.selectMotherLanguage,
                     style: TextStyle(
                       fontSize: 16,
-                      color: _selectedProvinceId != null 
+                      color: _selectedMotherLanguage != null 
                           ? AppColors.textPrimary 
                           : AppColors.textHint,
-                      fontWeight: _selectedProvinceId != null 
+                      fontWeight: _selectedMotherLanguage != null 
                           ? FontWeight.w500 
                           : FontWeight.normal,
                     ),
@@ -254,7 +370,7 @@ class _SignUpContentState extends State<SignUpContent> {
 }
 
 class _ProvinceBottomSheet extends StatefulWidget {
-  final List<Map<String, String>> provinces;
+  final List<Map<String, dynamic>> provinces;
   final String? selectedProvinceId;
   final Function(String provinceId, String provinceName) onProvinceSelected;
 
@@ -270,7 +386,7 @@ class _ProvinceBottomSheet extends StatefulWidget {
 
 class _ProvinceBottomSheetState extends State<_ProvinceBottomSheet> {
   final TextEditingController _searchController = TextEditingController();
-  List<Map<String, String>> _filteredProvinces = [];
+  List<Map<String, dynamic>> _filteredProvinces = [];
 
   @override
   void initState() {
@@ -293,8 +409,9 @@ class _ProvinceBottomSheetState extends State<_ProvinceBottomSheet> {
         _filteredProvinces = widget.provinces;
       } else {
         _filteredProvinces = widget.provinces.where((province) {
-          return province['name']!.toLowerCase().contains(query) ||
-                 province['nameAr']!.contains(query);
+          final name = province['name']?.toString().toLowerCase() ?? '';
+          final nameAr = province['name_ar']?.toString() ?? '';
+          return name.contains(query) || nameAr.contains(query);
         }).toList();
       }
     });
@@ -394,13 +511,16 @@ class _ProvinceBottomSheetState extends State<_ProvinceBottomSheet> {
               itemCount: _filteredProvinces.length,
               itemBuilder: (context, index) {
                 final province = _filteredProvinces[index];
-                final isSelected = widget.selectedProvinceId == province['id'];
+                final provinceId = province['id']?.toString() ?? '';
+                final provinceName = province['name']?.toString() ?? '';
+                final provinceNameAr = province['name_ar']?.toString() ?? '';
+                final isSelected = widget.selectedProvinceId == provinceId;
                 
                 return InkWell(
                   onTap: () {
                     widget.onProvinceSelected(
-                      province['id']!,
-                      '${province['name']} (${province['nameAr']})',
+                      provinceId,
+                      '$provinceName ($provinceNameAr)',
                     );
                   },
                   borderRadius: BorderRadius.circular(15),
@@ -429,7 +549,7 @@ class _ProvinceBottomSheetState extends State<_ProvinceBottomSheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                province['name']!,
+                                provinceName,
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
@@ -440,7 +560,161 @@ class _ProvinceBottomSheetState extends State<_ProvinceBottomSheet> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                province['nameAr']!,
+                                provinceNameAr,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isSelected 
+                                      ? AppColors.primary.withOpacity(0.8)
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.redGradient,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              color: AppColors.white,
+                              size: 16,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MotherLanguageBottomSheet extends StatelessWidget {
+  final List<Map<String, String>> languages;
+  final String? selectedLanguageCode;
+  final Function(String languageCode, String languageDisplay) onLanguageSelected;
+
+  const _MotherLanguageBottomSheet({
+    required this.languages,
+    required this.selectedLanguageCode,
+    required this.onLanguageSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.5,
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.grey.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          
+          // Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.redGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.language,
+                    color: AppColors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  AppLocalizations.of(context).selectMotherLanguage,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Languages list
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              itemCount: languages.length,
+              itemBuilder: (context, index) {
+                final language = languages[index];
+                final isSelected = selectedLanguageCode == language['code'];
+                
+                return InkWell(
+                  onTap: () {
+                    onLanguageSelected(
+                      language['code']!,
+                      '${language['name']} (${language['nameAr']})',
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(15),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected 
+                          ? AppColors.primary.withOpacity(0.1)
+                          : AppColors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: isSelected 
+                            ? AppColors.primary 
+                            : AppColors.border,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                language['name']!,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected 
+                                      ? AppColors.primary 
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                language['nameAr']!,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: isSelected 

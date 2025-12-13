@@ -388,6 +388,10 @@ abstract class AppLocalizations {
   String get fillAllFields;
   String get confirmAccount;
   
+  // Mother Language selection
+  String get selectMotherLanguage;
+  String get pleaseSelectMotherLanguage;
+  
   // Quiz Practice
   String get languageQuiz;
   String get yourStatistics;

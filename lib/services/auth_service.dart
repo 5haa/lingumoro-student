@@ -19,6 +19,7 @@ class AuthService {
     required String fullName,
     String? phone,
     String? provinceId,
+    String? motherLanguage,
   }) async {
     // Check if email already exists and what type of user it is
     final userType = await _supabase.rpc('check_user_type_by_email', 
@@ -53,6 +54,7 @@ class AuthService {
     required String fullName,
     String? phone,
     String? provinceId,
+    String? motherLanguage,
   }) async {
     // Verify the OTP - this will create an authenticated session
     final response = await _supabase.auth.verifyOTP(
@@ -61,9 +63,9 @@ class AuthService {
       token: token,
     );
 
-    // Create student profile after successful verification
+    // Create or update student profile after successful verification
     if (response.user != null) {
-      // Check if profile already exists
+      // Check if profile already exists (created by database trigger)
       final existing = await _supabase
           .from('students')
           .select()
@@ -71,13 +73,24 @@ class AuthService {
           .maybeSingle();
 
       if (existing == null) {
+        // Create new profile
         await _supabase.from('students').insert({
           'id': response.user!.id,
           'email': response.user!.email,
           'full_name': fullName,
           'phone': phone,
           if (provinceId != null) 'province_id': provinceId,
+          if (motherLanguage != null) 'mother_language': motherLanguage,
         });
+      } else {
+        // Update existing profile with correct data (trigger may have created with defaults)
+        await _supabase.from('students').update({
+          'full_name': fullName,
+          if (phone != null) 'phone': phone,
+          if (provinceId != null) 'province_id': provinceId,
+          if (motherLanguage != null) 'mother_language': motherLanguage,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', response.user!.id);
       }
       
       // Initialize Firebase notifications after successful signup
