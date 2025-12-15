@@ -314,6 +314,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           isLocked: false,
                           showProgress: false,
                           dailyLimitReached: _dailyLimitStatus['quiz_completed'],
+                          imagePath: 'assets/images/quiz.jpg',
                         ),
                         const SizedBox(height: 12),
 
@@ -331,6 +332,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           onTap: () => _navigateToVoiceAI(),
                           isLocked: false,
                           showProgress: false,
+                          imagePath: 'assets/images/speaking.jpg',
                         ),
                         const SizedBox(height: 12),
 
@@ -349,6 +351,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           isLocked: false,
                           showProgress: false,
                           dailyLimitReached: _dailyLimitStatus['reading_completed'],
+                          imagePath: 'assets/images/reading.jpg',
                         ),
                         const SizedBox(height: 12),
 
@@ -370,6 +373,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                               ? ((_watchedVideos.values.where((w) => w).length / _videos.length) * 100).toInt()
                               : 0,
                           dailyLimitReached: _dailyLimitStatus['video_completed'],
+                          imagePath: 'assets/images/listening.jpg',
                         ),
                                 const SizedBox(height: 16),
                               ],
@@ -449,6 +453,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     bool showProgress = false,
     int? progressValue,
     bool? dailyLimitReached,
+    String? imagePath,
   }) {
     final l10n = AppLocalizations.of(context);
     return GestureDetector(
@@ -461,7 +466,13 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
-              : gradient,
+              : (imagePath != null ? null : gradient),
+          image: imagePath != null && !isLocked
+              ? DecorationImage(
+                  image: AssetImage(imagePath),
+                  fit: BoxFit.cover,
+                )
+              : null,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -488,10 +499,10 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
               // Title
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: imagePath != null && !isLocked ? Colors.black87 : Colors.white,
                 ),
               ),
               
@@ -502,13 +513,11 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  _buildBadge(stat2Label, color),
+                  _buildBadge(stat2Label, color, hasImage: imagePath != null && !isLocked),
                   if (isLocked)
-                    _buildBadge(l10n.proFeature, Colors.amber.shade700),
+                    _buildBadge(l10n.proFeature, Colors.amber.shade700, hasImage: false),
                   if (dailyLimitReached == true)
-                    _buildBadge('✓ Today', Colors.green.shade700),
-                  if (dailyLimitReached == false && !isLocked)
-                    _buildBadge('Available', Colors.blue.shade700),
+                    _buildBadge('✓ Today', Colors.green.shade700, hasImage: imagePath != null && !isLocked),
                 ],
               ),
               
@@ -524,9 +533,9 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                       children: [
                         Text(
                           l10n.videos,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
-                            color: Colors.white,
+                            color: imagePath != null && !isLocked ? Colors.black87 : Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -534,7 +543,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                           isLocked ? '0%' : '${progressValue ?? 0}% ${l10n.completed}',
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.white.withOpacity(0.9),
+                            color: imagePath != null && !isLocked ? Colors.black87 : Colors.white.withOpacity(0.9),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -545,8 +554,12 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                       borderRadius: BorderRadius.circular(8),
                       child: LinearProgressIndicator(
                         value: isLocked ? 0 : (progressValue ?? 0) / 100,
-                        backgroundColor: Colors.white.withOpacity(0.3),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        backgroundColor: imagePath != null && !isLocked 
+                            ? Colors.black.withOpacity(0.2) 
+                            : Colors.white.withOpacity(0.3),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          imagePath != null && !isLocked ? Colors.black87 : Colors.white,
+                        ),
                         minHeight: 5,
                       ),
                     ),
@@ -561,18 +574,20 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     );
   }
 
-  Widget _buildBadge(String text, Color bgColor) {
+  Widget _buildBadge(String text, Color bgColor, {bool hasImage = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.25),
+        color: hasImage 
+            ? Colors.black.withOpacity(0.15) 
+            : Colors.white.withOpacity(0.25),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
-          color: Colors.white,
+          color: hasImage ? Colors.black87 : Colors.white,
           fontWeight: FontWeight.bold,
         ),
         maxLines: 1,
