@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/auth_service.dart';
-import 'package:student/services/level_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
-import 'package:student/services/daily_limit_service.dart';
+import 'package:student/models/quiz.dart';
 import 'package:student/models/difficulty_level.dart';
-import 'package:student/models/quiz_question.dart';
 import 'package:student/config/app_colors.dart';
+import 'package:student/screens/practice/quiz_session_screen.dart';
 import '../../widgets/custom_back_button.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -21,41 +20,55 @@ class QuizPracticeScreen extends StatefulWidget {
 class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   final _quizService = QuizPracticeService();
   final _authService = AuthService();
-  final _levelService = LevelService();
   final _proService = ProSubscriptionService();
-  final _dailyLimitService = DailyLimitService();
 
   bool _isLoading = true;
   bool _hasProSubscription = false;
   String? _errorMessage;
   String? _studentId;
   int _selectedDifficulty = 1;
-  int _highestUnlockedLevel = 1;
   bool _canAttemptToday = true;
-  String _timeUntilReset = '';
   
+  List<Quiz> _quizzes = [];
   Map<int, Map<String, dynamic>> _progressByLevel = {};
-  List<QuizQuestion> _currentLevelQuestions = [];
-  Set<String> _completedQuestionIds = {};
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
-    _startResetTimer();
+    _checkProAndLoadData();
   }
 
-  void _startResetTimer() {
-    Future.doWhile(() async {
-      if (!mounted) return false;
-      await Future.delayed(const Duration(seconds: 60));
+  Future<void> _checkProAndLoadData() async {
+    final studentId = _authService.currentUser?.id;
+    if (studentId == null) {
+      Navigator.pop(context);
+      return;
+    }
+
+    _studentId = studentId;
+
+    // Check device session validity
+    final result = await _proService.validateAndUpdateDeviceSession(
+      studentId,
+      forceClaim: false,
+    );
+
+    if (result['is_valid'] != true) {
       if (mounted) {
-        setState(() {
-          _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
-        });
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).proFeaturesActiveOnAnotherDevice),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
-      return mounted;
-    });
+      return;
+    }
+
+    // If valid, load data
+    _loadInitialData();
   }
 
   Future<void> _loadInitialData() async {
@@ -65,48 +78,15 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     });
 
     try {
-      final user = _authService.currentUser;
-      if (user == null) {
-        if (mounted) {
-          final l10n = AppLocalizations.of(context);
-          setState(() {
-            _isLoading = false;
-            _errorMessage = l10n.loginRequired;
-          });
-        }
-        return;
-      }
-
-      _studentId = user.id;
-
-      // Check PRO subscription
-      final hasPro = await _proService.hasActivePro(_studentId!);
-      if (!hasPro) {
-        if (mounted) {
-          final l10n = AppLocalizations.of(context);
-          setState(() {
-            _isLoading = false;
-            _hasProSubscription = false;
-            _errorMessage = l10n.proSubscriptionRequired;
-          });
-        }
-        return;
-      }
-
-      setState(() => _hasProSubscription = true);
-
       // Load data
       await Future.wait([
-        _loadHighestUnlockedLevel(),
+        _loadQuizzesForLevel(_selectedDifficulty),
         _loadProgressForAllLevels(),
         _checkDailyLimit(),
       ]);
 
-      await _loadQuestionsForLevel(_selectedDifficulty);
-
       setState(() {
         _isLoading = false;
-        _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
       });
     } catch (e) {
       if (mounted) {
@@ -119,42 +99,36 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     }
   }
 
-  Future<void> _loadHighestUnlockedLevel() async {
-    final level = await _quizService.getHighestUnlockedLevel(_studentId!);
+  Future<void> _loadQuizzesForLevel(int level) async {
+    final quizzes = await _quizService.getQuizzesWithProgress(_studentId!, level);
     setState(() {
-      _highestUnlockedLevel = level;
+      _quizzes = quizzes;
     });
   }
 
   Future<void> _loadProgressForAllLevels() async {
     for (int level = 1; level <= 4; level++) {
-      final progress = await _quizService.getQuizProgress(_studentId!, level);
-      _progressByLevel[level] = progress;
+      final quizzes = await _quizService.getQuizzesByDifficulty(level);
+      int completed = 0;
+      
+      for (var quiz in quizzes) {
+        final hasCompleted = await _quizService.hasCompletedQuiz(_studentId!, quiz.id);
+        if (hasCompleted) completed++;
+      }
+
+      _progressByLevel[level] = {
+        'total': quizzes.length,
+        'completed': completed,
+        'percentage': quizzes.isEmpty ? 0.0 : (completed / quizzes.length * 100),
+      };
     }
     setState(() {});
   }
 
   Future<void> _checkDailyLimit() async {
-    final canAttempt = await _quizService.canAttemptQuiz(_studentId!);
+    final canAttempt = await _quizService.canAttemptQuizToday(_studentId!);
     setState(() {
       _canAttemptToday = canAttempt;
-    });
-  }
-
-  Future<void> _loadQuestionsForLevel(int level) async {
-    final questions = await _quizService.getQuizQuestionsByDifficulty(level);
-    
-    // Load completion status for all questions
-    _completedQuestionIds.clear();
-    for (final question in questions) {
-      final isCompleted = await _quizService.isQuestionCompleted(_studentId!, question.id);
-      if (isCompleted) {
-        _completedQuestionIds.add(question.id);
-      }
-    }
-    
-    setState(() {
-      _currentLevelQuestions = questions;
     });
   }
 
@@ -163,34 +137,37 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       _selectedDifficulty = level;
       _isLoading = true;
     });
-    await _loadQuestionsForLevel(level);
+    await _loadQuizzesForLevel(level);
     setState(() {
       _isLoading = false;
     });
   }
 
-  Future<void> _startQuiz(QuizQuestion question) async {
-    final l10n = AppLocalizations.of(context);
-
-    // Check daily limit
-    if (!_canAttemptToday) {
-      _showErrorDialog('You have already completed your quiz for today. Come back tomorrow!');
+  Future<void> _startQuiz(Quiz quiz) async {
+    // Check if locked
+    if (quiz.isLocked == true) {
+      _showErrorDialog('Complete the previous quiz first to unlock this one!');
       return;
     }
 
-    // Navigate to quiz question screen
+    // Check daily limit
+    if (!_canAttemptToday) {
+      _showErrorDialog('You have already completed one quiz today. Come back tomorrow!');
+      return;
+    }
+
+    // Navigate to quiz session screen
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => QuizQuestionScreen(
-          question: question,
+        builder: (context) => QuizSessionScreen(
+          quiz: quiz,
           studentId: _studentId!,
-          difficultyLevel: _selectedDifficulty,
         ),
       ),
     );
 
-    // Reload data after completing question
+    // Reload data after completing quiz
     if (result == true) {
       _loadInitialData();
     }
@@ -215,7 +192,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -230,8 +207,8 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                         valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                       ),
                     )
-                  : !_hasProSubscription
-                      ? _buildProRequiredMessage(l10n)
+                  : _errorMessage != null
+                      ? _buildErrorState()
                       : RefreshIndicator(
                           onRefresh: _loadInitialData,
                           color: AppColors.primary,
@@ -249,7 +226,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                                 const SizedBox(height: 20),
                                 _buildProgressCard(l10n),
                                 const SizedBox(height: 20),
-                                _buildQuestionsList(l10n),
+                                _buildQuizzesList(l10n),
                               ],
                             ),
                           ),
@@ -270,7 +247,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
           Expanded(
             child: Center(
               child: Text(
-                l10n.languageQuiz,
+                'Quiz Practice',
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -291,14 +268,14 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFF9966), Color(0xFFFF6B6B)],
+          colors: [Color(0xFFE53935), Color(0xFFD32F2F)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withOpacity(0.3),
+            color: AppColors.primary.withOpacity(0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -306,27 +283,37 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       ),
       child: Row(
         children: [
-          const Text('✏️', style: TextStyle(fontSize: 48)),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              FontAwesomeIcons.clipboardQuestion,
+              size: 32,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l10n.quizPractice,
+                  'Test Your Knowledge',
                   style: const TextStyle(
-                    fontSize: 22,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
-                  'Manual Quiz Questions • 4 Levels',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
+                  'Complete quizzes to improve your skills',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.9),
                   ),
                 ),
               ],
@@ -371,7 +358,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                 Text(
                   _canAttemptToday
                       ? 'You can complete 1 quiz today'
-                      : 'Resets in $_timeUntilReset',
+                      : 'Come back tomorrow for another quiz',
                   style: TextStyle(
                     fontSize: 13,
                     color: _canAttemptToday ? Colors.green.shade700 : Colors.red.shade700,
@@ -401,53 +388,37 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
         Row(
           children: DifficultyLevel.values.map((level) {
             final isSelected = level.value == _selectedDifficulty;
-            final isLocked = level.value > _highestUnlockedLevel;
             
             return Expanded(
               child: GestureDetector(
-                onTap: isLocked ? null : () => _onDifficultyChanged(level.value),
+                onTap: () => _onDifficultyChanged(level.value),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: isLocked
-                        ? Colors.grey.shade200
-                        : isSelected
-                            ? AppColors.primary
-                            : Colors.white,
+                    color: isSelected ? AppColors.primary : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isLocked
-                          ? Colors.grey.shade300
-                          : isSelected
-                              ? AppColors.primary
-                              : AppColors.border,
+                      color: isSelected ? AppColors.primary : AppColors.border,
                       width: 2,
                     ),
                   ),
                   child: Column(
                     children: [
-                      if (isLocked)
-                        Icon(Icons.lock, size: 16, color: Colors.grey.shade600)
-                      else
-                        Text(
-                          '${level.value}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : AppColors.textPrimary,
-                          ),
+                      Text(
+                        '${level.value}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : AppColors.textPrimary,
                         ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         level.label,
                         style: TextStyle(
                           fontSize: 11,
-                          color: isLocked
-                              ? Colors.grey.shade600
-                              : isSelected
-                                  ? Colors.white
-                                  : AppColors.textSecondary,
+                          color: isSelected ? Colors.white : AppColors.textSecondary,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -523,58 +494,43 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
               color: AppColors.textSecondary,
             ),
           ),
-          if (completed == total && total > 0 && !DifficultyLevel.fromValue(_selectedDifficulty).isLastLevel)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.emoji_events, color: Colors.green.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Level completed! Next level unlocked.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green.shade900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildQuestionsList(AppLocalizations l10n) {
-    if (_currentLevelQuestions.isEmpty) {
+  Widget _buildQuizzesList(AppLocalizations l10n) {
+    if (_quizzes.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           children: [
-            Icon(Icons.info_outline, size: 48, color: Colors.grey.shade400),
+            Icon(
+              FontAwesomeIcons.clipboardQuestion,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 16),
             Text(
-              'No questions available for this level yet.',
+              'No Quizzes Available',
               style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey.shade600,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No quizzes have been created for this level yet.',
               textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -584,497 +540,244 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Quiz Questions (${_currentLevelQuestions.length})',
-          style: const TextStyle(
+        const Text(
+          'Available Quizzes',
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
-        ...List.generate(
-          _currentLevelQuestions.length,
-          (index) => _buildQuestionCard(_currentLevelQuestions[index], index, l10n),
-        ),
+        ...List.generate(_quizzes.length, (index) => _buildQuizCard(_quizzes[index])),
       ],
     );
   }
 
-  Widget _buildQuestionCard(QuizQuestion question, int index, AppLocalizations l10n) {
-    // Check if completed
-    final isCompleted = _isQuestionCompleted(question.id);
-    
-    // Check if previous question is completed (for lock state)
-    final isLocked = index > 0 && !_isQuestionCompleted(_currentLevelQuestions[index - 1].id);
+  Widget _buildQuizCard(Quiz quiz) {
+    final isLocked = quiz.isLocked == true;
+    final isCompleted = quiz.isCompleted == true;
+    final hasScore = quiz.bestScore != null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: isLocked ? Colors.grey.shade100 : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCompleted
-              ? Colors.green.shade300
-              : isLocked
-                  ? Colors.grey.shade300
-                  : AppColors.border,
+          color: isLocked ? Colors.grey.shade300 : AppColors.border,
         ),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isCompleted
-                ? Colors.green.shade100
-                : isLocked
-                    ? Colors.grey.shade200
-                    : AppColors.primary.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: isCompleted
-                ? Icon(Icons.check, color: Colors.green.shade700)
-                : isLocked
-                    ? Icon(Icons.lock, color: Colors.grey.shade600, size: 20)
-                    : Text(
-                        '${index + 1}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-          ),
-        ),
-        title: Text(
-          question.questionText,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isLocked ? Colors.grey.shade600 : AppColors.textPrimary,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Row(
-            children: [
-              Icon(Icons.star, size: 14, color: Colors.amber.shade700),
-              const SizedBox(width: 4),
-              Text(
-                '${question.pointsReward} points',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.amber.shade900,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (isCompleted) ...[
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Completed',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.green.shade800,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+        boxShadow: isLocked
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
-            ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLocked ? null : () => _startQuiz(quiz),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isLocked
+                            ? Colors.grey.shade300
+                            : AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Quiz ${quiz.orderIndex}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isLocked ? Colors.grey.shade600 : AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (isLocked)
+                      Icon(Icons.lock, size: 16, color: Colors.grey.shade600)
+                    else if (isCompleted)
+                      const Icon(Icons.check_circle, size: 16, color: Colors.green),
+                    const Spacer(),
+                    if (hasScore)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getScoreColor(quiz.bestScore!).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              FontAwesomeIcons.star,
+                              size: 12,
+                              color: _getScoreColor(quiz.bestScore!),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${quiz.bestScore!.toStringAsFixed(0)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _getScoreColor(quiz.bestScore!),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  quiz.title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isLocked ? Colors.grey.shade600 : AppColors.textPrimary,
+                  ),
+                ),
+                if (quiz.description != null && quiz.description!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    quiz.description!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      FontAwesomeIcons.clipboardQuestion,
+                      size: 14,
+                      color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${quiz.totalQuestions ?? 0} questions',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 14,
+                      color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '~${quiz.estimatedDurationMinutes} min',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                if (!isLocked) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.redGradient,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isCompleted ? FontAwesomeIcons.arrowsRotate : FontAwesomeIcons.play,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isCompleted ? 'Retake Quiz' : 'Start Quiz',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
-        trailing: isLocked
-            ? null
-            : Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: isCompleted ? Colors.grey.shade400 : AppColors.primary,
-              ),
-        onTap: isLocked || !_canAttemptToday
-            ? null
-            : () => _startQuiz(question),
       ),
     );
   }
 
-  bool _isQuestionCompleted(String questionId) {
-    return _completedQuestionIds.contains(questionId);
-  }
-
-  Widget _buildProRequiredMessage(AppLocalizations l10n) {
+  Widget _buildErrorState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade100,
-                shape: BoxShape.circle,
-              ),
-              child: FaIcon(
-                FontAwesomeIcons.crown,
-                size: 64,
-                color: Colors.amber.shade600,
-              ),
+            Icon(
+              FontAwesomeIcons.triangleExclamation,
+              size: 64,
+              color: Colors.orange.shade400,
             ),
             const SizedBox(height: 24),
             Text(
-              l10n.proSubscriptionRequired,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+              _errorMessage!,
               textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.languageQuizProOnly,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back),
-              label: Text(l10n.goBack),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loadInitialData,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Individual quiz question screen
-class QuizQuestionScreen extends StatefulWidget {
-  final QuizQuestion question;
-  final String studentId;
-  final int difficultyLevel;
-
-  const QuizQuestionScreen({
-    super.key,
-    required this.question,
-    required this.studentId,
-    required this.difficultyLevel,
-  });
-
-  @override
-  State<QuizQuestionScreen> createState() => _QuizQuestionScreenState();
-}
-
-class _QuizQuestionScreenState extends State<QuizQuestionScreen> {
-  final _quizService = QuizPracticeService();
-  int? _selectedAnswer;
-  bool _isSubmitted = false;
-  bool _isCorrect = false;
-  int _pointsAwarded = 0;
-  String _explanation = '';
-
-  Future<void> _submitAnswer() async {
-    if (_selectedAnswer == null) return;
-
-    setState(() {
-      _isSubmitted = true;
-    });
-
-    try {
-      final result = await _quizService.submitQuizAnswer(
-        studentId: widget.studentId,
-        question: widget.question,
-        studentAnswerIndex: _selectedAnswer!,
-      );
-
-      setState(() {
-        _isCorrect = result['isCorrect'] as bool;
-        _pointsAwarded = result['pointsAwarded'] as int;
-        _explanation = result['explanation'] as String;
-      });
-
-      // Show result dialog after a brief delay
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      if (mounted) {
-        _showResultDialog();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showResultDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              _isCorrect ? Icons.check_circle : Icons.cancel,
-              color: _isCorrect ? Colors.green : Colors.red,
-              size: 32,
-            ),
-            const SizedBox(width: 12),
-            Text(_isCorrect ? 'Correct!' : 'Incorrect'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_isCorrect) ...[
-              Text(
-                'You earned $_pointsAwarded points!',
-                style: const TextStyle(
-                  fontSize: 16,
+              child: const Text(
+                'Retry',
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            Text(
-              'Explanation:',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _explanation,
-              style: const TextStyle(fontSize: 14),
-            ),
-            if (!_isCorrect) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Correct answer: ${widget.question.correctAnswer}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context, true); // Go back to quiz list with success
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Question ${widget.question.orderIndex + 1}'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Question
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Text(
-                widget.question.questionText,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  height: 1.5,
+                  color: Colors.white,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Options
-            ...List.generate(
-              widget.question.options.length,
-              (index) => _buildOptionCard(index),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Submit button
-            if (!_isSubmitted)
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _selectedAnswer != null ? _submitAnswer : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Submit Answer',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildOptionCard(int index) {
-    final isSelected = _selectedAnswer == index;
-    final option = widget.question.options[index];
-
-    Color borderColor = AppColors.border;
-    Color backgroundColor = AppColors.white;
-
-    if (_isSubmitted) {
-      if (index == widget.question.correctOptionIndex) {
-        borderColor = Colors.green.shade400;
-        backgroundColor = Colors.green.shade50;
-      } else if (isSelected) {
-        borderColor = Colors.red.shade400;
-        backgroundColor = Colors.red.shade50;
-      }
-    } else if (isSelected) {
-      borderColor = AppColors.primary;
-      backgroundColor = AppColors.primary.withOpacity(0.05);
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 2),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: _isSubmitted
-                ? (index == widget.question.correctOptionIndex
-                    ? Colors.green
-                    : isSelected
-                        ? Colors.red
-                        : Colors.grey.shade300)
-                : isSelected
-                    ? AppColors.primary
-                    : Colors.grey.shade200,
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              String.fromCharCode(65 + index), // A, B, C, D
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _isSubmitted
-                    ? (index == widget.question.correctOptionIndex || isSelected
-                        ? Colors.white
-                        : Colors.grey.shade600)
-                    : isSelected
-                        ? Colors.white
-                        : Colors.grey.shade600,
-              ),
-            ),
-          ),
-        ),
-        title: Text(
-          option,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: _isSubmitted && (index == widget.question.correctOptionIndex || isSelected)
-                ? Colors.black87
-                : AppColors.textPrimary,
-          ),
-        ),
-        trailing: _isSubmitted
-            ? Icon(
-                index == widget.question.correctOptionIndex
-                    ? Icons.check_circle
-                    : isSelected
-                        ? Icons.cancel
-                        : null,
-                color: index == widget.question.correctOptionIndex
-                    ? Colors.green
-                    : Colors.red,
-              )
-            : null,
-        onTap: _isSubmitted
-            ? null
-            : () {
-                setState(() {
-                  _selectedAnswer = index;
-                });
-              },
-      ),
-    );
+  Color _getScoreColor(double score) {
+    if (score >= 90) return Colors.green;
+    if (score >= 70) return Colors.blue;
+    if (score >= 50) return Colors.orange;
+    return Colors.red;
   }
 }

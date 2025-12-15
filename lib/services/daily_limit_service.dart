@@ -48,12 +48,14 @@ class DailyLimitService {
 
   /// Record practice completion for today
   Future<bool> recordPracticeCompletion(
-      String studentId, String practiceType) async {
+      String studentId, String practiceType, {String? attemptId}) async {
     try {
       final today = DateTime.now().toUtc();
       final todayDate = DateTime(today.year, today.month, today.day);
       final todayDateString = todayDate.toIso8601String().split('T')[0];
       final now = DateTime.now().toIso8601String();
+
+      print('🔄 Recording practice completion: type=$practiceType, studentId=$studentId, date=$todayDateString');
 
       // Check if record exists for today
       final existing = await _supabase
@@ -63,6 +65,8 @@ class DailyLimitService {
           .eq('practice_date', todayDateString)
           .maybeSingle();
 
+      print('📊 Existing record: $existing');
+
       Map<String, dynamic> updateData = {
         'updated_at': now,
       };
@@ -71,6 +75,9 @@ class DailyLimitService {
         case practiceTypeQuiz:
           updateData['quiz_completed'] = true;
           updateData['quiz_completed_at'] = now;
+          if (attemptId != null) {
+            updateData['quiz_attempt_id'] = attemptId;
+          }
           break;
         case practiceTypeVideo:
           updateData['video_completed'] = true;
@@ -84,11 +91,14 @@ class DailyLimitService {
 
       if (existing != null) {
         // Update existing record
-        await _supabase
+        print('✏️ Updating existing record with: $updateData');
+        final result = await _supabase
             .from('daily_practice_limits')
             .update(updateData)
             .eq('student_id', studentId)
-            .eq('practice_date', todayDateString);
+            .eq('practice_date', todayDateString)
+            .select();
+        print('✅ Update result: $result');
       } else {
         // Create new record
         updateData.addAll({
@@ -100,12 +110,19 @@ class DailyLimitService {
           'created_at': now,
         });
 
-        await _supabase.from('daily_practice_limits').insert(updateData);
+        print('➕ Inserting new record with: $updateData');
+        final result = await _supabase
+            .from('daily_practice_limits')
+            .insert(updateData)
+            .select();
+        print('✅ Insert result: $result');
       }
 
+      print('✅ Successfully recorded practice completion');
       return true;
-    } catch (e) {
-      print('Error recording practice completion: $e');
+    } catch (e, stackTrace) {
+      print('❌ Error recording practice completion: $e');
+      print('Stack trace: $stackTrace');
       return false;
     }
   }

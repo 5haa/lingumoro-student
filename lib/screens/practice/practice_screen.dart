@@ -53,8 +53,8 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   
   // Statistics for cards
   Map<String, dynamic> _quizStats = {
-    'total_sessions': 0,
-    'total_questions': 0,
+    'total_attempts': 0,
+    'total_questions_answered': 0,
     'accuracy': 0.0,
   };
   int _completedReadings = 0;
@@ -220,7 +220,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   Future<void> _loadQuizStats() async {
     try {
       if (_studentId == null) return;
-      final stats = await _quizService.getStatistics(_studentId!);
+      final stats = await _quizService.getQuizStatistics(_studentId!);
       setState(() {
         _quizStats = stats;
       });
@@ -309,7 +309,7 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          stat2Label: '${_quizStats['total_sessions'] ?? 0} ${l10n.quizzes}',
+                          stat2Label: '${_quizStats['total_attempts'] ?? 0} ${l10n.quizzes}',
                           onTap: () => _navigateToQuiz(),
                           isLocked: false,
                           showProgress: false,
