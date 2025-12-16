@@ -264,8 +264,7 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
                                   );
                                   return;
                                 }
-                                
-                                Navigator.pop(context);
+
                                 await _redeemVoucher(code);
                               },
                               borderRadius: BorderRadius.circular(12),
@@ -336,50 +335,75 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
   }
 
   Future<void> _redeemVoucher(String code) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-        ),
-      ),
-    );
-
     final l = AppLocalizations.of(context);
+    bool loaderShown = false;
 
     try {
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+        ),
+      );
+      loaderShown = true;
+
       final studentId = _authService.currentUser?.id;
       if (studentId == null) {
         throw Exception('Not logged in');
       }
 
-      final result = await _proService.redeemVoucher(studentId, code);
-      
-      if (mounted) Navigator.pop(context);
+      final result = await _proService
+          .redeemVoucher(studentId, code)
+          .timeout(const Duration(seconds: 20));
 
       if (result['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${l.voucherRedeemed} +${result['days_added']} ${l.voucherRedeemedDesc}',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-          // Refresh both local state and preload cache
-          await _preloadService.refreshUserData();
-          
-          // Call the success callback
-          widget.onSuccess?.call();
+        // IMPORTANT: Clear cached device-session check (it may have cached "false" recently)
+        _proService.clearDeviceSessionCache();
+
+        // Claim/validate PRO session for this device immediately so PRO is usable right away
+        await _proService
+            .validateAndUpdateDeviceSession(studentId, forceClaim: false)
+            .timeout(const Duration(seconds: 20));
+
+        // Refresh preload cache
+        await _preloadService.refreshUserData().timeout(const Duration(seconds: 20));
+
+        // Close loader first
+        if (mounted && loaderShown) {
+          Navigator.of(context, rootNavigator: true).pop();
+          loaderShown = false;
         }
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${l.voucherRedeemed} +${result['days_added']} ${l.voucherRedeemedDesc}',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Close the modal and notify
+        Navigator.pop(context);
+        widget.onSuccess?.call();
       } else {
         throw Exception(result['error'] ?? 'Failed to redeem voucher');
       }
     } catch (e) {
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context);
+      if (mounted && loaderShown) {
+        // Best-effort close loader
+        try {
+          Navigator.of(context, rootNavigator: true).pop();
+        } catch (_) {}
+        loaderShown = false;
       }
       
       if (mounted) {
@@ -389,6 +413,12 @@ class _ProUpgradeModalState extends State<ProUpgradeModal> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    } finally {
+      if (mounted && loaderShown) {
+        try {
+          Navigator.of(context, rootNavigator: true).pop();
+        } catch (_) {}
       }
     }
   }

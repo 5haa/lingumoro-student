@@ -388,6 +388,7 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.06),
@@ -436,55 +437,68 @@ class _QuizSessionScreenState extends State<QuizSessionScreen> {
   }
 
   Widget _buildOptionButton(int index, String option, bool isSelected) {
-    return GestureDetector(
-      onTap: () => _selectAnswer(index),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withOpacity(0.1)
-              : Colors.grey.shade50,
+    final label = String.fromCharCode(65 + index); // A, B, C, D
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _selectAnswer(index),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 2 : 1,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppColors.primary.withOpacity(0.08)
+                  : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? AppColors.primary : AppColors.border,
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, size: 16, color: Colors.white)
+                      : Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    option,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected ? AppColors.primary : Colors.white,
-                border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.grey.shade400,
-                  width: 2,
-                ),
-              ),
-              child: isSelected
-                  ? const Icon(
-                      Icons.check,
-                      size: 14,
-                      color: Colors.white,
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                option,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppColors.textPrimary,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

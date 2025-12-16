@@ -6,10 +6,143 @@ import 'package:student/models/quiz_question.dart';
 import 'package:student/models/quiz_attempt.dart';
 import 'package:student/models/difficulty_level.dart';
 
+class QuizLevelProgressSummary {
+  final int total;
+  final int completed;
+
+  const QuizLevelProgressSummary({required this.total, required this.completed});
+
+  double get percentage => total <= 0 ? 0.0 : (completed / total * 100.0);
+}
+
+class QuizGlobalProgress {
+  final Map<int, QuizLevelProgressSummary> progressByLevel;
+  final Map<int, bool> unlockedByLevel;
+  final Set<String> completedQuizIds;
+  final Map<String, double> bestScoreByQuizId;
+
+  const QuizGlobalProgress({
+    required this.progressByLevel,
+    required this.unlockedByLevel,
+    required this.completedQuizIds,
+    required this.bestScoreByQuizId,
+  });
+}
+
 class QuizPracticeService {
   final _supabase = Supabase.instance.client;
   final _levelService = LevelService();
   final _dailyLimitService = DailyLimitService();
+
+  Future<Map<String, int>> _getActiveQuestionCountsForQuizIds(
+      List<String> quizIds) async {
+    if (quizIds.isEmpty) return {};
+
+    final response = await _supabase
+        .from('quiz_questions')
+        .select('quiz_id')
+        .inFilter('quiz_id', quizIds)
+        .eq('is_active', true);
+
+    final counts = <String, int>{};
+    for (final row in (response as List)) {
+      final quizId = row['quiz_id'] as String?;
+      if (quizId == null) continue;
+      counts[quizId] = (counts[quizId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  Future<({Set<String> completedQuizIds, Map<String, double> bestScoreByQuizId})>
+      _getAttemptSummaryForQuizIds(String studentId, List<String> quizIds) async {
+    if (quizIds.isEmpty) {
+      return (completedQuizIds: <String>{}, bestScoreByQuizId: <String, double>{});
+    }
+
+    final response = await _supabase
+        .from('student_quiz_attempts')
+        .select('quiz_id, score_percentage')
+        .eq('student_id', studentId)
+        .inFilter('quiz_id', quizIds);
+
+    final completed = <String>{};
+    final bestScore = <String, double>{};
+    for (final row in (response as List)) {
+      final quizId = row['quiz_id'] as String?;
+      if (quizId == null) continue;
+
+      completed.add(quizId);
+      final score = (row['score_percentage'] as num?)?.toDouble();
+      if (score == null) continue;
+      final current = bestScore[quizId];
+      if (current == null || score > current) {
+        bestScore[quizId] = score;
+      }
+    }
+
+    return (completedQuizIds: completed, bestScoreByQuizId: bestScore);
+  }
+
+  /// Fetch progress/unlock status in a batched way (2 queries total).
+  ///
+  /// Completion rule: any completed attempt counts as completion.
+  Future<QuizGlobalProgress> getQuizGlobalProgress(String studentId) async {
+    // 1) Fetch all active quizzes once
+    final quizzesResponse = await _supabase
+        .from('quizzes')
+        .select('id, difficulty_level, order_index')
+        .eq('is_active', true)
+        .order('difficulty_level', ascending: true)
+        .order('order_index', ascending: true);
+
+    final quizzes = (quizzesResponse as List)
+        .map((q) => {
+              'id': q['id'] as String,
+              'difficulty_level': q['difficulty_level'] as int,
+              'order_index': q['order_index'] as int,
+            })
+        .toList();
+
+    final quizIds = quizzes.map((q) => q['id'] as String).toList();
+
+    // 2) Fetch all attempts for those quizzes once
+    final attemptSummary = await _getAttemptSummaryForQuizIds(studentId, quizIds);
+
+    // Compute progress by level
+    final progressByLevel = <int, QuizLevelProgressSummary>{};
+    for (int level = 1; level <= 4; level++) {
+      final levelQuizzes =
+          quizzes.where((q) => (q['difficulty_level'] as int) == level).toList();
+      final total = levelQuizzes.length;
+      int completed = 0;
+      for (final q in levelQuizzes) {
+        final id = q['id'] as String;
+        if (attemptSummary.completedQuizIds.contains(id)) completed++;
+      }
+      progressByLevel[level] =
+          QuizLevelProgressSummary(total: total, completed: completed);
+    }
+
+    // Compute unlocks by level (Level 1 always unlocked)
+    final unlockedByLevel = <int, bool>{1: true};
+    for (int level = 2; level <= 4; level++) {
+      final prev = progressByLevel[level - 1];
+      if (prev == null) {
+        unlockedByLevel[level] = false;
+        continue;
+      }
+      // If previous level has no quizzes, keep locked.
+      unlockedByLevel[level] =
+          prev.total > 0 && prev.completed >= prev.total;
+    }
+
+    return QuizGlobalProgress(
+      progressByLevel: progressByLevel,
+      unlockedByLevel: unlockedByLevel,
+      completedQuizIds: attemptSummary.completedQuizIds,
+      bestScoreByQuizId: attemptSummary.bestScoreByQuizId,
+    );
+  }
 
   /// Get all quizzes for a specific difficulty level
   Future<List<Quiz>> getQuizzesByDifficulty(int difficultyLevel) async {
@@ -187,21 +320,9 @@ class QuizPracticeService {
     try {
       // Level 1 is always unlocked
       if (difficultyLevel == 1) return true;
-      
-      // Check if ALL quizzes in previous level are completed
-      final previousLevel = difficultyLevel - 1;
-      final previousQuizzes = await getQuizzesByDifficulty(previousLevel);
-      
-      // If previous level has no quizzes, lock this level
-      if (previousQuizzes.isEmpty) return false;
-      
-      // Check if all previous level quizzes are completed
-      for (var quiz in previousQuizzes) {
-        final completed = await hasCompletedQuiz(studentId, quiz.id);
-        if (!completed) return false;
-      }
-      
-      return true;
+
+      final global = await getQuizGlobalProgress(studentId);
+      return global.unlockedByLevel[difficultyLevel] == true;
     } catch (e) {
       print('Error checking difficulty level unlock: $e');
       return false;
@@ -236,34 +357,33 @@ class QuizPracticeService {
   Future<List<Quiz>> getQuizzesWithProgress(
       String studentId, int difficultyLevel) async {
     try {
+      // Fetch quizzes for level (1 query)
       final quizzes = await getQuizzesByDifficulty(difficultyLevel);
-      
-      // Check if this difficulty level is unlocked
-      final isLevelUnlocked = await isDifficultyLevelUnlocked(studentId, difficultyLevel);
-      
+      if (quizzes.isEmpty) return [];
+
+      final global = await getQuizGlobalProgress(studentId);
+      final isLevelUnlocked = global.unlockedByLevel[difficultyLevel] == true;
+
+      // Batch question counts and attempts for these quizzes (2 queries)
+      final quizIds = quizzes.map((q) => q.id).toList();
+      final questionCounts = await _getActiveQuestionCountsForQuizIds(quizIds);
+
       for (int i = 0; i < quizzes.length; i++) {
         final quiz = quizzes[i];
-        
-        // Get question count
-        final questions = await getQuizQuestions(quiz.id);
-        quiz.totalQuestions = questions.length;
-        
-        // Get best score
-        final bestAttempt = await getQuizBestAttempt(studentId, quiz.id);
-        quiz.bestScore = bestAttempt?.scorePercentage;
-        quiz.isCompleted = bestAttempt != null;
-        
-        // Determine if locked
+
+        quiz.totalQuestions = questionCounts[quiz.id] ?? 0;
+
+        final isCompleted = global.completedQuizIds.contains(quiz.id);
+        quiz.isCompleted = isCompleted;
+        quiz.bestScore = global.bestScoreByQuizId[quiz.id];
+
         if (!isLevelUnlocked) {
-          // If entire level is locked, all quizzes are locked
           quiz.isLocked = true;
         } else if (i == 0) {
-          // First quiz in unlocked level is always unlocked
           quiz.isLocked = false;
         } else {
-          // Sequential unlocking within level: check if previous quiz is completed
           final previousQuiz = quizzes[i - 1];
-          final previousCompleted = await hasCompletedQuiz(studentId, previousQuiz.id);
+          final previousCompleted = global.completedQuizIds.contains(previousQuiz.id);
           quiz.isLocked = !previousCompleted;
         }
       }
@@ -271,6 +391,45 @@ class QuizPracticeService {
       return quizzes;
     } catch (e) {
       print('Error fetching quizzes with progress: $e');
+      return [];
+    }
+  }
+
+  /// Same as [getQuizzesWithProgress] but reuses a pre-fetched [QuizGlobalProgress]
+  /// to avoid re-querying attempts/unlocks.
+  Future<List<Quiz>> getQuizzesWithProgressUsingGlobal(
+    String studentId,
+    int difficultyLevel,
+    QuizGlobalProgress global,
+  ) async {
+    try {
+      final quizzes = await getQuizzesByDifficulty(difficultyLevel);
+      if (quizzes.isEmpty) return [];
+
+      final isLevelUnlocked = global.unlockedByLevel[difficultyLevel] == true;
+      final quizIds = quizzes.map((q) => q.id).toList();
+      final questionCounts = await _getActiveQuestionCountsForQuizIds(quizIds);
+
+      for (int i = 0; i < quizzes.length; i++) {
+        final quiz = quizzes[i];
+
+        quiz.totalQuestions = questionCounts[quiz.id] ?? 0;
+        quiz.isCompleted = global.completedQuizIds.contains(quiz.id);
+        quiz.bestScore = global.bestScoreByQuizId[quiz.id];
+
+        if (!isLevelUnlocked) {
+          quiz.isLocked = true;
+        } else if (i == 0) {
+          quiz.isLocked = false;
+        } else {
+          final previousQuiz = quizzes[i - 1];
+          quiz.isLocked = !global.completedQuizIds.contains(previousQuiz.id);
+        }
+      }
+
+      return quizzes;
+    } catch (e) {
+      print('Error fetching quizzes with progress (using global): $e');
       return [];
     }
   }

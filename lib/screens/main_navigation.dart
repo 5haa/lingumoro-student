@@ -25,24 +25,16 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   int _unreadMessageCount = 0;
+  int _practiceTabVersion = 0; // bump to force PracticeScreen rebuild (e.g., after PRO redemption)
   final _chatService = ChatService();
   final _pointsNotificationService = PointsNotificationService();
   final _proService = ProSubscriptionService();
   final _authService = AuthService();
   RealtimeChannel? _conversationChannel;
   
-  late final List<Widget> _screens;
-  
   @override
   void initState() {
     super.initState();
-    _screens = [
-      const HomeScreen(),
-      const ClassesScreen(),
-      const PracticeScreen(),
-      const ChatScreen(),
-      const ProfileScreen(),
-    ];
     _loadUnreadCount();
     _setupRealtimeListener();
     
@@ -202,7 +194,14 @@ class _MainNavigationState extends State<MainNavigation> {
       drawer: const AppDrawer(),
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          const HomeScreen(),
+          const ClassesScreen(),
+          // Practice tab is kept alive by IndexedStack; bumping the key forces it to rebuild.
+          PracticeScreen(key: ValueKey('practice-$_practiceTabVersion')),
+          const ChatScreen(),
+          const ProfileScreen(),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -255,6 +254,7 @@ class _MainNavigationState extends State<MainNavigation> {
                   onSuccess: () {
                     // After successful voucher redemption, navigate to practice
                     setState(() {
+                      _practiceTabVersion++;
                       _currentIndex = index;
                     });
                   },

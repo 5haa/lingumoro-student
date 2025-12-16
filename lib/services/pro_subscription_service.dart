@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
 
 import 'package:student/services/device_id_service.dart';
 
@@ -142,11 +143,19 @@ class ProSubscriptionService {
     try {
       final response = await _supabase.rpc('redeem_voucher', params: {
         'p_student_id': studentId,
-        'p_voucher_code': voucherCode.toUpperCase(),
+        'p_voucher_code': voucherCode.trim().toUpperCase(),
       });
 
       if (response is Map<String, dynamic>) {
         return response;
+      }
+
+      // Some environments return JSON as a string for Postgres `json` return types
+      if (response is String) {
+        final decoded = jsonDecode(response);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
       }
       
       throw Exception('Invalid response format');

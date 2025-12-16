@@ -27,6 +27,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   final _dailyLimitService = DailyLimitService();
 
   bool _isLoading = true;
+  bool _isLevelLoading = false;
   bool _hasProSubscription = false;
   String? _errorMessage;
   String? _studentId;
@@ -37,6 +38,10 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   
   List<Quiz> _quizzes = [];
   Map<int, Map<String, dynamic>> _progressByLevel = {};
+  Map<int, bool> _unlockedByLevel = {1: true};
+  final Map<int, List<Quiz>> _quizzesByLevelCache = {};
+  QuizGlobalProgress? _globalProgress;
+  int _difficultyLoadSeq = 0;
 
   @override
   void initState() {
@@ -100,17 +105,26 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _isLevelLoading = false;
     });
 
     try {
-      // Load data
-      await Future.wait([
-        _loadQuizzesForLevel(_selectedDifficulty),
-        _loadProgressForAllLevels(),
-        _checkDailyLimit(),
-      ]);
+      // Reset caches so unlock/progress reflect latest attempts
+      _quizzesByLevelCache.clear();
+      _globalProgress = null;
 
+      // Load global progress/unlocks (batched) first
+      await _loadGlobalProgress();
+
+      // Load current level quizzes + daily limit in parallel
+      final quizzesFuture = _fetchQuizzesForLevel(_selectedDifficulty);
+      final dailyLimitFuture = _checkDailyLimit();
+      final quizzes = await quizzesFuture;
+      await dailyLimitFuture;
+
+      if (!mounted) return;
       setState(() {
+        _quizzes = quizzes;
         _isLoading = false;
         _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
       });
@@ -125,30 +139,49 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     }
   }
 
-  Future<void> _loadQuizzesForLevel(int level) async {
-    final quizzes = await _quizService.getQuizzesWithProgress(_studentId!, level);
+  Future<void> _loadGlobalProgress() async {
+    final global = await _quizService.getQuizGlobalProgress(_studentId!);
+
+    final progressByLevel = <int, Map<String, dynamic>>{};
+    for (int level = 1; level <= 4; level++) {
+      final summary = global.progressByLevel[level] ??
+          const QuizLevelProgressSummary(total: 0, completed: 0);
+      progressByLevel[level] = {
+        'total': summary.total,
+        'completed': summary.completed,
+        'percentage': summary.percentage,
+      };
+    }
+
+    if (!mounted) return;
     setState(() {
-      _quizzes = quizzes;
+      _globalProgress = global;
+      _progressByLevel = progressByLevel;
+      _unlockedByLevel = {
+        1: true,
+        2: global.unlockedByLevel[2] == true,
+        3: global.unlockedByLevel[3] == true,
+        4: global.unlockedByLevel[4] == true,
+      };
     });
   }
 
-  Future<void> _loadProgressForAllLevels() async {
-    for (int level = 1; level <= 4; level++) {
-      final quizzes = await _quizService.getQuizzesByDifficulty(level);
-      int completed = 0;
-      
-      for (var quiz in quizzes) {
-        final hasCompleted = await _quizService.hasCompletedQuiz(_studentId!, quiz.id);
-        if (hasCompleted) completed++;
-      }
-
-      _progressByLevel[level] = {
-        'total': quizzes.length,
-        'completed': completed,
-        'percentage': quizzes.isEmpty ? 0.0 : (completed / quizzes.length * 100),
-      };
+  Future<List<Quiz>> _fetchQuizzesForLevel(int level, {bool force = false}) async {
+    if (!force && _quizzesByLevelCache.containsKey(level)) {
+      return _quizzesByLevelCache[level]!;
     }
-    setState(() {});
+
+    final global = _globalProgress;
+    final quizzes = global != null
+        ? await _quizService.getQuizzesWithProgressUsingGlobal(
+            _studentId!,
+            level,
+            global,
+          )
+        : await _quizService.getQuizzesWithProgress(_studentId!, level);
+
+    _quizzesByLevelCache[level] = quizzes;
+    return quizzes;
   }
 
   Future<void> _checkDailyLimit() async {
@@ -159,13 +192,38 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   void _onDifficultyChanged(int level) async {
+    if (level == _selectedDifficulty) return;
+
+    final isUnlocked = _unlockedByLevel[level] == true || level == 1;
+    if (!isUnlocked) return;
+
+    final requestSeq = ++_difficultyLoadSeq;
+
+    // Instant swap if cached
+    final cached = _quizzesByLevelCache[level];
+    if (cached != null) {
+      if (!mounted) return;
+      setState(() {
+        _selectedDifficulty = level;
+        _quizzes = cached;
+        _isLevelLoading = false;
+      });
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _selectedDifficulty = level;
-      _isLoading = true;
+      _isLevelLoading = true;
+      _quizzes = [];
     });
-    await _loadQuizzesForLevel(level);
+
+    final quizzes = await _fetchQuizzesForLevel(level);
+    if (!mounted || requestSeq != _difficultyLoadSeq) return;
+
     setState(() {
-      _isLoading = false;
+      _quizzes = quizzes;
+      _isLevelLoading = false;
     });
   }
 
@@ -291,34 +349,31 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
 
   Widget _buildHeader(AppLocalizations l10n) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE53935), Color(0xFFD32F2F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(
               FontAwesomeIcons.clipboardQuestion,
-              size: 32,
-              color: Colors.white,
+              size: 20,
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(width: 16),
@@ -327,19 +382,19 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Test Your Knowledge',
+                  'Quiz practice',
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Complete quizzes to improve your skills',
+                  'Complete quizzes in order to unlock higher levels.',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white.withOpacity(0.9),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -418,18 +473,23 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
         Row(
           children: DifficultyLevel.values.map((level) {
             final isSelected = level.value == _selectedDifficulty;
+            final isUnlocked = _unlockedByLevel[level.value] == true || level.value == 1;
             
             return Expanded(
               child: GestureDetector(
-                onTap: () => _onDifficultyChanged(level.value),
+                onTap: isUnlocked ? () => _onDifficultyChanged(level.value) : null,
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : Colors.white,
+                    color: !isUnlocked
+                        ? Colors.grey.shade100
+                        : (isSelected ? AppColors.primary : Colors.white),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.border,
+                      color: !isUnlocked
+                          ? Colors.grey.shade300
+                          : (isSelected ? AppColors.primary : AppColors.border),
                       width: 2,
                     ),
                   ),
@@ -440,17 +500,37 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.white : AppColors.textPrimary,
+                          color: !isUnlocked
+                              ? Colors.grey.shade500
+                              : (isSelected ? Colors.white : AppColors.textPrimary),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        level.label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isSelected ? Colors.white : AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (!isUnlocked) ...[
+                            Icon(
+                              Icons.lock,
+                              size: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              level.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: !isUnlocked
+                                    ? Colors.grey.shade500
+                                    : (isSelected ? Colors.white : AppColors.textSecondary),
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -530,6 +610,46 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildQuizzesList(AppLocalizations l10n) {
+    if (_isLevelLoading) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Loading quizzes...',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_quizzes.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
@@ -588,14 +708,16 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     final isLocked = quiz.isLocked == true;
     final isCompleted = quiz.isCompleted == true;
     final hasScore = quiz.bestScore != null;
+    final cardBorder = isLocked ? Colors.grey.shade300 : AppColors.border;
+    final cardBg = isLocked ? Colors.grey.shade100 : Colors.white;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isLocked ? Colors.grey.shade100 : Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isLocked ? Colors.grey.shade300 : AppColors.border,
+          color: cardBorder,
         ),
         boxShadow: isLocked
             ? []
@@ -622,9 +744,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isLocked
-                            ? Colors.grey.shade300
-                            : AppColors.primary.withOpacity(0.1),
+                        color: isLocked ? Colors.grey.shade300 : AppColors.primary.withOpacity(0.10),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -692,61 +812,39 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(
-                      FontAwesomeIcons.clipboardQuestion,
-                      size: 14,
-                      color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
+                    _buildMetaChip(
+                      icon: FontAwesomeIcons.clipboardQuestion,
+                      text: '${quiz.totalQuestions ?? 0} Q',
+                      disabled: isLocked,
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${quiz.totalQuestions ?? 0} questions',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Icon(
-                      Icons.timer_outlined,
-                      size: 14,
-                      color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '~${quiz.estimatedDurationMinutes} min',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isLocked ? Colors.grey.shade500 : AppColors.textSecondary,
-                      ),
+                    const SizedBox(width: 8),
+                    _buildMetaChip(
+                      icon: Icons.timer_outlined,
+                      text: '~${quiz.estimatedDurationMinutes} min',
+                      disabled: isLocked,
                     ),
                   ],
                 ),
                 if (!isLocked) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.redGradient,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isCompleted ? FontAwesomeIcons.arrowsRotate : FontAwesomeIcons.play,
-                          size: 14,
-                          color: Colors.white,
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _startQuiz(quiz),
+                      icon: Icon(
+                        isCompleted ? FontAwesomeIcons.arrowsRotate : FontAwesomeIcons.play,
+                        size: 14,
+                      ),
+                      label: Text(isCompleted ? 'Retake' : 'Start'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          isCompleted ? 'Retake Quiz' : 'Start Quiz',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
+                        elevation: 0,
+                      ),
                     ),
                   ),
                 ],
@@ -754,6 +852,39 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMetaChip({
+    required IconData icon,
+    required String text,
+    required bool disabled,
+  }) {
+    final fg = disabled ? Colors.grey.shade500 : AppColors.textSecondary;
+    final bg = disabled ? Colors.grey.shade200 : Colors.grey.shade100;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: disabled ? Colors.grey.shade300 : Colors.transparent),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
