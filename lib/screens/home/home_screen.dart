@@ -653,6 +653,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               final double iconSize = (constraints.maxWidth * 0.25).clamp(30.0, 45.0);
               final double fontSize = (constraints.maxWidth * 0.12).clamp(14.0, 16.0);
               final double padding = (constraints.maxWidth * 0.1).clamp(10.0, 15.0);
+              final String languageCode = Localizations.localeOf(context).languageCode;
+              // Per requirement: English/Spanish should have the card image mirrored,
+              // while Arabic stays as-is (current direction/position is correct for Arabic).
+              final bool shouldFlipImage = languageCode == 'en' || languageCode == 'es';
               
               return Stack(
                 children: [
@@ -660,33 +664,37 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   RepaintBoundary(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(15),
-                      child: Image(
-                        image: imagePath == 'assets/images/student.jpg' 
-                            ? _studentImageProvider 
-                            : _teacherImageProvider,
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                        filterQuality: FilterQuality.medium,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: double.infinity,
-                            height: double.infinity,
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.2),
-                            ),
-                            child: Center(
-                              child: FaIcon(
-                                imageOnRight 
-                                  ? FontAwesomeIcons.chalkboardUser
-                                  : FontAwesomeIcons.graduationCap,
-                                color: color,
-                                size: iconSize * 2,
+                      child: Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()..scale(shouldFlipImage ? -1.0 : 1.0, 1.0, 1.0),
+                        child: Image(
+                          image: imagePath == 'assets/images/student.jpg' 
+                              ? _studentImageProvider 
+                              : _teacherImageProvider,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          filterQuality: FilterQuality.medium,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: double.infinity,
+                              height: double.infinity,
+                              decoration: BoxDecoration(
+                                color: color.withOpacity(0.2),
                               ),
-                            ),
-                          );
-                        },
+                              child: Center(
+                                child: FaIcon(
+                                  imageOnRight 
+                                    ? FontAwesomeIcons.chalkboardUser
+                                    : FontAwesomeIcons.graduationCap,
+                                  color: color,
+                                  size: iconSize * 2,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),

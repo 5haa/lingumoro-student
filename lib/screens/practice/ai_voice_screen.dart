@@ -120,6 +120,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   
   // Loading state
   bool _isLoadingSession = true;
+  bool _isExiting = false;
   
   // Points and stats
   Map<String, dynamic> _todayStats = {};
@@ -297,7 +298,8 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   void dispose() {
     _stopSessionTimer();
     _amplitudeTimer?.cancel();
-    _disconnect();
+    // Best-effort: persist/count any active session without showing UI.
+    unawaited(_disconnect(showCompletionDialog: false, isDisposing: true));
     _player.dispose();
     _audioRecorder.dispose();
     _scrollController.dispose();
@@ -430,7 +432,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     );
   }
 
-  Future<void> _disconnect() async {
+  Future<void> _disconnect({bool showCompletionDialog = true, bool isDisposing = false}) async {
     _allowRecorderRestart = false;
     _amplitudeTimer?.cancel();
     await _recorderSubscription?.cancel();
@@ -466,15 +468,16 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
           _sessionDurationSeconds,
         );
 
-        if (result['success'] == true && result['pointsAwarded'] > 0) {
+        if (showCompletionDialog &&
+            result['success'] == true &&
+            (result['pointsAwarded'] as int? ?? 0) > 0 &&
+            mounted) {
           // Show points notification
-          if (mounted) {
-            _pointsNotificationService.showPointsEarnedNotification(
-              context: context,
-              pointsGained: result['pointsAwarded'],
-            );
-          }
-          
+          _pointsNotificationService.showPointsEarnedNotification(
+            context: context,
+            pointsGained: result['pointsAwarded'],
+          );
+
           _showSessionCompletedDialog(
             result['pointsAwarded'],
             result['durationMinutes'],
@@ -490,13 +493,20 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       _sessionStartTime = null;
 
       // Reload session info
-      await _loadSessionInfo();
+      if (!isDisposing) {
+        await _loadSessionInfo();
+      }
     }
 
-    setState(() {
+    if (!isDisposing && mounted) {
+      setState(() {
+        _status = AppStatus.disconnected;
+        _statusMessage = AppLocalizations.of(context).notConnected;
+      });
+    } else {
       _status = AppStatus.disconnected;
-      _statusMessage = AppLocalizations.of(context).notConnected;
-    });
+      _statusMessage = "Not connected";
+    }
   }
 
   void _showSessionCompletedDialog(int points, int minutes) {
@@ -945,16 +955,18 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
         ? _messages 
         : _messages.length > 2 ? _messages.sublist(_messages.length - 2) : _messages;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar
-            _buildTopBar(),
-            
-            // Session Timer Header (Always visible)
-            _buildSessionHeader(),
+    return WillPopScope(
+      onWillPop: _handleSystemBack,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Top Bar
+              _buildTopBar(),
+              
+              // Session Timer Header (Always visible)
+              _buildSessionHeader(),
 
             // Main Content (Bubble)
             Expanded(
@@ -1037,7 +1049,8 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
             
             if (!_isChatExpanded)
               const SizedBox(height: 20),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1048,7 +1061,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          const CustomBackButton(),
+          CustomBackButton(onPressed: _handleBackPressed),
                   Expanded(
             child: Center(
               child: Text(
@@ -1092,6 +1105,64 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   }
   
   Widget _buildSessionHeader() {
+    if (_isLoadingSession) {
+      // Avoid flashing incorrect defaults (e.g. 0/2) while session limits are still loading.
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.black12),
+              ),
+              child: Row(
+                children: const [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Loading…',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.timer_outlined, size: 14, color: Colors.white),
+                  SizedBox(width: 6),
+                  Text(
+                    '00:00',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     // Calculate current session number properly
     final sessionsUsedToday = _maxSessions - _remainingSessions;
     final currentSession = _status != AppStatus.disconnected ? sessionsUsedToday + 1 : sessionsUsedToday;
@@ -1206,6 +1277,37 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
         );
       },
     );
+  }
+
+  Future<bool> _handleSystemBack() async {
+    // Intercept Android back / iOS swipe-back to ensure session is counted & stopped.
+    if (_isExiting) return false;
+    if (_status != AppStatus.disconnected || _currentSessionId != null) {
+      await _exitAndPersistSession();
+      return false; // we manually popped
+    }
+    return true;
+  }
+
+  Future<void> _handleBackPressed() async {
+    if (_isExiting) return;
+    if (_status != AppStatus.disconnected || _currentSessionId != null) {
+      await _exitAndPersistSession();
+      return;
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _exitAndPersistSession() async {
+    if (!mounted) return;
+    setState(() => _isExiting = true);
+    try {
+      await _disconnect(showCompletionDialog: false);
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   Future<void> _startRecorderStream() async {
