@@ -393,6 +393,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get startConversation => 'ابدأ محادثة';
   @override
+  String get tapToOpenChat => 'اضغط لفتح المحادثة';
+  @override
+  String get startToSeeConversation => 'ابدأ التحدث لرؤية المحادثة';
+  @override
   String get chatRequests => 'طلبات المحادثة';
   @override
   String get noChatRequests => 'لا توجد طلبات محادثة';

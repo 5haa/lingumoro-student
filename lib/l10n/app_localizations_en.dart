@@ -393,6 +393,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get startConversation => 'Start a conversation';
   @override
+  String get tapToOpenChat => 'Tap to open chat';
+  @override
+  String get startToSeeConversation => 'Start speaking to see the conversation';
+  @override
   String get chatRequests => 'Chat Requests';
   @override
   String get noChatRequests => 'No chat requests';

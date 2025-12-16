@@ -28,7 +28,8 @@ class AIVoiceSessionService {
         }
       }
 
-      // Get today's sessions (completed ones only)
+      // Get today's sessions (count active ones too, so users can't start new sessions
+      // while a previous one is still finalizing/ending).
       final now = DateTime.now();
       final startOfDay = DateTime(now.year, now.month, now.day);
       final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
@@ -37,7 +38,7 @@ class AIVoiceSessionService {
           .from('ai_voice_sessions')
           .select()
           .eq('student_id', studentId)
-          .eq('status', 'completed')
+          .inFilter('status', ['completed', 'active'])
           .gte('started_at', startOfDay.toUtc().toIso8601String())
           .lte('started_at', endOfDay.toUtc().toIso8601String());
 

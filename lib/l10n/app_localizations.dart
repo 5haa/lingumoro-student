@@ -225,6 +225,9 @@ abstract class AppLocalizations {
   String get sendMessage;
   String get noMessages;
   String get startConversation;
+  // AI voice: opening the full chat transcript
+  String get tapToOpenChat;
+  String get startToSeeConversation;
   String get chatRequests;
   String get noChatRequests;
   String get accept;

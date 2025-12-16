@@ -121,6 +121,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   // Loading state
   bool _isLoadingSession = true;
   bool _isExiting = false;
+  bool _isStopping = false;
   
   // Points and stats
   Map<String, dynamic> _todayStats = {};
@@ -203,7 +204,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       // Check if session limit reached
       if (_sessionDurationSeconds >= (_maxSessionDurationMinutes * 60)) {
         _showTimeUpDialog();
-        _disconnect();
+        _disconnect(showCompletionDialog: false);
       }
     });
   }
@@ -304,6 +305,132 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     _audioRecorder.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  ({String? sessionId, int durationSeconds}) _drainSessionForFinalize() {
+    final drained = (sessionId: _currentSessionId, durationSeconds: _sessionDurationSeconds);
+    _currentSessionId = null;
+    _sessionDurationSeconds = 0;
+    _sessionStartTime = null;
+    return drained;
+  }
+
+  Future<void> _stopRealtimeNow({required bool isDisposing}) async {
+    _allowRecorderRestart = false;
+    _isWarmingUp = false;
+
+    // Stop timers first (instant UI response)
+    _amplitudeTimer?.cancel();
+    _stopSessionTimer();
+
+    // Stop audio/streaming
+    await _recorderSubscription?.cancel();
+    _recorderSubscription = null;
+    try {
+      await _audioRecorder.stop();
+    } catch (_) {}
+
+    await _channelSubscription?.cancel();
+    _channelSubscription = null;
+    _channel?.sink.close(kStatus.goingAway);
+    _channel = null;
+
+    _audioQueue.clear();
+    _isProcessingAudio = false;
+    _isPlayingTts = false;
+    try {
+      await _player.stop();
+    } catch (_) {}
+
+    _sessionReady = false;
+
+    if (!isDisposing && mounted) {
+      setState(() {
+        _soundLevel = 0.0;
+        _status = AppStatus.disconnected;
+        _statusMessage = AppLocalizations.of(context).notConnected;
+      });
+    } else {
+      _soundLevel = 0.0;
+      _status = AppStatus.disconnected;
+      _statusMessage = "Not connected";
+    }
+  }
+
+  Future<void> _finalizeSessionInBackground(
+    ({String? sessionId, int durationSeconds}) drained, {
+    required bool showCompletionDialog,
+    required bool isDisposing,
+  }) async {
+    final sessionId = drained.sessionId;
+    if (sessionId == null) return;
+
+    try {
+      if (drained.durationSeconds > 0) {
+        final result = await _sessionService.endSession(sessionId, drained.durationSeconds);
+
+        if (showCompletionDialog &&
+            result['success'] == true &&
+            (result['pointsAwarded'] as int? ?? 0) > 0 &&
+            mounted) {
+          _pointsNotificationService.showPointsEarnedNotification(
+            context: context,
+            pointsGained: result['pointsAwarded'],
+          );
+
+          _showSessionCompletedDialog(
+            result['pointsAwarded'],
+            result['durationMinutes'],
+          );
+        }
+      } else {
+        await _sessionService.cancelSession(sessionId);
+      }
+    } catch (e) {
+      debugPrint("Error finalizing session: $e");
+    } finally {
+      if (!isDisposing && mounted) {
+        await _loadSessionInfo();
+      }
+    }
+  }
+
+  Future<void> _stopSessionFast() async {
+    if (_isStopping || _isExiting) return;
+    if (_status == AppStatus.disconnected && _currentSessionId == null) return;
+
+    if (mounted) {
+      setState(() {
+        _isStopping = true;
+        _status = AppStatus.disconnected;
+        _statusMessage = AppLocalizations.of(context).notConnected;
+        _soundLevel = 0.0;
+        _isWarmingUp = false;
+      });
+    } else {
+      _isStopping = true;
+      _status = AppStatus.disconnected;
+      _statusMessage = "Not connected";
+      _soundLevel = 0.0;
+      _isWarmingUp = false;
+    }
+
+    // Yield a frame so the UI updates immediately.
+    await Future<void>.delayed(Duration.zero);
+
+    final drained = _drainSessionForFinalize();
+    await _stopRealtimeNow(isDisposing: false);
+    await _finalizeSessionInBackground(
+      drained,
+      showCompletionDialog: true,
+      isDisposing: false,
+    );
+
+    if (mounted) {
+      setState(() => _isStopping = false);
+    } else {
+      _isStopping = false;
+    }
   }
 
   void _updateSettings() {
@@ -433,80 +560,23 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   }
 
   Future<void> _disconnect({bool showCompletionDialog = true, bool isDisposing = false}) async {
-    _allowRecorderRestart = false;
-    _amplitudeTimer?.cancel();
-    await _recorderSubscription?.cancel();
-    _recorderSubscription = null;
-    try {
-      await _audioRecorder.stop();
-    } catch (_) {}
-    await _channelSubscription?.cancel();
-    _channelSubscription = null;
-    _channel?.sink.close(kStatus.goingAway);
-    _channel = null;
-    _audioQueue.clear();
-    _isProcessingAudio = false;
-    _isPlayingTts = false;
-    await _player.stop();
-    _sessionReady = false;
-    _isWarmingUp = false;
-
-    // Stop session timer
-    _stopSessionTimer();
-    
-    // Reset sound level
-    setState(() {
-      _soundLevel = 0.0;
-    });
-
-    // End session and award points
-    if (_currentSessionId != null) {
-      if (_sessionDurationSeconds > 0) {
-        // Session had activity - end it and award points
-        final result = await _sessionService.endSession(
-          _currentSessionId!,
-          _sessionDurationSeconds,
-        );
-
-        if (showCompletionDialog &&
-            result['success'] == true &&
-            (result['pointsAwarded'] as int? ?? 0) > 0 &&
-            mounted) {
-          // Show points notification
-          _pointsNotificationService.showPointsEarnedNotification(
-            context: context,
-            pointsGained: result['pointsAwarded'],
-          );
-
-          _showSessionCompletedDialog(
-            result['pointsAwarded'],
-            result['durationMinutes'],
-          );
-        }
-      } else {
-        // Session was started but stopped immediately - cancel it
-        await _sessionService.cancelSession(_currentSessionId!);
-      }
-
-      _currentSessionId = null;
-      _sessionDurationSeconds = 0;
-      _sessionStartTime = null;
-
-      // Reload session info
-      if (!isDisposing) {
-        await _loadSessionInfo();
-      }
-    }
-
+    // Make the UI feel instant: disconnect locally first, then persist remotely.
     if (!isDisposing && mounted) {
       setState(() {
         _status = AppStatus.disconnected;
         _statusMessage = AppLocalizations.of(context).notConnected;
+        _soundLevel = 0.0;
+        _isWarmingUp = false;
       });
-    } else {
-      _status = AppStatus.disconnected;
-      _statusMessage = "Not connected";
     }
+
+    final drained = _drainSessionForFinalize();
+    await _stopRealtimeNow(isDisposing: isDisposing);
+    await _finalizeSessionInBackground(
+      drained,
+      showCompletionDialog: showCompletionDialog,
+      isDisposing: isDisposing,
+    );
   }
 
   void _showSessionCompletedDialog(int points, int minutes) {
@@ -681,11 +751,11 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
         onError: (error) {
           debugPrint("WebSocket error: $error");
           _showError("${AppLocalizations.of(context).connectionError} $error");
-          _disconnect();
+          _disconnect(showCompletionDialog: false);
         },
         onDone: () {
           debugPrint("WebSocket connection closed");
-          _disconnect();
+          _disconnect(showCompletionDialog: false);
         },
       );
 
@@ -693,14 +763,14 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       final hasNativePermission = await _audioRecorder.hasPermission();
       if (!hasNativePermission) {
         _showError(AppLocalizations.of(context).recorderPermissionDenied);
-        await _disconnect();
+        await _disconnect(showCompletionDialog: false);
         return;
       }
 
     } catch (e) {
       debugPrint("Error starting conversation: $e");
       _showError("${AppLocalizations.of(context).failedToStart} $e");
-      _disconnect();
+      _disconnect(showCompletionDialog: false);
     }
   }
 
@@ -951,9 +1021,11 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final displayMessages = _isChatExpanded 
-        ? _messages 
-        : _messages.length > 2 ? _messages.sublist(_messages.length - 2) : _messages;
+    final displayMessages = _isChatExpanded
+        ? _messages
+        : _messages.length > 2
+            ? _messages.sublist(_messages.length - 2)
+            : _messages;
 
     return WillPopScope(
       onWillPop: _handleSystemBack,
@@ -968,87 +1040,148 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               // Session Timer Header (Always visible)
               _buildSessionHeader(),
 
-            // Main Content (Bubble)
-            Expanded(
-              flex: _isChatExpanded ? 3 : 5,
-              child: Center(
-                child: AIAgentBubble(
-                  soundLevel: _soundLevel,
-                  isAgentSpeaking: _isPlayingTts,
-                ),
-              ),
-            ),
-            
-            // Single Toggle Button for Start/Stop
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-              child: ElevatedButton(
-                onPressed: _isLoadingSession ? null : (_status == AppStatus.disconnected
-                    ? _startConversation
-                    : _disconnect),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  backgroundColor: _status == AppStatus.disconnected ? Colors.black : Colors.white,
-                  foregroundColor: _status == AppStatus.disconnected ? Colors.white : Colors.black,
-                  elevation: 0,
-                  side: _status == AppStatus.disconnected 
-                      ? null 
-                      : const BorderSide(color: Colors.black12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+              // Chat-only mode: show full chat and hide the agent bubble
+              if (_isChatExpanded) ...[
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              AppLocalizations.of(context).chat,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isChatExpanded = false;
+                                });
+                              },
+                              child: Text(AppLocalizations.of(context).close),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: _messages.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    AppLocalizations.of(context).startToSeeConversation,
+                                    style: const TextStyle(color: AppColors.textSecondary),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                )
+                              : _buildMessageList(_messages, expanded: true),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                child: Text(
-                  _status == AppStatus.disconnected ? AppLocalizations.of(context).start : AppLocalizations.of(context).stop,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ] else ...[
+                // Main Content (Bubble)
+                Expanded(
+                  flex: 5,
+                  child: Center(
+                    child: AIAgentBubble(
+                      soundLevel: _soundLevel,
+                      isAgentSpeaking: _isPlayingTts,
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
-            // Integrated Chat Area
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              height: _isChatExpanded ? 400 : null,
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.6,
-              ),
-              child: GestureDetector(
-                onTap: _messages.isNotEmpty ? () {
-                  setState(() {
-                    _isChatExpanded = !_isChatExpanded;
-                  });
-                } : null,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                  color: Colors.transparent,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_messages.isNotEmpty && !_isChatExpanded)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 15),
-                          width: 30,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(1.5),
+                // Single Toggle Button for Start/Stop
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                  child: ElevatedButton(
+                    onPressed: (_isLoadingSession || _isStopping)
+                        ? null
+                        : (_status == AppStatus.disconnected ? _startConversation : _stopSessionFast),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: _status == AppStatus.disconnected ? Colors.black : Colors.white,
+                      foregroundColor: _status == AppStatus.disconnected ? Colors.white : Colors.black,
+                      elevation: 0,
+                      side: _status == AppStatus.disconnected
+                          ? null
+                          : const BorderSide(color: Colors.black12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: Text(
+                      _isStopping
+                          ? AppLocalizations.of(context).loading
+                          : _status == AppStatus.disconnected
+                          ? AppLocalizations.of(context).start
+                          : AppLocalizations.of(context).stop,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+
+                // Integrated Chat Area (preview: last 2 messages)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isChatExpanded = true;
+                    });
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    color: Colors.transparent,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_messages.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            width: 30,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(1.5),
+                            ),
+                          ),
+                        if (_messages.isNotEmpty)
+                          _buildMessageList(displayMessages, expanded: false)
+                        else
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: Text(
+                              AppLocalizations.of(context).startToSeeConversation,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                            AppLocalizations.of(context).tapToOpenChat,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
-                        
-                      if (_messages.isNotEmpty)
-                        _isChatExpanded 
-                          ? Expanded(child: _buildMessageList(displayMessages))
-                          : _buildMessageList(displayMessages),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-            
-            if (!_isChatExpanded)
-              const SizedBox(height: 20),
+
+                const SizedBox(height: 20),
+              ],
             ],
           ),
         ),
@@ -1227,10 +1360,10 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     );
   }
   
-  Widget _buildMessageList(List<ChatMessage> messages) {
+  Widget _buildMessageList(List<ChatMessage> messages, {required bool expanded}) {
     return ListView.separated(
-      shrinkWrap: true,
-      physics: _isChatExpanded ? const BouncingScrollPhysics() : const NeverScrollableScrollPhysics(),
+      shrinkWrap: !expanded,
+      physics: expanded ? const BouncingScrollPhysics() : const NeverScrollableScrollPhysics(),
       padding: EdgeInsets.zero,
       itemCount: messages.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
@@ -1301,13 +1434,15 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   Future<void> _exitAndPersistSession() async {
     if (!mounted) return;
     setState(() => _isExiting = true);
-    try {
-      await _disconnect(showCompletionDialog: false);
-    } finally {
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    }
+    final drained = _drainSessionForFinalize();
+    // Stop local audio/websocket immediately, then persist in the background.
+    await _stopRealtimeNow(isDisposing: true);
+    unawaited(_finalizeSessionInBackground(
+      drained,
+      showCompletionDialog: false,
+      isDisposing: true,
+    ));
+    if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _startRecorderStream() async {
