@@ -2,6 +2,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/level_service.dart';
 import 'package:student/services/daily_limit_service.dart';
 
+class ReadingLevelProgressSummary {
+  final int total;
+  final int completed;
+
+  const ReadingLevelProgressSummary({required this.total, required this.completed});
+
+  double get percentage => total <= 0 ? 0.0 : (completed / total * 100.0);
+}
+
+class ReadingGlobalProgress {
+  final Map<int, ReadingLevelProgressSummary> progressByLevel;
+  final Map<int, bool> unlockedByLevel;
+  final Set<String> completedReadingIds;
+
+  const ReadingGlobalProgress({
+    required this.progressByLevel,
+    required this.unlockedByLevel,
+    required this.completedReadingIds,
+  });
+}
+
 class ReadingService {
   final _supabase = Supabase.instance.client;
   final _levelService = LevelService();
@@ -38,6 +59,110 @@ class ReadingService {
       print('Error fetching readings by difficulty: $e');
       rethrow;
     }
+  }
+
+  /// Fetch global progress/unlocks for readings in a batched way.
+  ///
+  /// Unlock rule: Level 1 always unlocked; Level N unlocks only when ALL readings
+  /// in Level N-1 are completed.
+  Future<ReadingGlobalProgress> getReadingGlobalProgress(String studentId) async {
+    // 1) Fetch all readings once (minimal columns)
+    final readingsResponse = await _supabase
+        .from('readings')
+        .select('id, difficulty_level, order')
+        .order('difficulty_level', ascending: true)
+        .order('order', ascending: true);
+
+    final readings = (readingsResponse as List)
+        .map((r) => {
+              'id': r['id'] as String,
+              'difficulty_level': r['difficulty_level'] as int,
+              'order': r['order'] as int,
+            })
+        .toList();
+
+    final readingIds = readings.map((r) => r['id'] as String).toList();
+
+    // 2) Fetch completed progress once
+    final completedReadingIds = <String>{};
+    if (readingIds.isNotEmpty) {
+      final progressResponse = await _supabase
+          .from('student_reading_progress')
+          .select('reading_id, completed')
+          .eq('student_id', studentId)
+          .inFilter('reading_id', readingIds);
+
+      for (final row in (progressResponse as List)) {
+        final id = row['reading_id'] as String?;
+        if (id == null) continue;
+        if (row['completed'] == true) completedReadingIds.add(id);
+      }
+    }
+
+    // Progress per level
+    final progressByLevel = <int, ReadingLevelProgressSummary>{};
+    for (int level = 1; level <= 4; level++) {
+      final levelReadings =
+          readings.where((r) => (r['difficulty_level'] as int) == level).toList();
+      final total = levelReadings.length;
+      int completed = 0;
+      for (final r in levelReadings) {
+        if (completedReadingIds.contains(r['id'] as String)) completed++;
+      }
+      progressByLevel[level] =
+          ReadingLevelProgressSummary(total: total, completed: completed);
+    }
+
+    // Unlocks by level
+    final unlockedByLevel = <int, bool>{1: true};
+    for (int level = 2; level <= 4; level++) {
+      final prev = progressByLevel[level - 1] ??
+          const ReadingLevelProgressSummary(total: 0, completed: 0);
+      unlockedByLevel[level] = prev.total > 0 && prev.completed >= prev.total;
+    }
+
+    return ReadingGlobalProgress(
+      progressByLevel: progressByLevel,
+      unlockedByLevel: unlockedByLevel,
+      completedReadingIds: completedReadingIds,
+    );
+  }
+
+  /// Add computed fields to readings using a pre-fetched [global].
+  /// Adds:
+  /// - `is_completed`
+  /// - `is_locked`
+  List<Map<String, dynamic>> buildReadingsWithProgressUsingGlobal(
+    List<Map<String, dynamic>> readings,
+    int difficultyLevel,
+    ReadingGlobalProgress global,
+  ) {
+    final isLevelUnlocked = global.unlockedByLevel[difficultyLevel] == true;
+
+    final result = <Map<String, dynamic>>[];
+    for (int i = 0; i < readings.length; i++) {
+      final r = Map<String, dynamic>.from(readings[i]);
+      final id = r['id'] as String;
+      final isCompleted = global.completedReadingIds.contains(id);
+
+      bool isLocked;
+      if (!isLevelUnlocked) {
+        isLocked = true;
+      } else if (i == 0) {
+        isLocked = false;
+      } else {
+        final prevId = readings[i - 1]['id'] as String;
+        final prevCompleted = global.completedReadingIds.contains(prevId);
+        isLocked = !prevCompleted;
+      }
+
+      if (isCompleted) isLocked = false;
+      r['is_completed'] = isCompleted;
+      r['is_locked'] = isLocked;
+      result.add(r);
+    }
+
+    return result;
   }
 
   /// Fetch questions for a specific reading
@@ -143,6 +268,16 @@ class ReadingService {
     int points,
   ) async {
     try {
+      // If reading is already completed, do NOT award points again.
+      final existingProgress = await _supabase
+          .from('student_reading_progress')
+          .select('completed')
+          .eq('student_id', studentId)
+          .eq('reading_id', readingId)
+          .maybeSingle();
+
+      final alreadyCompleted = existingProgress?['completed'] == true;
+
       // Calculate score
       int correctCount = 0;
       final correctList = <bool>[];
@@ -161,18 +296,7 @@ class ReadingService {
 
       // If all correct, award points and mark as completed
       if (allCorrect) {
-        // Award points to student
-        await _levelService.awardPoints(studentId, points);
-
-        // Mark reading as completed
-        // First check if progress record exists
-        final existingProgress = await _supabase
-            .from('student_reading_progress')
-            .select('id')
-            .eq('student_id', studentId)
-            .eq('reading_id', readingId)
-            .maybeSingle();
-
+        // Mark reading as completed (idempotent)
         if (existingProgress == null) {
           // Create new progress record
           await _supabase.from('student_reading_progress').insert({
@@ -183,7 +307,7 @@ class ReadingService {
             'created_at': DateTime.now().toIso8601String(),
             'updated_at': DateTime.now().toIso8601String(),
           });
-        } else {
+        } else if (!alreadyCompleted) {
           // Update existing progress record
           await _supabase
               .from('student_reading_progress')
@@ -196,9 +320,12 @@ class ReadingService {
               .eq('reading_id', readingId);
         }
 
-        // Record daily limit
-        await _dailyLimitService.recordPracticeCompletion(
-            studentId, DailyLimitService.practiceTypeReading);
+        // Only award points + record daily limit on FIRST completion.
+        if (!alreadyCompleted) {
+          await _levelService.awardPoints(studentId, points);
+          await _dailyLimitService.recordPracticeCompletion(
+              studentId, DailyLimitService.practiceTypeReading);
+        }
       }
 
       return {
@@ -206,7 +333,7 @@ class ReadingService {
         'total': totalQuestions,
         'correct': correctList,
         'allCorrect': allCorrect,
-        'pointsAwarded': allCorrect ? points : 0,
+        'pointsAwarded': (allCorrect && !alreadyCompleted) ? points : 0,
       };
     } catch (e) {
       print('Error submitting answers: $e');

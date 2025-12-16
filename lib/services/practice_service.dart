@@ -2,6 +2,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/services/daily_limit_service.dart';
 import 'package:student/services/level_service.dart';
 
+class VideoLevelProgressSummary {
+  final int total;
+  final int completed;
+
+  const VideoLevelProgressSummary({required this.total, required this.completed});
+
+  double get percentage => total <= 0 ? 0.0 : (completed / total * 100.0);
+}
+
+class VideoGlobalProgress {
+  final Map<int, VideoLevelProgressSummary> progressByLevel;
+  final Map<int, bool> unlockedByLevel;
+  final Set<String> watchedVideoIds;
+
+  const VideoGlobalProgress({
+    required this.progressByLevel,
+    required this.unlockedByLevel,
+    required this.watchedVideoIds,
+  });
+}
+
 class PracticeService {
   final _supabase = Supabase.instance.client;
   final _dailyLimitService = DailyLimitService();
@@ -36,6 +57,117 @@ class PracticeService {
   Future<List<Map<String, dynamic>>> getVideosForDifficulty(
       int difficultyLevel) async {
     return getPracticeVideos(null, difficultyLevel: difficultyLevel);
+  }
+
+  /// Fetch global progress/unlocks for practice videos in a batched way.
+  ///
+  /// Unlock rule: Level 1 always unlocked; Level N unlocks only when ALL videos
+  /// in Level N-1 are watched.
+  Future<VideoGlobalProgress> getVideoGlobalProgress(String studentId) async {
+    // 1) Fetch all active videos once (minimal columns)
+    final videosResponse = await _supabase
+        .from('practice_videos')
+        .select('id, difficulty_level, order_index')
+        .eq('is_active', true)
+        .order('difficulty_level', ascending: true)
+        .order('order_index', ascending: true);
+
+    final videos = (videosResponse as List)
+        .map((v) => {
+              'id': v['id'] as String,
+              'difficulty_level': v['difficulty_level'] as int,
+              'order_index': v['order_index'] as int,
+            })
+        .toList();
+
+    final videoIds = videos.map((v) => v['id'] as String).toList();
+
+    // 2) Fetch watched progress for those videos once
+    final watchedVideoIds = <String>{};
+    if (videoIds.isNotEmpty) {
+      final progressResponse = await _supabase
+          .from('student_video_progress')
+          .select('video_id, watched')
+          .eq('student_id', studentId)
+          .inFilter('video_id', videoIds);
+
+      for (final row in (progressResponse as List)) {
+        final id = row['video_id'] as String?;
+        if (id == null) continue;
+        if (row['watched'] == true) watchedVideoIds.add(id);
+      }
+    }
+
+    // Progress per level
+    final progressByLevel = <int, VideoLevelProgressSummary>{};
+    for (int level = 1; level <= 4; level++) {
+      final levelVideos =
+          videos.where((v) => (v['difficulty_level'] as int) == level).toList();
+      final total = levelVideos.length;
+      int completed = 0;
+      for (final v in levelVideos) {
+        if (watchedVideoIds.contains(v['id'] as String)) completed++;
+      }
+      progressByLevel[level] =
+          VideoLevelProgressSummary(total: total, completed: completed);
+    }
+
+    // Unlocks by level
+    final unlockedByLevel = <int, bool>{1: true};
+    for (int level = 2; level <= 4; level++) {
+      final prev = progressByLevel[level - 1] ??
+          const VideoLevelProgressSummary(total: 0, completed: 0);
+      unlockedByLevel[level] = prev.total > 0 && prev.completed >= prev.total;
+    }
+
+    return VideoGlobalProgress(
+      progressByLevel: progressByLevel,
+      unlockedByLevel: unlockedByLevel,
+      watchedVideoIds: watchedVideoIds,
+    );
+  }
+
+  /// Get videos for a difficulty level annotated with progress/locking using a pre-fetched [global].
+  /// Adds the following keys to each video map:
+  /// - `is_watched` (bool)
+  /// - `is_locked` (bool)
+  ///
+  /// Locking rules:
+  /// - If level locked: all videos locked.
+  /// - Else sequential within level: video #2 locked until #1 watched, etc.
+  List<Map<String, dynamic>> buildVideosWithProgressUsingGlobal(
+    List<Map<String, dynamic>> videos,
+    int difficultyLevel,
+    VideoGlobalProgress global,
+  ) {
+    final isLevelUnlocked = global.unlockedByLevel[difficultyLevel] == true;
+
+    final result = <Map<String, dynamic>>[];
+    for (int i = 0; i < videos.length; i++) {
+      final v = Map<String, dynamic>.from(videos[i]);
+      final id = v['id'] as String;
+      final isWatched = global.watchedVideoIds.contains(id);
+
+      bool isLocked;
+      if (!isLevelUnlocked) {
+        isLocked = true;
+      } else if (i == 0) {
+        isLocked = false;
+      } else {
+        final prevId = videos[i - 1]['id'] as String;
+        final prevWatched = global.watchedVideoIds.contains(prevId);
+        isLocked = !prevWatched;
+      }
+
+      // Completed items should never appear locked.
+      if (isWatched) isLocked = false;
+
+      v['is_watched'] = isWatched;
+      v['is_locked'] = isLocked;
+      result.add(v);
+    }
+
+    return result;
   }
 
   /// Get student's video progress
@@ -105,18 +237,24 @@ class PracticeService {
         studentId, DailyLimitService.practiceTypeVideo);
   }
 
-  /// Mark video as watched and record daily limit
-  Future<void> markVideoAsWatched(String studentId, String videoId,
+  /// Mark video as watched and record daily limit.
+  ///
+  /// Returns the **actual points awarded** (0 if it was already watched before).
+  Future<int> markVideoAsWatched(String studentId, String videoId,
       {int? pointsReward}) async {
     try {
       final existing = await _supabase
           .from('student_video_progress')
-          .select('id')
+          .select('id, watched')
           .eq('student_id', studentId)
           .eq('video_id', videoId)
           .maybeSingle();
 
       if (existing != null) {
+        // If already watched, do not award points or consume daily limit again.
+        if (existing['watched'] == true) {
+          return 0;
+        }
         // Update existing record
         await _supabase
             .from('student_video_progress')
@@ -127,6 +265,18 @@ class PracticeService {
             })
             .eq('student_id', studentId)
             .eq('video_id', videoId);
+
+        // Award points on first completion (transition false -> true)
+        final awarded = (pointsReward != null && pointsReward > 0) ? pointsReward : 0;
+        if (pointsReward != null && pointsReward > 0) {
+          await _levelService.awardPoints(studentId, pointsReward);
+        }
+
+        // Record daily limit only on first completion
+        await _dailyLimitService.recordPracticeCompletion(
+            studentId, DailyLimitService.practiceTypeVideo);
+
+        return awarded;
       } else {
         // Insert new record
         await _supabase.from('student_video_progress').insert({
@@ -138,14 +288,17 @@ class PracticeService {
         });
 
         // Award points on first completion
+        final awarded = (pointsReward != null && pointsReward > 0) ? pointsReward : 0;
         if (pointsReward != null && pointsReward > 0) {
           await _levelService.awardPoints(studentId, pointsReward);
         }
-      }
 
-      // Record daily limit
-      await _dailyLimitService.recordPracticeCompletion(
-          studentId, DailyLimitService.practiceTypeVideo);
+        // Record daily limit only on first completion
+        await _dailyLimitService.recordPracticeCompletion(
+            studentId, DailyLimitService.practiceTypeVideo);
+
+        return awarded;
+      }
     } catch (e) {
       print('Error marking video as watched: $e');
       rethrow;

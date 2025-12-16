@@ -479,37 +479,46 @@ class QuizPracticeService {
     required int durationSeconds,
   }) async {
     try {
-      // Get questions that were previously answered correctly (to avoid duplicate points)
-      final previouslyCorrectIds = await _getPreviouslyCorrectQuestionIds(studentId, quizId);
-      
-      print('📝 Previously correct question IDs: $previouslyCorrectIds');
+      // If this quiz was ever attempted before, do NOT award points again.
+      final existingAttempt = await _supabase
+          .from('student_quiz_attempts')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('quiz_id', quizId)
+          .limit(1)
+          .maybeSingle();
 
-      // Calculate score and points (only award points for newly correct answers)
+      final isFirstAttemptForQuiz = existingAttempt == null;
+
       final correctCount = answers.where((a) => a.isCorrect).length;
       int actualPointsToAward = 0;
       
       // Create a map to track actual points for each answer
       final Map<String, int> actualPointsPerAnswer = {};
-      
-      for (var answer in answers) {
-        if (answer.isCorrect && !previouslyCorrectIds.contains(answer.quizQuestionId)) {
-          // This is a newly correct answer - award full points
-          actualPointsPerAnswer[answer.quizQuestionId] = answer.pointsEarned;
-          actualPointsToAward += answer.pointsEarned;
-          print('✅ New correct answer for question ${answer.quizQuestionId}: +${answer.pointsEarned} points');
-        } else if (answer.isCorrect && previouslyCorrectIds.contains(answer.quizQuestionId)) {
-          // Previously correct - award 0 points but keep answer as correct
-          actualPointsPerAnswer[answer.quizQuestionId] = 0;
-          print('⏭️ Already correct before for question ${answer.quizQuestionId}: 0 points');
-        } else {
-          // Wrong answer - 0 points
+
+      if (isFirstAttemptForQuiz) {
+        // Award points for correct answers only on first attempt.
+        for (var answer in answers) {
+          if (answer.isCorrect) {
+            actualPointsPerAnswer[answer.quizQuestionId] = answer.pointsEarned;
+            actualPointsToAward += answer.pointsEarned;
+          } else {
+            actualPointsPerAnswer[answer.quizQuestionId] = 0;
+          }
+        }
+        print('🆕 First attempt for quiz: awarding $actualPointsToAward points');
+      } else {
+        // Retake: always 0 points.
+        for (var answer in answers) {
           actualPointsPerAnswer[answer.quizQuestionId] = 0;
         }
+        actualPointsToAward = 0;
+        print('🔁 Retake for quiz: awarding 0 points');
       }
 
       final scorePercentage = (correctCount / answers.length * 100).toDouble();
 
-      print('💰 Total new points to award: $actualPointsToAward');
+      print('💰 Total points to award: $actualPointsToAward');
 
       // Insert quiz attempt
       final attemptResponse = await _supabase

@@ -24,14 +24,18 @@ class _ReadingScreenState extends State<ReadingScreen> {
   final _dailyLimitService = DailyLimitService();
   
   bool _isLoading = true;
+  bool _isLevelLoading = false;
   int _selectedDifficulty = 1;
-  int _highestUnlockedLevel = 1;
+  Map<int, bool> _unlockedByLevel = {1: true};
   bool _canReadToday = true;
   String _timeUntilReset = '';
   
   List<Map<String, dynamic>> _currentLevelReadings = [];
   Map<String, bool> _progressMap = {};
   Map<int, Map<String, dynamic>> _progressByLevel = {};
+  ReadingGlobalProgress? _globalProgress;
+  final Map<int, List<Map<String, dynamic>>> _readingsByLevelCache = {};
+  int _difficultyLoadSeq = 0;
 
   @override
   void initState() {
@@ -91,15 +95,18 @@ class _ReadingScreenState extends State<ReadingScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Future.wait([
-        _loadHighestUnlockedLevel(),
-        _loadProgressForAllLevels(),
-        _checkDailyLimit(),
-      ]);
+      _readingsByLevelCache.clear();
+      _globalProgress = null;
 
-      await _loadReadingsForLevel(_selectedDifficulty);
+      await _loadGlobalProgress(studentId);
+
+      final readingsFuture = _fetchReadingsForLevel(_selectedDifficulty);
+      final dailyLimitFuture = _checkDailyLimit();
+      final readings = await readingsFuture;
+      await dailyLimitFuture;
 
       setState(() {
+        _currentLevelReadings = readings;
         _isLoading = false;
         _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
       });
@@ -116,53 +123,31 @@ class _ReadingScreenState extends State<ReadingScreen> {
     }
   }
 
-  Future<void> _loadHighestUnlockedLevel() async {
-    final studentId = _authService.currentUser?.id;
-    if (studentId == null) return;
+  Future<void> _loadGlobalProgress(String studentId) async {
+    final global = await _readingService.getReadingGlobalProgress(studentId);
 
-    int unlockedLevel = 1;
-    
+    final progressByLevel = <int, Map<String, dynamic>>{};
     for (int level = 1; level <= 4; level++) {
-      if (level == 1) {
-        unlockedLevel = 1;
-        continue;
-      }
-
-      final canUnlock = await _readingService.canUnlockNextLevel(studentId, level - 1);
-      if (canUnlock) {
-        unlockedLevel = level;
-      } else {
-        break;
-      }
-    }
-
-    setState(() {
-      _highestUnlockedLevel = unlockedLevel;
-    });
-  }
-
-  Future<void> _loadProgressForAllLevels() async {
-    final studentId = _authService.currentUser?.id;
-    if (studentId == null) return;
-
-    for (int level = 1; level <= 4; level++) {
-      final readings = await _readingService.getReadingsByDifficulty(level);
-      final progressMap = await _readingService.getStudentProgress(studentId);
-      
-      int completed = 0;
-      for (var reading in readings) {
-        if (progressMap[reading['id']] == true) {
-          completed++;
-        }
-      }
-
-      _progressByLevel[level] = {
-        'total': readings.length,
-        'completed': completed,
-        'percentage': readings.isEmpty ? 0.0 : (completed / readings.length * 100),
+      final summary = global.progressByLevel[level] ??
+          const ReadingLevelProgressSummary(total: 0, completed: 0);
+      progressByLevel[level] = {
+        'total': summary.total,
+        'completed': summary.completed,
+        'percentage': summary.percentage,
       };
     }
-    setState(() {});
+
+    if (!mounted) return;
+    setState(() {
+      _globalProgress = global;
+      _progressByLevel = progressByLevel;
+      _unlockedByLevel = {
+        1: true,
+        2: global.unlockedByLevel[2] == true,
+        3: global.unlockedByLevel[3] == true,
+        4: global.unlockedByLevel[4] == true,
+      };
+    });
   }
 
   Future<void> _checkDailyLimit() async {
@@ -175,27 +160,61 @@ class _ReadingScreenState extends State<ReadingScreen> {
     });
   }
 
-  Future<void> _loadReadingsForLevel(int level) async {
-    final studentId = _authService.currentUser?.id;
-    if (studentId == null) return;
+  Future<List<Map<String, dynamic>>> _fetchReadingsForLevel(int level, {bool force = false}) async {
+    if (!force && _readingsByLevelCache.containsKey(level)) {
+      return _readingsByLevelCache[level]!;
+    }
 
     final readings = await _readingService.getReadingsByDifficulty(level);
-    final progressMap = await _readingService.getStudentProgress(studentId);
 
-    setState(() {
-      _currentLevelReadings = readings;
-      _progressMap = progressMap;
-    });
+    final global = _globalProgress;
+    final decorated = global != null
+        ? _readingService.buildReadingsWithProgressUsingGlobal(readings, level, global)
+        : readings;
+
+    // Keep compatibility with existing UI bits
+    final progressMap = <String, bool>{};
+    for (final r in decorated) {
+      final id = r['id'] as String;
+      progressMap[id] = r['is_completed'] == true;
+    }
+    _progressMap = progressMap;
+
+    _readingsByLevelCache[level] = decorated;
+    return decorated;
   }
 
   void _onDifficultyChanged(int level) async {
+    if (level == _selectedDifficulty) return;
+    final isUnlocked = _unlockedByLevel[level] == true || level == 1;
+    if (!isUnlocked) return;
+
+    final requestSeq = ++_difficultyLoadSeq;
+
+    final cached = _readingsByLevelCache[level];
+    if (cached != null) {
+      if (!mounted) return;
+      setState(() {
+        _selectedDifficulty = level;
+        _currentLevelReadings = cached;
+        _isLevelLoading = false;
+      });
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _selectedDifficulty = level;
-      _isLoading = true;
+      _isLevelLoading = true;
+      _currentLevelReadings = [];
     });
-    await _loadReadingsForLevel(level);
+
+    final readings = await _fetchReadingsForLevel(level);
+    if (!mounted || requestSeq != _difficultyLoadSeq) return;
+
     setState(() {
-      _isLoading = false;
+      _currentLevelReadings = readings;
+      _isLevelLoading = false;
     });
   }
 
@@ -204,22 +223,17 @@ class _ReadingScreenState extends State<ReadingScreen> {
     final studentId = _authService.currentUser?.id;
     if (studentId == null) return;
 
-    // Check daily limit
-    if (!_canReadToday) {
-      _showErrorDialog('You have already completed your reading for today. Come back tomorrow!');
+    final isCompleted = reading['is_completed'] == true || _progressMap[reading['id']] == true;
+    final isLocked = reading['is_locked'] == true;
+
+    if (isLocked) {
+      _showErrorDialog(l10n.completePreviousReading);
       return;
     }
 
-    // Check if unlocked
-    final isUnlocked = await _readingService.isReadingUnlocked(
-      studentId,
-      reading['id'],
-      reading['title'] ?? '',
-      reading['order'] ?? 0,
-    );
-
-    if (!isUnlocked) {
-      _showErrorDialog('Complete previous readings first to unlock this one.');
+    // Daily limit blocks starting a NEW reading; allow opening completed items.
+    if (!_canReadToday && !isCompleted) {
+      _showErrorDialog('You have already completed your reading for today. Resets in $_timeUntilReset.');
       return;
     }
 
@@ -330,25 +344,33 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   Widget _buildHeader(AppLocalizations l10n) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
-          const Text('📚', style: TextStyle(fontSize: 48)),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.menu_book,
+              size: 20,
+              color: AppColors.primary,
+            ),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -357,19 +379,15 @@ class _ReadingScreenState extends State<ReadingScreen> {
                 Text(
                   l10n.readings,
                   style: const TextStyle(
-                    fontSize: 22,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Practice Reading • 4 Levels',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  'Complete readings in order to unlock higher levels.',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -443,7 +461,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
         Row(
           children: DifficultyLevel.values.map((level) {
             final isSelected = level.value == _selectedDifficulty;
-            final isLocked = level.value > _highestUnlockedLevel;
+            final isLocked = _unlockedByLevel[level.value] != true && level.value != 1;
             
             return Expanded(
               child: GestureDetector(
@@ -453,45 +471,50 @@ class _ReadingScreenState extends State<ReadingScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
                     color: isLocked
-                        ? Colors.grey.shade200
-                        : isSelected
-                            ? AppColors.primary
-                            : Colors.white,
+                        ? Colors.grey.shade100
+                        : (isSelected ? AppColors.primary : Colors.white),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isLocked
                           ? Colors.grey.shade300
-                          : isSelected
-                              ? AppColors.primary
-                              : AppColors.border,
+                          : (isSelected ? AppColors.primary : AppColors.border),
                       width: 2,
                     ),
                   ),
                   child: Column(
                     children: [
-                      if (isLocked)
-                        Icon(Icons.lock, size: 16, color: Colors.grey.shade600)
-                      else
-                        Text(
-                          '${level.value}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : AppColors.textPrimary,
-                          ),
-                        ),
-                      const SizedBox(height: 4),
                       Text(
-                        level.label,
+                        '${level.value}',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                           color: isLocked
-                              ? Colors.grey.shade600
-                              : isSelected
-                                  ? Colors.white
-                                  : AppColors.textSecondary,
+                              ? Colors.grey.shade500
+                              : (isSelected ? Colors.white : AppColors.textPrimary),
                         ),
-                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (isLocked) ...[
+                            Icon(Icons.lock, size: 12, color: Colors.grey.shade500),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              level.label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isLocked
+                                    ? Colors.grey.shade500
+                                    : (isSelected ? Colors.white : AppColors.textSecondary),
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -599,6 +622,47 @@ class _ReadingScreenState extends State<ReadingScreen> {
   }
 
   Widget _buildReadingsList(AppLocalizations l10n) {
+    if (_isLevelLoading) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                l10n.loading,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_currentLevelReadings.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
@@ -644,10 +708,9 @@ class _ReadingScreenState extends State<ReadingScreen> {
   }
 
   Widget _buildReadingCard(Map<String, dynamic> reading, int index, AppLocalizations l10n) {
-    final isCompleted = _progressMap[reading['id']] == true;
-    
-    // Check if previous reading is completed (for lock state)
-    final isLocked = index > 0 && _progressMap[_currentLevelReadings[index - 1]['id']] != true;
+    final isCompleted = reading['is_completed'] == true || _progressMap[reading['id']] == true;
+    final isLocked = reading['is_locked'] == true;
+    final isBlockedByDailyLimit = !_canReadToday && !isCompleted;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -657,7 +720,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
         border: Border.all(
           color: isCompleted
               ? Colors.green.shade300
-              : isLocked
+              : (isLocked || isBlockedByDailyLimit)
                   ? Colors.grey.shade300
                   : AppColors.border,
         ),
@@ -670,7 +733,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
           decoration: BoxDecoration(
             color: isCompleted
                 ? Colors.green.shade100
-                : isLocked
+                : (isLocked || isBlockedByDailyLimit)
                     ? Colors.grey.shade200
                     : AppColors.primary.withOpacity(0.1),
             shape: BoxShape.circle,
@@ -678,7 +741,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
           child: Center(
             child: isCompleted
                 ? Icon(Icons.check, color: Colors.green.shade700)
-                : isLocked
+                : (isLocked || isBlockedByDailyLimit)
                     ? Icon(Icons.lock, color: Colors.grey.shade600, size: 20)
                     : Text(
                         '${index + 1}',
@@ -697,7 +760,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: isLocked ? Colors.grey.shade600 : AppColors.textPrimary,
+            color: (isLocked || isBlockedByDailyLimit) ? Colors.grey.shade600 : AppColors.textPrimary,
           ),
         ),
         subtitle: Padding(
@@ -722,7 +785,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    'Completed',
+                    l10n.completed,
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.green.shade800,
@@ -734,16 +797,24 @@ class _ReadingScreenState extends State<ReadingScreen> {
             ],
           ),
         ),
-        trailing: isLocked
+        trailing: (isLocked || isBlockedByDailyLimit)
             ? null
             : Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
                 color: isCompleted ? Colors.grey.shade400 : AppColors.primary,
               ),
-        onTap: isLocked || !_canReadToday
-            ? null
-            : () => _openReading(reading),
+        onTap: () {
+          if (isLocked) {
+            _showErrorDialog(l10n.completePreviousReading);
+            return;
+          }
+          if (isBlockedByDailyLimit) {
+            _showErrorDialog('You have already completed your reading for today. Resets in $_timeUntilReset.');
+            return;
+          }
+          _openReading(reading);
+        },
       ),
     );
   }

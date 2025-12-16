@@ -35,6 +35,8 @@ class _ReadingDetailScreenState extends State<ReadingDetailScreen> {
   Duration _audioDuration = Duration.zero;
   Duration _audioPosition = Duration.zero;
 
+  bool get _isCompleted => _results?['allCorrect'] == true;
+
   @override
   void initState() {
     super.initState();
@@ -301,30 +303,36 @@ class _ReadingDetailScreenState extends State<ReadingDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildReadingContent(),
-                    const SizedBox(height: 24),
-                    if (widget.reading['audio_url'] != null &&
-                        widget.reading['audio_url'].toString().isNotEmpty)
-                      _buildAudioPlayer(),
-                    const SizedBox(height: 24),
-                    _buildQuestionsSection(),
-                  ],
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop(_isCompleted);
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildReadingContent(),
+                      const SizedBox(height: 24),
+                      if (widget.reading['audio_url'] != null &&
+                          widget.reading['audio_url'].toString().isNotEmpty)
+                        _buildAudioPlayer(),
+                      const SizedBox(height: 24),
+                      _buildQuestionsSection(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -335,7 +343,9 @@ class _ReadingDetailScreenState extends State<ReadingDetailScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          const CustomBackButton(),
+          CustomBackButton(
+            onPressed: () => Navigator.of(context).pop(_isCompleted),
+          ),
           const Expanded(
             child: Center(
               child: Text(
