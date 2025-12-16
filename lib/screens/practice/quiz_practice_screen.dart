@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
+import 'package:student/services/daily_limit_service.dart';
 import 'package:student/models/quiz.dart';
 import 'package:student/models/difficulty_level.dart';
 import 'package:student/config/app_colors.dart';
@@ -21,6 +24,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   final _quizService = QuizPracticeService();
   final _authService = AuthService();
   final _proService = ProSubscriptionService();
+  final _dailyLimitService = DailyLimitService();
 
   bool _isLoading = true;
   bool _hasProSubscription = false;
@@ -28,6 +32,8 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   String? _studentId;
   int _selectedDifficulty = 1;
   bool _canAttemptToday = true;
+  String _timeUntilReset = '';
+  Timer? _resetTimer;
   
   List<Quiz> _quizzes = [];
   Map<int, Map<String, dynamic>> _progressByLevel = {};
@@ -36,6 +42,25 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   void initState() {
     super.initState();
     _checkProAndLoadData();
+    _startResetTimer();
+  }
+
+  void _startResetTimer() {
+    // Update immediately, then every minute
+    _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
+    _resetTimer?.cancel();
+    _resetTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _resetTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkProAndLoadData() async {
@@ -87,6 +112,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
 
       setState(() {
         _isLoading = false;
+        _timeUntilReset = _dailyLimitService.getTimeUntilResetFormatted();
       });
     } catch (e) {
       if (mounted) {
@@ -325,6 +351,10 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   }
 
   Widget _buildDailyLimitCard(AppLocalizations l10n) {
+    final resetText = _timeUntilReset.isNotEmpty
+        ? _timeUntilReset
+        : _dailyLimitService.getTimeUntilResetFormatted();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -358,7 +388,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
                 Text(
                   _canAttemptToday
                       ? 'You can complete 1 quiz today'
-                      : 'Come back tomorrow for another quiz',
+                      : 'Resets in $resetText',
                   style: TextStyle(
                     fontSize: 13,
                     color: _canAttemptToday ? Colors.green.shade700 : Colors.red.shade700,

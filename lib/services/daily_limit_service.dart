@@ -4,18 +4,36 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class DailyLimitService {
   final _supabase = Supabase.instance.client;
 
+  // Iraq uses Asia/Baghdad (UTC+3). We enforce the same day-boundary in DB via trigger.
+  static const Duration _iraqOffset = Duration(hours: 3);
+
   /// Practice types for daily limits
   static const String practiceTypeQuiz = 'quiz';
   static const String practiceTypeVideo = 'video';
   static const String practiceTypeReading = 'reading';
 
+  DateTime _nowUtc() => DateTime.now().toUtc();
+
+  /// Returns a UTC DateTime whose date components represent Iraq local date/time (UTC shifted by +3h).
+  DateTime _nowIraqAsUtc() => _nowUtc().add(_iraqOffset);
+
+  String _formatDateYmd(DateTime dt) {
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  String _todayIraqDateString() {
+    final iraqNow = _nowIraqAsUtc();
+    return _formatDateYmd(iraqNow);
+  }
+
   /// Check if student can practice a specific type today
   /// Returns true if limit not reached, false if already completed today
   Future<bool> checkDailyLimit(String studentId, String practiceType) async {
     try {
-      final today = DateTime.now().toUtc();
-      final todayDate = DateTime(today.year, today.month, today.day);
-      final todayDateString = todayDate.toIso8601String().split('T')[0];
+      final todayDateString = _todayIraqDateString();
 
       final response = await _supabase
           .from('daily_practice_limits')
@@ -50,10 +68,8 @@ class DailyLimitService {
   Future<bool> recordPracticeCompletion(
       String studentId, String practiceType, {String? attemptId}) async {
     try {
-      final today = DateTime.now().toUtc();
-      final todayDate = DateTime(today.year, today.month, today.day);
-      final todayDateString = todayDate.toIso8601String().split('T')[0];
-      final now = DateTime.now().toIso8601String();
+      final todayDateString = _todayIraqDateString();
+      final now = _nowUtc().toIso8601String();
 
       print('🔄 Recording practice completion: type=$practiceType, studentId=$studentId, date=$todayDateString');
 
@@ -131,9 +147,7 @@ class DailyLimitService {
   /// Returns map with keys: quiz_completed, video_completed, reading_completed
   Future<Map<String, bool>> getDailyLimitStatus(String studentId) async {
     try {
-      final today = DateTime.now().toUtc();
-      final todayDate = DateTime(today.year, today.month, today.day);
-      final todayDateString = todayDate.toIso8601String().split('T')[0];
+      final todayDateString = _todayIraqDateString();
 
       final response = await _supabase
           .from('daily_practice_limits')
@@ -165,11 +179,11 @@ class DailyLimitService {
     }
   }
 
-  /// Calculate time until daily reset (midnight UTC)
+  /// Calculate time until daily reset (midnight Iraq time, Asia/Baghdad).
   Duration getTimeUntilReset() {
-    final now = DateTime.now().toUtc();
-    final tomorrow = DateTime(now.year, now.month, now.day + 1);
-    return tomorrow.difference(now);
+    final nowIraq = _nowIraqAsUtc();
+    final nextMidnightIraq = DateTime.utc(nowIraq.year, nowIraq.month, nowIraq.day + 1);
+    return nextMidnightIraq.difference(nowIraq);
   }
 
   /// Get time until reset as a formatted string (e.g., "5h 23m")

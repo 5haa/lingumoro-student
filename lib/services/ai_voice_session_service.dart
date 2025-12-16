@@ -3,6 +3,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AIVoiceSessionService {
   final _supabase = Supabase.instance.client;
 
+  // Iraq uses Asia/Baghdad (UTC+3). We approximate with a fixed +3h offset.
+  // This matches the DB-side enforcement we use for daily_practice_limits.
+  static const Duration _iraqOffset = Duration(hours: 3);
+
+  DateTime _nowUtc() => DateTime.now().toUtc();
+
+  /// Returns UTC boundaries (start inclusive, end exclusive) for the current Iraq day.
+  ({DateTime startUtc, DateTime endUtc}) _iraqDayWindowUtc() {
+    final iraqNow = _nowUtc().add(_iraqOffset);
+    // Iraq midnight expressed as UTC date (needs subtracting offset to become real UTC boundary).
+    final iraqMidnightAsUtc = DateTime.utc(iraqNow.year, iraqNow.month, iraqNow.day);
+    final startUtc = iraqMidnightAsUtc.subtract(_iraqOffset);
+    final endUtc = startUtc.add(const Duration(days: 1));
+    return (startUtc: startUtc, endUtc: endUtc);
+  }
+
   /// Check if student can start a new voice session
   /// Returns a map with: canStart (bool), remainingSessions (int), reason (String)
   Future<Map<String, dynamic>> canStartSession(String studentId) async {
@@ -30,17 +46,15 @@ class AIVoiceSessionService {
 
       // Get today's sessions (count active ones too, so users can't start new sessions
       // while a previous one is still finalizing/ending).
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      final window = _iraqDayWindowUtc();
 
       final sessionsResponse = await _supabase
           .from('ai_voice_sessions')
           .select()
           .eq('student_id', studentId)
           .inFilter('status', ['completed', 'active'])
-          .gte('started_at', startOfDay.toUtc().toIso8601String())
-          .lte('started_at', endOfDay.toUtc().toIso8601String());
+          .gte('started_at', window.startUtc.toIso8601String())
+          .lt('started_at', window.endUtc.toIso8601String());
 
       final sessionCount = (sessionsResponse as List).length;
       final remainingSessions = maxSessions - sessionCount;
@@ -214,17 +228,15 @@ class AIVoiceSessionService {
   /// Get today's session stats
   Future<Map<String, dynamic>> getTodayStats(String studentId) async {
     try {
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      final window = _iraqDayWindowUtc();
 
       final sessionsResponse = await _supabase
           .from('ai_voice_sessions')
           .select()
           .eq('student_id', studentId)
           .eq('status', 'completed')
-          .gte('started_at', startOfDay.toUtc().toIso8601String())
-          .lte('started_at', endOfDay.toUtc().toIso8601String());
+          .gte('started_at', window.startUtc.toIso8601String())
+          .lt('started_at', window.endUtc.toIso8601String());
 
       final sessions = sessionsResponse as List;
       final totalSessions = sessions.length;
