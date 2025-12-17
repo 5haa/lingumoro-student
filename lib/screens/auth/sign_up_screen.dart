@@ -5,6 +5,7 @@ import 'package:student/services/province_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_text_field.dart';
 import 'package:student/l10n/app_localizations.dart';
+import 'package:student/utils/error_helper.dart';
 import 'otp_verification_screen.dart';
 
 class SignUpContent extends StatefulWidget {
@@ -193,7 +194,7 @@ class _SignUpContentState extends State<SignUpContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context).signupFailed}: ${e.toString()}'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: AppColors.primary,
           ),
         );

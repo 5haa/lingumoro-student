@@ -5,6 +5,7 @@ import 'package:student/config/app_colors.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_back_button.dart';
+import 'package:student/utils/error_helper.dart';
 import 'reset_password_screen.dart';
 import '../main_navigation.dart';
 import '../../l10n/app_localizations.dart';
@@ -101,7 +102,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context).failedToResendCode} ${e.toString()}'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -162,7 +163,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context).verificationFailed} ${e.toString()}'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: AppColors.primary,
           ),
         );

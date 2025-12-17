@@ -11,6 +11,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_back_button.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/error_helper.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> profile;
@@ -130,7 +131,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         setState(() => _isUploadingPhoto = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context).failedToUploadPhoto} $e'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: Colors.red,
           ),
         );
@@ -159,7 +160,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context).failedToSetMainPhoto} $e'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: Colors.red,
           ),
         );
@@ -190,7 +191,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context).failedToDeletePhoto} $e'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: Colors.red,
           ),
         );
@@ -222,7 +223,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context).failedToUpdateProfile} $e'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: Colors.red,
           ),
         );

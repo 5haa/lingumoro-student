@@ -4,6 +4,7 @@ import 'package:student/services/auth_service.dart';
 import 'package:student/widgets/custom_button.dart';
 import 'package:student/widgets/custom_back_button.dart';
 import 'package:student/l10n/app_localizations.dart';
+import 'package:student/utils/error_helper.dart';
 import 'otp_verification_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -61,10 +62,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${l10n.failedToSendCode}: ${e.toString()}'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: AppColors.primary,
           ),
         );

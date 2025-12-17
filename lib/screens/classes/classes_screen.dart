@@ -11,6 +11,7 @@ import '../../services/preload_service.dart';
 import '../chat/chat_conversation_screen.dart';
 import '../teachers/teacher_detail_screen.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/error_helper.dart';
 
 class ClassesScreen extends StatefulWidget {
   const ClassesScreen({Key? key}) : super(key: key);
@@ -212,7 +213,7 @@ class _ClassesScreenState extends State<ClassesScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalizations.of(context).errorLoadingSessions} $e'),
+            content: Text(ErrorHelper.getUserFriendlyError(e)),
             backgroundColor: AppColors.primary,
           ),
         );
