@@ -147,6 +147,11 @@ class PreloadService {
     if (!context.mounted) return;
     
     try {
+      // Ensure we're past the first frame. Calling precacheImage too early (e.g. from initState)
+      // can crash because it may try to read MediaQuery/other inherited widgets.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!context.mounted) return;
+
       final List<Future> imageFutures = [];
       print('🖼️ Starting image precaching...');
       

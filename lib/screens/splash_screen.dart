@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/screens/auth/auth_screen.dart';
 import 'package:student/screens/main_navigation.dart';
-import 'package:student/screens/onboarding_screen.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/firebase_notification_service.dart';
 import 'package:student/services/preload_service.dart';
@@ -23,7 +21,12 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-    _checkAuthStatus();
+    // Run after first frame so InheritedWidgets (e.g. MediaQuery) are available
+    // for any preload work that depends on context.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _checkAuthStatus();
+    });
   }
   
   @override
@@ -38,23 +41,6 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkAuthStatus() async {
     // Start with minimum splash duration and preloading in parallel
     final minimumSplashDuration = Future.delayed(const Duration(seconds: 3));
-    
-    // Check if onboarding has been completed
-    final prefs = await SharedPreferences.getInstance();
-    final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
-
-    // If onboarding not completed, show onboarding screen
-    if (!onboardingCompleted) {
-      await minimumSplashDuration; // Wait for minimum splash time
-      if (!mounted) return;
-      
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const OnboardingScreen(),
-        ),
-      );
-      return;
-    }
 
     // Check authentication status
     final session = Supabase.instance.client.auth.currentSession;
@@ -160,27 +146,14 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Logo
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Image.asset(
-                'assets/images/logo.jpg',
-                width: 280,
-                height: 280,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Loading indicator
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              strokeWidth: 3,
-            ),
-          ],
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/splash.jpg'),
+            fit: BoxFit.cover,
+          ),
         ),
       ),
     );

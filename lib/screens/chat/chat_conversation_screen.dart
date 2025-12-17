@@ -307,6 +307,29 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
     }
   }
 
+  Future<void> _refreshMessages() async {
+    if (_isLoading) return;
+
+    final shouldStayAtBottom = _scrollController.hasClients && _scrollController.offset < 50;
+
+    if (mounted) {
+      setState(() {
+        _hasMoreMessages = true;
+        _isLoadingMore = false;
+      });
+    }
+
+    // Force a fresh fetch instead of showing stale cached messages
+    _preloadService.invalidateMessages(widget.conversationId);
+
+    await _loadMessages();
+    await _markMessagesAsRead();
+
+    if (shouldStayAtBottom) {
+      _scrollToBottom(animate: false);
+    }
+  }
+
   Future<void> _loadMoreMessages() async {
     if (_isLoadingMore || !_hasMoreMessages) return;
     
@@ -1041,102 +1064,123 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
 
             // Messages
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                  : _messages.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+              child: RefreshIndicator(
+                onRefresh: _refreshMessages,
+                color: AppColors.primary,
+                triggerMode: RefreshIndicatorTriggerMode.anywhere,
+                child: _isLoading && _messages.isEmpty
+                    ? ListView(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          SizedBox(height: 120),
+                          Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                        ],
+                      )
+                    : _messages.isEmpty
+                        ? ListView(
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
                             children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  color: AppColors.grey.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  FontAwesomeIcons.comment,
-                                  size: 40,
-                                  color: AppColors.grey.withOpacity(0.3),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              Text(
-                                'No messages yet',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textSecondary.withOpacity(0.6),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Start the conversation',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textSecondary.withOpacity(0.5),
+                              const SizedBox(height: 80),
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.grey.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        FontAwesomeIcons.comment,
+                                        size: 40,
+                                        color: AppColors.grey.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Text(
+                                      'No messages yet',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textSecondary.withOpacity(0.6),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Start the conversation',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: AppColors.textSecondary.withOpacity(0.5),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
-                          ),
-                        )
-                      : ListView.builder(
-                          reverse: true, // Latest messages at bottom
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _messages.length + (_isLoadingMore ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            // Show loading indicator at the end (top when reversed)
-                            if (index == _messages.length) {
-                              return const Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                          )
+                        : ListView.builder(
+                            reverse: true, // Latest messages at bottom
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _messages.length + (_isLoadingMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              // Show loading indicator at the end (top when reversed)
+                              if (index == _messages.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              );
-                            }
-                            
-                            // Reverse index since list is reversed
-                            final reversedIndex = _messages.length - 1 - index;
-                            final message = _messages[reversedIndex];
-                            final isMe = message['sender_id'] == _currentUserId;
-                            final showDateSeparator = _shouldShowDateSeparator(reversedIndex);
+                                );
+                              }
 
-                            return Column(
-                              children: [
-                                if (showDateSeparator)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[300],
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        _formatMessageDate(message['created_at']),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[700],
+                              // Reverse index since list is reversed
+                              final reversedIndex = _messages.length - 1 - index;
+                              final message = _messages[reversedIndex];
+                              final isMe = message['sender_id'] == _currentUserId;
+                              final showDateSeparator = _shouldShowDateSeparator(reversedIndex);
+
+                              return Column(
+                                children: [
+                                  if (showDateSeparator)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          _formatMessageDate(message['created_at']),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[700],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                _buildMessageBubble(message, isMe),
-                              ],
-                            );
-                          },
-                        ),
+                                  _buildMessageBubble(message, isMe),
+                                ],
+                              );
+                            },
+                          ),
+              ),
             ),
 
             // Selected File Preview

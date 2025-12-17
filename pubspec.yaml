@@ -119,6 +119,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_native_splash: ^2.4.4
 
 # Fix for record_linux compatibility
 dependency_overrides:
@@ -152,3 +153,11 @@ flutter:
     - family: Arabic
       fonts:
         - asset: assets/fonts/arabic.ttf
+
+# Native splash (Android/iOS) shown before the first Flutter frame
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/images/splash.jpg
+  android_12:
+    color: "#FFFFFF"
+    image: assets/images/splash.jpg
