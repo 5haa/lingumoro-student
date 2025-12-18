@@ -61,6 +61,19 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   final PointsNotificationService _pointsNotificationService = PointsNotificationService();
   final ProSubscriptionService _proService = ProSubscriptionService();
 
+  // Force AI/TTS playback to use the normal/media audio mode (not "in-call").
+  // This prevents very-low/unhearable playback when the recorder puts Android
+  // into communication mode (different volume stream).
+  late final AudioContext _ttsAudioContext = AudioContext(
+    android: const AudioContextAndroid(
+      audioMode: AndroidAudioMode.normal,
+      contentType: AndroidContentType.speech,
+      usageType: AndroidUsageType.media,
+      audioFocus: AndroidAudioFocus.gain,
+      isSpeakerphoneOn: true,
+    ),
+  );
+
   final RecordConfig _recordConfig = const RecordConfig(
     encoder: AudioEncoder.pcm16bits,
     sampleRate: 16000,
@@ -73,7 +86,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     androidConfig: AndroidRecordConfig(
       audioSource: AndroidAudioSource.voiceCommunication,
       speakerphone: true,
-      audioManagerMode: AudioManagerMode.modeInCommunication,
+      // Using "in communication" can route playback to the call volume stream,
+      // which is often much lower than media volume. Keep this on normal.
+      audioManagerMode: AudioManagerMode.modeNormal,
     ),
   );
 
@@ -965,7 +980,11 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     await _pauseRecordingForPlayback();
     try {
       await _player.stop();
-      await _player.play(BytesSource(Uint8List.fromList(audioBytes)));
+      await _player.play(
+        BytesSource(Uint8List.fromList(audioBytes)),
+        volume: 1.0,
+        ctx: _ttsAudioContext,
+      );
       try {
         await _player.onPlayerComplete.first
             .timeout(const Duration(minutes: 1));

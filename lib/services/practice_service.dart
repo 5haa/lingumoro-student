@@ -113,12 +113,14 @@ class PracticeService {
     }
 
     // Unlocks by level
-    final unlockedByLevel = <int, bool>{1: true};
-    for (int level = 2; level <= 4; level++) {
-      final prev = progressByLevel[level - 1] ??
-          const VideoLevelProgressSummary(total: 0, completed: 0);
-      unlockedByLevel[level] = prev.total > 0 && prev.completed >= prev.total;
-    }
+    // All levels are now unlocked by default - students can access
+    // the first video of any level immediately
+    final unlockedByLevel = <int, bool>{
+      1: true,
+      2: true,
+      3: true,
+      4: true,
+    };
 
     return VideoGlobalProgress(
       progressByLevel: progressByLevel,

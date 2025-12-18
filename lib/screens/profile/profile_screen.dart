@@ -238,16 +238,16 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
             
             // Content
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadProfile,
-                color: AppColors.primary,
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                        ),
-                      )
-                    : SingleChildScrollView(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadProfile,
+                      color: AppColors.primary,
+                      child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.all(20),
                         child: Column(
@@ -328,7 +328,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
                         ],
                       ),
                     ),
-              ),
+                  ),
             ),
           ],
         ),

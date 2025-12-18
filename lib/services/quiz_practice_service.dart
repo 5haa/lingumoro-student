@@ -123,18 +123,15 @@ class QuizPracticeService {
           QuizLevelProgressSummary(total: total, completed: completed);
     }
 
-    // Compute unlocks by level (Level 1 always unlocked)
-    final unlockedByLevel = <int, bool>{1: true};
-    for (int level = 2; level <= 4; level++) {
-      final prev = progressByLevel[level - 1];
-      if (prev == null) {
-        unlockedByLevel[level] = false;
-        continue;
-      }
-      // If previous level has no quizzes, keep locked.
-      unlockedByLevel[level] =
-          prev.total > 0 && prev.completed >= prev.total;
-    }
+    // Compute unlocks by level
+    // All levels are now unlocked by default - students can access
+    // the first quiz of any level immediately
+    final unlockedByLevel = <int, bool>{
+      1: true,
+      2: true,
+      3: true,
+      4: true,
+    };
 
     return QuizGlobalProgress(
       progressByLevel: progressByLevel,

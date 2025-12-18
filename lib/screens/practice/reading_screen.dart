@@ -399,48 +399,68 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   Widget _buildDailyLimitCard(AppLocalizations l10n) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _canReadToday ? Colors.green.shade50 : Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _canReadToday ? Colors.green.shade200 : Colors.red.shade200,
+        gradient: LinearGradient(
+          colors: _canReadToday
+              ? [Color(0xFF10B981), Color(0xFF059669)]
+              : [Color(0xFFEF4444), Color(0xFFDC2626)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _canReadToday ? Icons.check_circle : Icons.timer,
-            color: _canReadToday ? Colors.green.shade700 : Colors.red.shade700,
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _canReadToday ? 'Reading Available Today' : 'Daily Limit Reached',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: _canReadToday ? Colors.green.shade900 : Colors.red.shade900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _canReadToday
-                      ? 'You can complete 1 reading today'
-                      : 'Resets in $_timeUntilReset',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: _canReadToday ? Colors.green.shade700 : Colors.red.shade700,
-                  ),
-                ),
-              ],
-            ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: (_canReadToday ? Colors.green : Colors.red).withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _canReadToday ? Icons.check_circle_rounded : Icons.schedule_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _canReadToday ? 'Reading Available' : 'Daily Limit',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _canReadToday
+                        ? '1 reading today'
+                        : 'Resets in $_timeUntilReset',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.9),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -457,64 +477,100 @@ class _ReadingScreenState extends State<ReadingScreen> {
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 12),
-        Row(
+        const SizedBox(height: 10),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 2.8,
           children: DifficultyLevel.values.map((level) {
             final isSelected = level.value == _selectedDifficulty;
             final isLocked = _unlockedByLevel[level.value] != true && level.value != 1;
             
-            return Expanded(
-              child: GestureDetector(
-                onTap: isLocked ? null : () => _onDifficultyChanged(level.value),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
+            return GestureDetector(
+              onTap: isLocked ? null : () => _onDifficultyChanged(level.value),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: isLocked
+                      ? LinearGradient(
+                          colors: [Colors.grey.shade200, Colors.grey.shade300],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : isSelected
+                          ? LinearGradient(
+                              colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                  color: isSelected ? null : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
                     color: isLocked
-                        ? Colors.grey.shade100
-                        : (isSelected ? AppColors.primary : Colors.white),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isLocked
-                          ? Colors.grey.shade300
-                          : (isSelected ? AppColors.primary : AppColors.border),
-                      width: 2,
-                    ),
+                        ? Colors.grey.shade400
+                        : (isSelected ? AppColors.primary : AppColors.border),
+                    width: isSelected ? 2 : 1.5,
                   ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${level.value}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isLocked
-                              ? Colors.grey.shade500
-                              : (isSelected ? Colors.white : AppColors.textPrimary),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (isLocked) ...[
-                            Icon(Icons.lock, size: 12, color: Colors.grey.shade500),
-                            const SizedBox(width: 4),
-                          ],
-                          Flexible(
-                            child: Text(
-                              level.label,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isLocked
-                                    ? Colors.grey.shade500
-                                    : (isSelected ? Colors.white : AppColors.textSecondary),
-                              ),
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.25),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ]
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
                           ),
                         ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: isLocked
+                              ? Colors.grey.shade400
+                              : (isSelected ? Colors.white.withOpacity(0.2) : AppColors.primary.withOpacity(0.1)),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: isLocked
+                              ? Icon(Icons.lock, size: 14, color: Colors.grey.shade600)
+                              : Text(
+                                  '${level.value}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected ? Colors.white : AppColors.primary,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          level.label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isLocked
+                                ? Colors.grey.shade600
+                                : (isSelected ? Colors.white : AppColors.textPrimary),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
