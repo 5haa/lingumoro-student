@@ -4,6 +4,7 @@ import 'package:student/services/reading_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/daily_limit_service.dart';
+import 'package:student/services/preload_service.dart';
 import 'package:student/models/difficulty_level.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/screens/practice/reading_detail_screen.dart';
@@ -22,6 +23,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
   final _authService = AuthService();
   final _proService = ProSubscriptionService();
   final _dailyLimitService = DailyLimitService();
+  final _preloadService = PreloadService();
   
   bool _isLoading = true;
   bool _isLevelLoading = false;
@@ -36,6 +38,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
   ReadingGlobalProgress? _globalProgress;
   final Map<int, List<Map<String, dynamic>>> _readingsByLevelCache = {};
   int _difficultyLoadSeq = 0;
+  bool _didChange = false;
 
   @override
   void initState() {
@@ -84,8 +87,45 @@ class _ReadingScreenState extends State<ReadingScreen> {
       return;
     }
 
-    // If valid, load data
+    // If valid, hydrate from cache for instant UI, then refresh from network.
+    _tryHydrateFromCache(studentId);
     _loadData();
+  }
+
+  void _tryHydrateFromCache(String studentId) {
+    final cachedGlobal = _preloadService.getReadingGlobalProgressCached(studentId);
+    if (cachedGlobal != null) {
+      final progressByLevel = <int, Map<String, dynamic>>{};
+      for (int level = 1; level <= 4; level++) {
+        final summary = cachedGlobal.progressByLevel[level] ??
+            const ReadingLevelProgressSummary(total: 0, completed: 0);
+        progressByLevel[level] = {
+          'total': summary.total,
+          'completed': summary.completed,
+          'percentage': summary.percentage,
+        };
+      }
+      setState(() {
+        _globalProgress = cachedGlobal;
+        _progressByLevel = progressByLevel;
+        _unlockedByLevel = {
+          1: true,
+          2: cachedGlobal.unlockedByLevel[2] == true,
+          3: cachedGlobal.unlockedByLevel[3] == true,
+          4: cachedGlobal.unlockedByLevel[4] == true,
+        };
+      });
+    }
+
+    final cachedLevel =
+        _preloadService.getReadingsLevelCached(studentId, _selectedDifficulty);
+    if (cachedLevel != null) {
+      _readingsByLevelCache[_selectedDifficulty] = cachedLevel;
+      setState(() {
+        _currentLevelReadings = cachedLevel;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -95,8 +135,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
     setState(() => _isLoading = true);
 
     try {
-      _readingsByLevelCache.clear();
-      _globalProgress = null;
+      // Do NOT clear caches here. We cache across visits and only invalidate on completion.
 
       await _loadGlobalProgress(studentId);
 
@@ -125,6 +164,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   Future<void> _loadGlobalProgress(String studentId) async {
     final global = await _readingService.getReadingGlobalProgress(studentId);
+    _preloadService.cacheReadingGlobalProgress(studentId, global);
 
     final progressByLevel = <int, Map<String, dynamic>>{};
     for (int level = 1; level <= 4; level++) {
@@ -165,6 +205,15 @@ class _ReadingScreenState extends State<ReadingScreen> {
       return _readingsByLevelCache[level]!;
     }
 
+    final studentId = _authService.currentUser?.id;
+    if (!force && studentId != null) {
+      final cached = _preloadService.getReadingsLevelCached(studentId, level);
+      if (cached != null) {
+        _readingsByLevelCache[level] = cached;
+        return cached;
+      }
+    }
+
     final readings = await _readingService.getReadingsByDifficulty(level);
 
     final global = _globalProgress;
@@ -181,6 +230,9 @@ class _ReadingScreenState extends State<ReadingScreen> {
     _progressMap = progressMap;
 
     _readingsByLevelCache[level] = decorated;
+    if (studentId != null) {
+      _preloadService.cacheReadingsLevel(studentId, level, decorated);
+    }
     return decorated;
   }
 
@@ -250,6 +302,9 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
     // Reload if reading was completed
     if (result == true) {
+      _didChange = true;
+      _preloadService.invalidateReadingCache();
+      _preloadService.invalidatePractice();
       _loadData();
     }
   }
@@ -274,7 +329,12 @@ class _ReadingScreenState extends State<ReadingScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, _didChange);
+        return false;
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
@@ -314,7 +374,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildTopBar(AppLocalizations l10n) {
@@ -322,7 +382,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          const CustomBackButton(),
+          CustomBackButton(onPressed: () => Navigator.pop(context, _didChange)),
           Expanded(
             child: Center(
               child: Text(

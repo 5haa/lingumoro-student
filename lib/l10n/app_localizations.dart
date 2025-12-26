@@ -450,6 +450,8 @@ abstract class AppLocalizations {
   String get notConnected;
   String get preparingVoiceSession;
   String get listening;
+  String get holdToSpeak;
+  String get releaseToSend;
   String get pleaseLoginToUseAI;
   String get microphonePermissionRequired;
   String get failedToStartSession;

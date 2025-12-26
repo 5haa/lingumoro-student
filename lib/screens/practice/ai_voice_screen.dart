@@ -116,6 +116,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   double _soundLevel = 0.0;
   Timer? _amplitudeTimer;
   bool _isChatExpanded = false;
+  bool _isHoldingToTalk = false;
 
   // Voice Settings
   String _selectedVoice = VoiceAIConfig.defaultVoice;
@@ -137,6 +138,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   bool _isLoadingSession = true;
   bool _isExiting = false;
   bool _isStopping = false;
+  bool _didChange = false;
   
   // Points and stats
   Map<String, dynamic> _todayStats = {};
@@ -751,6 +753,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
       _currentSessionId = sessionId;
       _startSessionTimer();
+      _didChange = true;
 
       // WebSocket URL - Connect to aiagent server
       const String wsUrl = VoiceAIConfig.wsUrl;
@@ -972,12 +975,79 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       _status = AppStatus.listening;
       _statusMessage = AppLocalizations.of(context).listening;
     });
-    unawaited(_startRecorderStream());
+  }
+
+  bool get _canHoldToTalk {
+    return _channel != null &&
+        _status != AppStatus.disconnected &&
+        _sessionReady &&
+        !_isWarmingUp &&
+        !_isStopping &&
+        !_isExiting &&
+        !_isPlayingTts;
+  }
+
+  Future<void> _startHoldToTalk() async {
+    if (!_canHoldToTalk || _isHoldingToTalk) return;
+    setState(() {
+      _isHoldingToTalk = true;
+    });
+
+    try {
+      _channel?.sink.add(jsonEncode({"type": "utt_start"}));
+    } catch (e) {
+      debugPrint("Failed to send utt_start: $e");
+    }
+
+    // Start streaming mic audio only while the user is holding.
+    _allowRecorderRestart = true;
+    await _startRecorderStream();
+  }
+
+  Future<void> _stopHoldRecordingOnly() async {
+    _amplitudeTimer?.cancel();
+    await _recorderSubscription?.cancel();
+    _recorderSubscription = null;
+    try {
+      await _audioRecorder.stop();
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _soundLevel = 0.0);
+    } else {
+      _soundLevel = 0.0;
+    }
+  }
+
+  Future<void> _endHoldToTalk({required bool cancelled}) async {
+    if (!_isHoldingToTalk) return;
+    setState(() {
+      _isHoldingToTalk = false;
+    });
+
+    // Stop mic streaming first (no more bytes after release).
+    await _stopHoldRecordingOnly();
+
+    if (cancelled) return;
+    try {
+      _channel?.sink.add(jsonEncode({"type": "utt_end"}));
+    } catch (e) {
+      debugPrint("Failed to send utt_end: $e");
+    }
   }
 
   Future<void> _playAudio(List<int> audioBytes) async {
     if (audioBytes.isEmpty) return;
-    await _pauseRecordingForPlayback();
+    // Ensure no mic streaming occurs during TTS playback.
+    if (_isHoldingToTalk) {
+      await _endHoldToTalk(cancelled: true);
+    } else {
+      await _stopHoldRecordingOnly();
+    }
+    if (mounted) {
+      setState(() => _isPlayingTts = true);
+    } else {
+      _isPlayingTts = true;
+    }
     try {
       await _player.stop();
       await _player.play(
@@ -994,7 +1064,13 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     } catch (e) {
       debugPrint("Error playing audio: $e");
     } finally {
-      await _resumeRecordingAfterPlayback();
+      // Push-to-talk: do NOT auto-resume recording after playback.
+      if (mounted) {
+        setState(() => _isPlayingTts = false);
+      } else {
+        _isPlayingTts = false;
+      }
+      _allowRecorderRestart = true;
     }
   }
 
@@ -1116,34 +1192,91 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                   ),
                 ),
 
-                // Single Toggle Button for Start/Stop
+                // Controls
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-                  child: ElevatedButton(
-                    onPressed: (_isLoadingSession || _isStopping)
-                        ? null
-                        : (_status == AppStatus.disconnected ? _startConversation : _stopSessionFast),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor: _status == AppStatus.disconnected ? Colors.black : Colors.white,
-                      foregroundColor: _status == AppStatus.disconnected ? Colors.white : Colors.black,
-                      elevation: 0,
-                      side: _status == AppStatus.disconnected
-                          ? null
-                          : const BorderSide(color: Colors.black12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: Text(
-                      _isStopping
-                          ? AppLocalizations.of(context).loading
-                          : _status == AppStatus.disconnected
-                          ? AppLocalizations.of(context).start
-                          : AppLocalizations.of(context).stop,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: _status == AppStatus.disconnected
+                      ? SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: (_isLoadingSession || _isStopping) ? null : _startConversation,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            child: Text(
+                              _isStopping
+                                  ? AppLocalizations.of(context).loading
+                                  : AppLocalizations.of(context).start,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            // Hold-to-speak primary control
+                            Opacity(
+                              opacity: _canHoldToTalk ? 1.0 : 0.55,
+                              child: GestureDetector(
+                                onTapDown: (_) => unawaited(_startHoldToTalk()),
+                                onTapUp: (_) => unawaited(_endHoldToTalk(cancelled: false)),
+                                onTapCancel: () => unawaited(_endHoldToTalk(cancelled: true)),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 120),
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  decoration: BoxDecoration(
+                                    color: _isHoldingToTalk ? Colors.redAccent : Colors.black,
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _isHoldingToTalk
+                                          ? AppLocalizations.of(context).releaseToSend
+                                          : AppLocalizations.of(context).holdToSpeak,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            // Stop session
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: (_isStopping || _isExiting) ? null : _stopSessionFast,
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  side: const BorderSide(color: Colors.black12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                ),
+                                child: Text(
+                                  AppLocalizations.of(context).stop,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
 
                 // Integrated Chat Area (preview: last 2 messages)
@@ -1447,7 +1580,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       await _exitAndPersistSession();
       return;
     }
-    if (mounted) Navigator.of(context).pop();
+    if (mounted) Navigator.of(context).pop(_didChange);
   }
 
   Future<void> _exitAndPersistSession() async {
@@ -1461,11 +1594,14 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       showCompletionDialog: false,
       isDisposing: true,
     ));
-    if (mounted) Navigator.of(context).pop();
+    if (mounted) Navigator.of(context).pop(_didChange);
   }
 
   Future<void> _startRecorderStream() async {
-    if (!_allowRecorderRestart || _isStartingRecorder || !_sessionReady) {
+    if (!_allowRecorderRestart ||
+        _isStartingRecorder ||
+        !_sessionReady ||
+        !_isHoldingToTalk) {
       return;
     }
     _isStartingRecorder = true;
@@ -1476,6 +1612,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
         (Uint8List data) {
           if (_channel != null &&
               _status != AppStatus.disconnected &&
+              _isHoldingToTalk &&
               !_isPlayingTts) {
             _channel!.sink.add(data);
           }
@@ -1515,13 +1652,14 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
   void _handleRecorderStreamClosed() {
     _recorderSubscription = null;
+    if (!_isHoldingToTalk) return;
     _scheduleRecorderRestart();
   }
 
   void _scheduleRecorderRestart() {
-    if (!_allowRecorderRestart || _isStartingRecorder) return;
+    if (!_allowRecorderRestart || _isStartingRecorder || !_isHoldingToTalk) return;
     Future.delayed(const Duration(milliseconds: 200), () {
-      if (_allowRecorderRestart && !_isStartingRecorder) {
+      if (_allowRecorderRestart && !_isStartingRecorder && _isHoldingToTalk) {
         _startRecorderStream();
       }
     });
@@ -1562,7 +1700,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
   Future<void> _resumeRecordingAfterPlayback() async {
     _isPlayingTts = false;
-    if (_status == AppStatus.disconnected || !_sessionReady) return;
+    if (_status == AppStatus.disconnected || !_sessionReady || !_isHoldingToTalk) return;
     _allowRecorderRestart = true;
     await _startRecorderStream();
   }

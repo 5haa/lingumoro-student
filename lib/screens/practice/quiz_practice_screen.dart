@@ -6,6 +6,7 @@ import 'package:student/services/quiz_practice_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/daily_limit_service.dart';
+import 'package:student/services/preload_service.dart';
 import 'package:student/models/quiz.dart';
 import 'package:student/models/difficulty_level.dart';
 import 'package:student/config/app_colors.dart';
@@ -25,6 +26,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   final _authService = AuthService();
   final _proService = ProSubscriptionService();
   final _dailyLimitService = DailyLimitService();
+  final _preloadService = PreloadService();
 
   bool _isLoading = true;
   bool _isLevelLoading = false;
@@ -42,6 +44,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   final Map<int, List<Quiz>> _quizzesByLevelCache = {};
   QuizGlobalProgress? _globalProgress;
   int _difficultyLoadSeq = 0;
+  bool _didChange = false;
 
   @override
   void initState() {
@@ -97,8 +100,48 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       return;
     }
 
-    // If valid, load data
+    // If valid, hydrate from cache for instant UI, then refresh from network.
+    _tryHydrateFromCache();
     _loadInitialData();
+  }
+
+  void _tryHydrateFromCache() {
+    final studentId = _studentId;
+    if (studentId == null) return;
+
+    final cachedGlobal = _preloadService.getQuizGlobalProgressCached(studentId);
+    if (cachedGlobal != null) {
+      final progressByLevel = <int, Map<String, dynamic>>{};
+      for (int level = 1; level <= 4; level++) {
+        final summary = cachedGlobal.progressByLevel[level] ??
+            const QuizLevelProgressSummary(total: 0, completed: 0);
+        progressByLevel[level] = {
+          'total': summary.total,
+          'completed': summary.completed,
+          'percentage': summary.percentage,
+        };
+      }
+      setState(() {
+        _globalProgress = cachedGlobal;
+        _progressByLevel = progressByLevel;
+        _unlockedByLevel = {
+          1: true,
+          2: cachedGlobal.unlockedByLevel[2] == true,
+          3: cachedGlobal.unlockedByLevel[3] == true,
+          4: cachedGlobal.unlockedByLevel[4] == true,
+        };
+      });
+    }
+
+    final cachedLevel =
+        _preloadService.getQuizLevelCached(studentId, _selectedDifficulty);
+    if (cachedLevel != null) {
+      _quizzesByLevelCache[_selectedDifficulty] = cachedLevel;
+      setState(() {
+        _quizzes = cachedLevel;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -109,9 +152,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
     });
 
     try {
-      // Reset caches so unlock/progress reflect latest attempts
-      _quizzesByLevelCache.clear();
-      _globalProgress = null;
+      // Do NOT clear caches here. We cache across visits and only invalidate on completion.
 
       // Load global progress/unlocks (batched) first
       await _loadGlobalProgress();
@@ -141,6 +182,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
 
   Future<void> _loadGlobalProgress() async {
     final global = await _quizService.getQuizGlobalProgress(_studentId!);
+    _preloadService.cacheQuizGlobalProgress(_studentId!, global);
 
     final progressByLevel = <int, Map<String, dynamic>>{};
     for (int level = 1; level <= 4; level++) {
@@ -171,6 +213,14 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       return _quizzesByLevelCache[level]!;
     }
 
+    if (!force && _studentId != null) {
+      final cached = _preloadService.getQuizLevelCached(_studentId!, level);
+      if (cached != null) {
+        _quizzesByLevelCache[level] = cached;
+        return cached;
+      }
+    }
+
     final global = _globalProgress;
     final quizzes = global != null
         ? await _quizService.getQuizzesWithProgressUsingGlobal(
@@ -181,6 +231,9 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
         : await _quizService.getQuizzesWithProgress(_studentId!, level);
 
     _quizzesByLevelCache[level] = quizzes;
+    if (_studentId != null) {
+      _preloadService.cacheQuizLevel(_studentId!, level, quizzes);
+    }
     return quizzes;
   }
 
@@ -253,6 +306,9 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
 
     // Reload data after completing quiz
     if (result == true) {
+      _didChange = true;
+      _preloadService.invalidateQuizCache();
+      _preloadService.invalidatePractice();
       _loadInitialData();
     }
   }
@@ -277,46 +333,51 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(l10n),
-            
-            Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                      ),
-                    )
-                  : _errorMessage != null
-                      ? _buildErrorState()
-                      : RefreshIndicator(
-                          onRefresh: _loadInitialData,
-                          color: AppColors.primary,
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildHeader(l10n),
-                                const SizedBox(height: 20),
-                                _buildDailyLimitCard(l10n),
-                                const SizedBox(height: 20),
-                                _buildDifficultySelector(l10n),
-                                const SizedBox(height: 20),
-                                _buildProgressCard(l10n),
-                                const SizedBox(height: 20),
-                                _buildQuizzesList(l10n),
-                              ],
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, _didChange);
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(l10n),
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        ),
+                      )
+                    : _errorMessage != null
+                        ? _buildErrorState()
+                        : RefreshIndicator(
+                            onRefresh: _loadInitialData,
+                            color: AppColors.primary,
+                            child: SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildHeader(l10n),
+                                  const SizedBox(height: 20),
+                                  _buildDailyLimitCard(l10n),
+                                  const SizedBox(height: 20),
+                                  _buildDifficultySelector(l10n),
+                                  const SizedBox(height: 20),
+                                  _buildProgressCard(l10n),
+                                  const SizedBox(height: 20),
+                                  _buildQuizzesList(l10n),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -327,7 +388,7 @@ class _QuizPracticeScreenState extends State<QuizPracticeScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
-          const CustomBackButton(),
+          CustomBackButton(onPressed: () => Navigator.pop(context, _didChange)),
           Expanded(
             child: Center(
               child: Text(

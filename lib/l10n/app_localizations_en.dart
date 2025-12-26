@@ -812,6 +812,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get listening => '🎙️ Listening...';
   @override
+  String get holdToSpeak => 'Hold to speak';
+  @override
+  String get releaseToSend => 'Release to send';
+  @override
   String get pleaseLoginToUseAI => 'Please log in to use AI Voice Practice';
   @override
   String get microphonePermissionRequired => 'Microphone permission required';

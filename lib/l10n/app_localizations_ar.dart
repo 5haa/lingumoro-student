@@ -812,6 +812,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get listening => '🎙️ جاري الاستماع...';
   @override
+  String get holdToSpeak => 'اضغط مطولاً للتحدث';
+  @override
+  String get releaseToSend => 'حرر للإرسال';
+  @override
   String get pleaseLoginToUseAI => 'الرجاء تسجيل الدخول لاستخدام تمرين الصوت بالذكاء الاصطناعي';
   @override
   String get microphonePermissionRequired => 'إذن الميكروفون مطلوب';

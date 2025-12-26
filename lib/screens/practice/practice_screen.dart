@@ -143,12 +143,17 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
     _loadAllData();
   }
 
-  Future<void> _loadAllData() async {
+  Future<void> _loadAllData({bool showSpinner = true}) async {
     final l10n = AppLocalizations.of(context);
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        // If we already have data on screen, do a soft refresh without the spinner.
+        final hasAnyData =
+            _videos.isNotEmpty || _quizStats.isNotEmpty || _totalReadings > 0;
+        _isLoading = showSpinner && !hasAnyData;
+        _errorMessage = null;
+      });
+    }
 
     try {
       // Get current student ID
@@ -668,60 +673,69 @@ class _PracticeScreenState extends State<PracticeScreen> with AutomaticKeepAlive
   void _navigateToVoiceAI() async {
     if (await _checkProBeforeNavigation()) {
       if (!mounted) return;
-      Navigator.push(
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => const AIVoicePracticeScreen(),
         ),
-      ).then((_) {
+      );
+      if (!mounted) return;
+      if (result == true) {
         _preloadService.invalidatePractice();
-        _loadAllData();
-      });
+        // Soft refresh (avoid showing loading state if we already have cached data)
+        await _loadAllData(showSpinner: false);
+      }
     }
   }
 
   void _navigateToVideoPractice() async {
     if (await _checkProBeforeNavigation()) {
       if (!mounted) return;
-      Navigator.push(
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => const VideoPracticeListScreen(),
         ),
-      ).then((_) {
+      );
+      if (!mounted) return;
+      if (result == true) {
         _preloadService.invalidatePractice();
-        _loadAllData();
-      });
+        await _loadAllData(showSpinner: false);
+      }
     }
   }
 
   void _navigateToReading() async {
     if (await _checkProBeforeNavigation()) {
       if (!mounted) return;
-      Navigator.push(
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => const ReadingScreen(),
         ),
-      ).then((_) {
+      );
+      if (!mounted) return;
+      if (result == true) {
         _preloadService.invalidatePractice();
-        _loadAllData();
-      });
+        await _loadAllData(showSpinner: false);
+      }
     }
   }
 
   void _navigateToQuiz() async {
     if (await _checkProBeforeNavigation()) {
       if (!mounted) return;
-      Navigator.push(
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => const QuizPracticeScreen(),
         ),
-      ).then((_) {
+      );
+      if (!mounted) return;
+      if (result == true) {
         _preloadService.invalidatePractice();
-        _loadAllData();
-      });
+        await _loadAllData(showSpinner: false);
+      }
     }
   }
 
@@ -828,6 +842,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
   final _authService = AuthService();
   final _proService = ProSubscriptionService();
   final _dailyLimitService = DailyLimitService();
+  final _preloadService = PreloadService();
   
   List<Map<String, dynamic>> _currentLevelVideos = [];
   Map<String, bool> _watchedVideos = {};
@@ -899,9 +914,8 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
         _hasProSubscription = true;
       });
 
-      // Reset caches so unlock/progress is fresh after completions
-      _videosByLevelCache.clear();
-      _globalProgress = null;
+      // Hydrate from cache for instant UI, then refresh from network.
+      _tryHydrateFromCache(_studentId!);
 
       // Load global progress/unlocks once, then load selected level + daily limit
       await _loadGlobalProgress();
@@ -925,6 +939,7 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
 
   Future<void> _loadGlobalProgress() async {
     final global = await _practiceService.getVideoGlobalProgress(_studentId!);
+    _preloadService.cacheVideoGlobalProgress(_studentId!, global);
 
     final progressByLevel = <int, Map<String, dynamic>>{};
     for (int level = 1; level <= 4; level++) {
@@ -962,6 +977,14 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
       return _videosByLevelCache[level]!;
     }
 
+    if (!force && _studentId != null) {
+      final cached = _preloadService.getVideosLevelCached(_studentId!, level);
+      if (cached != null) {
+        _videosByLevelCache[level] = cached;
+        return cached;
+      }
+    }
+
     // NOTE: Practice videos are not language-filtered here, so pass null languageId.
     final videos = await _practiceService.getPracticeVideos(null, difficultyLevel: level);
 
@@ -979,7 +1002,45 @@ class _VideoPracticeListScreenState extends State<VideoPracticeListScreen> {
     _watchedVideos = watched;
 
     _videosByLevelCache[level] = decorated;
+    if (_studentId != null) {
+      _preloadService.cacheVideosLevel(_studentId!, level, decorated);
+    }
     return decorated;
+  }
+
+  void _tryHydrateFromCache(String studentId) {
+    final cachedGlobal = _preloadService.getVideoGlobalProgressCached(studentId);
+    if (cachedGlobal != null) {
+      final progressByLevel = <int, Map<String, dynamic>>{};
+      for (int level = 1; level <= 4; level++) {
+        final summary = cachedGlobal.progressByLevel[level] ??
+            const VideoLevelProgressSummary(total: 0, completed: 0);
+        progressByLevel[level] = {
+          'total': summary.total,
+          'completed': summary.completed,
+          'percentage': summary.percentage,
+        };
+      }
+      setState(() {
+        _globalProgress = cachedGlobal;
+        _progressByLevel = progressByLevel;
+        _unlockedByLevel = {
+          1: true,
+          2: cachedGlobal.unlockedByLevel[2] == true,
+          3: cachedGlobal.unlockedByLevel[3] == true,
+          4: cachedGlobal.unlockedByLevel[4] == true,
+        };
+      });
+    }
+
+    final cachedLevel = _preloadService.getVideosLevelCached(studentId, _selectedDifficulty);
+    if (cachedLevel != null) {
+      _videosByLevelCache[_selectedDifficulty] = cachedLevel;
+      setState(() {
+        _currentLevelVideos = cachedLevel;
+        _isLoading = false;
+      });
+    }
   }
 
   void _onDifficultyChanged(int level) async {
@@ -2032,6 +2093,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late YoutubePlayerController _controller;
   final _practiceService = PracticeService();
   final _pointsNotificationService = PointsNotificationService();
+  final PreloadService _preloadService = PreloadService();
   bool _hasMarkedAsWatched = false;
   bool _didCompleteVideo = false;
   bool _isExitingScreen = false;
@@ -2148,6 +2210,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       
       if (mounted) {
         _didCompleteVideo = true;
+        // Invalidate caches so parent Practice/Video screens can refresh quickly (without forced reloads everywhere).
+        _preloadService.invalidateVideoCache();
+        _preloadService.invalidatePractice();
         // Show points notification using the new service
         _pointsNotificationService.showPointsEarnedNotification(
           context: context,

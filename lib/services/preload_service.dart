@@ -12,8 +12,10 @@ import 'package:student/services/chat_service.dart';
 import 'package:student/services/session_service.dart';
 import 'package:student/services/practice_service.dart';
 import 'package:student/services/quiz_practice_service.dart';
+import 'package:student/services/reading_service.dart';
 import 'package:student/services/ai_story_service.dart';
 import 'package:student/services/rating_service.dart';
+import 'package:student/models/quiz.dart';
 
 /// Helper class to cache teachers data with timestamp and ratings
 class _CachedTeachers {
@@ -44,6 +46,7 @@ class PreloadService {
   final _sessionService = SessionService();
   final _practiceService = PracticeService();
   final _quizService = QuizPracticeService();
+  final _readingService = ReadingService();
   final _aiStoryService = AIStoryService();
   final _ratingService = RatingService();
 
@@ -85,6 +88,24 @@ class PreloadService {
   int? _completedReadings;
   int? _totalReadings;
   DateTime? _practiceTimestamp;
+
+  // Cached data - Quiz Practice (per student)
+  String? _quizCacheStudentId;
+  QuizGlobalProgress? _quizGlobalProgress;
+  final Map<int, List<Quiz>> _quizByLevelCache = {};
+  DateTime? _quizCacheTimestamp;
+
+  // Cached data - Reading Practice (per student)
+  String? _readingCacheStudentId;
+  ReadingGlobalProgress? _readingGlobalProgress;
+  final Map<int, List<Map<String, dynamic>>> _readingsByLevelCache = {};
+  DateTime? _readingCacheTimestamp;
+
+  // Cached data - Video Practice (per student)
+  String? _videoCacheStudentId;
+  VideoGlobalProgress? _videoGlobalProgress;
+  final Map<int, List<Map<String, dynamic>>> _videosByLevelCache = {};
+  DateTime? _videoCacheTimestamp;
 
   // Singleton pattern
   static final PreloadService _instance = PreloadService._internal();
@@ -555,6 +576,119 @@ class PreloadService {
     _totalReadings = null;
     _practiceTimestamp = null;
     print('🗑️ Invalidated practice cache');
+  }
+
+  // ========== QUIZ PRACTICE CACHE ==========
+  bool get hasQuizCache =>
+      _quizCacheStudentId != null && _quizCacheTimestamp != null;
+
+  bool _quizCacheValidFor(String studentId) =>
+      _quizCacheStudentId == studentId && _quizCacheTimestamp != null;
+
+  QuizGlobalProgress? getQuizGlobalProgressCached(String studentId) {
+    if (!_quizCacheValidFor(studentId)) return null;
+    return _quizGlobalProgress;
+  }
+
+  List<Quiz>? getQuizLevelCached(String studentId, int level) {
+    if (!_quizCacheValidFor(studentId)) return null;
+    return _quizByLevelCache[level];
+  }
+
+  void cacheQuizGlobalProgress(String studentId, QuizGlobalProgress global) {
+    _quizCacheStudentId = studentId;
+    _quizGlobalProgress = global;
+    _quizCacheTimestamp = DateTime.now();
+  }
+
+  void cacheQuizLevel(String studentId, int level, List<Quiz> quizzes) {
+    _quizCacheStudentId = studentId;
+    _quizByLevelCache[level] = quizzes;
+    _quizCacheTimestamp = DateTime.now();
+  }
+
+  void invalidateQuizCache() {
+    _quizCacheStudentId = null;
+    _quizGlobalProgress = null;
+    _quizByLevelCache.clear();
+    _quizCacheTimestamp = null;
+    print('🗑️ Invalidated quiz practice cache');
+  }
+
+  // ========== READING PRACTICE CACHE ==========
+  bool _readingCacheValidFor(String studentId) =>
+      _readingCacheStudentId == studentId && _readingCacheTimestamp != null;
+
+  ReadingGlobalProgress? getReadingGlobalProgressCached(String studentId) {
+    if (!_readingCacheValidFor(studentId)) return null;
+    return _readingGlobalProgress;
+  }
+
+  List<Map<String, dynamic>>? getReadingsLevelCached(String studentId, int level) {
+    if (!_readingCacheValidFor(studentId)) return null;
+    return _readingsByLevelCache[level];
+  }
+
+  void cacheReadingGlobalProgress(String studentId, ReadingGlobalProgress global) {
+    _readingCacheStudentId = studentId;
+    _readingGlobalProgress = global;
+    _readingCacheTimestamp = DateTime.now();
+  }
+
+  void cacheReadingsLevel(
+    String studentId,
+    int level,
+    List<Map<String, dynamic>> readings,
+  ) {
+    _readingCacheStudentId = studentId;
+    _readingsByLevelCache[level] = readings;
+    _readingCacheTimestamp = DateTime.now();
+  }
+
+  void invalidateReadingCache() {
+    _readingCacheStudentId = null;
+    _readingGlobalProgress = null;
+    _readingsByLevelCache.clear();
+    _readingCacheTimestamp = null;
+    print('🗑️ Invalidated reading practice cache');
+  }
+
+  // ========== VIDEO PRACTICE CACHE ==========
+  bool _videoCacheValidFor(String studentId) =>
+      _videoCacheStudentId == studentId && _videoCacheTimestamp != null;
+
+  VideoGlobalProgress? getVideoGlobalProgressCached(String studentId) {
+    if (!_videoCacheValidFor(studentId)) return null;
+    return _videoGlobalProgress;
+  }
+
+  List<Map<String, dynamic>>? getVideosLevelCached(String studentId, int level) {
+    if (!_videoCacheValidFor(studentId)) return null;
+    return _videosByLevelCache[level];
+  }
+
+  void cacheVideoGlobalProgress(String studentId, VideoGlobalProgress global) {
+    _videoCacheStudentId = studentId;
+    _videoGlobalProgress = global;
+    _videoCacheTimestamp = DateTime.now();
+  }
+
+  void cacheVideosLevel(
+    String studentId,
+    int level,
+    List<Map<String, dynamic>> videos,
+  ) {
+    _videoCacheStudentId = studentId;
+    _videosByLevelCache[level] = videos;
+    _videoCacheTimestamp = DateTime.now();
+  }
+
+  void invalidateVideoCache() {
+    _videoCacheStudentId = null;
+    _videoGlobalProgress = null;
+    _videosByLevelCache.clear();
+    _videoCacheTimestamp = null;
+    print('🗑️ Invalidated video practice cache');
   }
 }
 
