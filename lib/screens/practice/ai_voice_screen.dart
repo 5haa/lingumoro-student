@@ -1029,9 +1029,14 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
 
     if (cancelled) return;
     try {
+      // Send ~500ms of silence (16000hz * 2 bytes/sample * 0.5s = 16000 bytes)
+      // This forces the VAD to recognize end-of-speech immediately so we don't cut off the last word.
+      final silence = Uint8List(16000); 
+      _channel?.sink.add(silence);
+      
       _channel?.sink.add(jsonEncode({"type": "utt_end"}));
     } catch (e) {
-      debugPrint("Failed to send utt_end: $e");
+      debugPrint("Failed to send silence/utt_end: $e");
     }
   }
 
