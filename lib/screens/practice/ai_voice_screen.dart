@@ -1186,158 +1186,127 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                   ),
                 ),
               ] else ...[
-                // Main Content (Bubble)
+                // Main Content (Holdable Bubble) - Active Session
                 Expanded(
-                  flex: 5,
-                  child: Center(
-                    child: AIAgentBubble(
-                      soundLevel: _soundLevel,
-                      isAgentSpeaking: _isPlayingTts,
-                    ),
-                  ),
-                ),
-
-                // Controls
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   child: _status == AppStatus.disconnected
-                      ? SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: (_isLoadingSession || _isStopping) ? null : _startConversation,
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              backgroundColor: Colors.black,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ),
-                            child: Text(
-                              _isStopping
-                                  ? AppLocalizations.of(context).loading
-                                  : AppLocalizations.of(context).start,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Column(
+                      // DISCONNECTED STATE - Show start button
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Hold-to-speak primary control
-                            Opacity(
-                              opacity: _canHoldToTalk ? 1.0 : 0.55,
-                              child: GestureDetector(
-                                onTapDown: (_) => unawaited(_startHoldToTalk()),
-                                onTapUp: (_) => unawaited(_endHoldToTalk(cancelled: false)),
-                                onTapCancel: () => unawaited(_endHoldToTalk(cancelled: true)),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 120),
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: _isHoldingToTalk ? Colors.redAccent : Colors.black,
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      _isHoldingToTalk
-                                          ? AppLocalizations.of(context).releaseToSend
-                                          : AppLocalizations.of(context).holdToSpeak,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                            AIAgentBubble(
+                              soundLevel: 0.0,
+                              isAgentSpeaking: false,
                             ),
-                            const SizedBox(height: 10),
-                            // Stop session
+                            const SizedBox(height: 24),
                             SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                onPressed: (_isStopping || _isExiting) ? null : _stopSessionFast,
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  side: const BorderSide(color: Colors.black12),
+                              width: 160,
+                              child: ElevatedButton(
+                                onPressed: (_isLoadingSession || _isStopping) ? null : _startConversation,
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
                                 ),
                                 child: Text(
-                                  AppLocalizations.of(context).stop,
+                                  _isStopping
+                                      ? AppLocalizations.of(context).loading
+                                      : AppLocalizations.of(context).start,
                                   style: const TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.black,
                                   ),
                                 ),
+                              ),
+                            ),
+                          ],
+                        )
+                      // ACTIVE SESSION - Holdable bubble + stop button
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Large holdable area (bubble + padding around it)
+                            Opacity(
+                              opacity: _canHoldToTalk ? 1.0 : 0.6,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTapDown: (_) => unawaited(_startHoldToTalk()),
+                                onTapUp: (_) => unawaited(_endHoldToTalk(cancelled: false)),
+                                onTapCancel: () => unawaited(_endHoldToTalk(cancelled: true)),
+                                onLongPressStart: (_) => unawaited(_startHoldToTalk()),
+                                onLongPressEnd: (_) => unawaited(_endHoldToTalk(cancelled: false)),
+                                child: Container(
+                                  // Large touch target around the bubble
+                                  padding: const EdgeInsets.all(24),
+                                  child: AIAgentBubble(
+                                    soundLevel: _soundLevel,
+                                    isAgentSpeaking: _isPlayingTts,
+                                    isHolding: _isHoldingToTalk,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Instruction text
+                            Text(
+                              _isHoldingToTalk
+                                  ? AppLocalizations.of(context).releaseToSend
+                                  : AppLocalizations.of(context).holdToSpeak,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _isHoldingToTalk ? Colors.black87 : Colors.black45,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Stop button
+                            TextButton.icon(
+                              onPressed: (_isStopping || _isExiting) ? null : _stopSessionFast,
+                              icon: const Icon(Icons.stop_rounded, size: 20),
+                              label: Text(AppLocalizations.of(context).stop),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.black54,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                               ),
                             ),
                           ],
                         ),
                 ),
 
-                // Integrated Chat Area (preview: last 2 messages)
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isChatExpanded = true;
-                    });
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                    color: Colors.transparent,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_messages.isNotEmpty)
+                // Chat preview - only show when there are messages, keep it minimal
+                if (_messages.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => setState(() => _isChatExpanded = true),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Handle bar
                           Container(
+                            width: 36,
+                            height: 4,
                             margin: const EdgeInsets.only(bottom: 12),
-                            width: 30,
-                            height: 3,
                             decoration: BoxDecoration(
                               color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(1.5),
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                        if (_messages.isNotEmpty)
-                          _buildMessageList(displayMessages, expanded: false)
-                        else
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            child: Text(
-                              AppLocalizations.of(context).startToSeeConversation,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textSecondary,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Text(
+                          // Use same message list as expanded view
+                          _buildMessageList(_messages.takeLast(2), expanded: false),
+                          const SizedBox(height: 8),
+                          Text(
                             AppLocalizations.of(context).tapToOpenChat,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
+                            style: const TextStyle(fontSize: 11, color: Colors.black38),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 20),
               ],
             ],
           ),
@@ -1561,6 +1530,8 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                   fontWeight: message.isUser ? FontWeight.w400 : FontWeight.w500,
                   fontSize: 15,
                 ),
+                maxLines: expanded ? null : 2,
+                overflow: expanded ? null : TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -1722,11 +1693,13 @@ extension ListExtension<E> on List<E> {
 class AIAgentBubble extends StatefulWidget {
   final double soundLevel;
   final bool isAgentSpeaking;
+  final bool isHolding;
 
   const AIAgentBubble({
     super.key, 
     required this.soundLevel,
     required this.isAgentSpeaking,
+    this.isHolding = false,
   });
 
   @override
@@ -1783,8 +1756,9 @@ class _AIAgentBubbleState extends State<AIAgentBubble>
             soundLevel: widget.soundLevel,
             soundMultiplier: soundMultiplier,
             isAgentSpeaking: widget.isAgentSpeaking,
+            isHolding: widget.isHolding,
           ),
-          size: const Size(300, 300),
+          size: const Size(220, 220),
         );
       },
     );
@@ -1797,6 +1771,7 @@ class AIBubblePainter extends CustomPainter {
   final double soundLevel;
   final double soundMultiplier;
   final bool isAgentSpeaking;
+  final bool isHolding;
 
   AIBubblePainter({
     required this.pulseValue,
@@ -1804,6 +1779,7 @@ class AIBubblePainter extends CustomPainter {
     required this.soundLevel,
     required this.soundMultiplier,
     required this.isAgentSpeaking,
+    this.isHolding = false,
   });
 
   @override
