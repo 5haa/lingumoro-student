@@ -651,6 +651,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get errorTryAgain => 'Por favor intenta de nuevo';
   @override
   String get errorUnknown => 'Ocurrió un error desconocido';
+  @override
+  String get noInternetConnection => 'Sin Conexión a Internet';
   
   // Success messages
   @override

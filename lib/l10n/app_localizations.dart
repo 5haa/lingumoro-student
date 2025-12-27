@@ -362,6 +362,7 @@ abstract class AppLocalizations {
   String get errorNoInternet;
   String get errorTryAgain;
   String get errorUnknown;
+  String get noInternetConnection;
   
   // Success messages
   String get successSaved;

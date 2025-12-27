@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/config/app_colors.dart';
 import 'package:student/widgets/app_drawer.dart';
 import 'package:student/widgets/pro_upgrade_modal.dart';
+import 'package:student/widgets/connectivity_banner.dart';
 import 'package:student/l10n/app_localizations.dart';
 import 'package:student/services/chat_service.dart';
 import 'package:student/services/points_notification_service.dart';
@@ -192,15 +193,25 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: const AppDrawer(),
-      body: IndexedStack(
-        index: _currentIndex,
+      body: Stack(
         children: [
-          const HomeScreen(),
-          const ClassesScreen(),
-          // Practice tab is kept alive by IndexedStack; bumping the key forces it to rebuild.
-          PracticeScreen(key: ValueKey('practice-$_practiceTabVersion')),
-          const ChatScreen(),
-          const ProfileScreen(),
+          IndexedStack(
+            index: _currentIndex,
+            children: [
+              const HomeScreen(),
+              const ClassesScreen(),
+              // Practice tab is kept alive by IndexedStack; bumping the key forces it to rebuild.
+              PracticeScreen(key: ValueKey('practice-$_practiceTabVersion')),
+              const ChatScreen(),
+              const ProfileScreen(),
+            ],
+          ),
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: ConnectivityBanner(),
+          ),
         ],
       ),
       bottomNavigationBar: Container(

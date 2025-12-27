@@ -651,6 +651,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get errorTryAgain => 'الرجاء المحاولة مرة أخرى';
   @override
   String get errorUnknown => 'حدث خطأ غير معروف';
+  @override
+  String get noInternetConnection => 'لا يوجد اتصال بالإنترنت';
   
   // Success messages
   @override
