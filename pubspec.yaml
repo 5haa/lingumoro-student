@@ -120,6 +120,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
   flutter_native_splash: ^2.4.4
+  
+  # App icon generator
+  flutter_launcher_icons: ^0.13.1
 
 # Fix for record_linux compatibility
 dependency_overrides:
@@ -161,3 +164,11 @@ flutter_native_splash:
   android_12:
     color: "#FFFFFF"
     image: assets/images/splash.jpg
+
+# App icon configuration
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/student_logo.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
