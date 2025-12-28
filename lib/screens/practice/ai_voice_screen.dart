@@ -1127,189 +1127,302 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
             ? _messages.sublist(_messages.length - 2)
             : _messages;
 
+    // Show floating button when session is active (not disconnected)
+    final bool showFloatingButton = _status != AppStatus.disconnected;
+
     return WillPopScope(
       onWillPop: _handleSystemBack,
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
-          child: Column(
+          child: Stack(
             children: [
-              // Top Bar
-              _buildTopBar(),
-              
-              // Session Timer Header (Always visible)
-              _buildSessionHeader(),
+              // Main content column
+              Column(
+                children: [
+                  // Top Bar
+                  _buildTopBar(),
+                  
+                  // Session Timer Header (Always visible)
+                  _buildSessionHeader(),
 
-              // Chat-only mode: show full chat and hide the agent bubble
-              if (_isChatExpanded) ...[
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      children: [
-                        Row(
+                  // Chat-only mode: show full chat and hide the agent bubble
+                  if (_isChatExpanded) ...[
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Column(
                           children: [
-                            Text(
-                              AppLocalizations.of(context).chat,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const Spacer(),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _isChatExpanded = false;
-                                });
-                              },
-                              child: Text(AppLocalizations.of(context).close),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: _messages.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    AppLocalizations.of(context).startToSeeConversation,
-                                    style: const TextStyle(color: AppColors.textSecondary),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                )
-                              : _buildMessageList(_messages, expanded: true),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ] else ...[
-                // Main Content (Holdable Bubble) - Active Session
-                Expanded(
-                  child: _status == AppStatus.disconnected
-                      // DISCONNECTED STATE - Show start button
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            AIAgentBubble(
-                              soundLevel: 0.0,
-                              isAgentSpeaking: false,
-                            ),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              width: 160,
-                              child: ElevatedButton(
-                                onPressed: (_isLoadingSession || _isStopping) ? null : _startConversation,
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  backgroundColor: Colors.black,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                                child: Text(
-                                  _isStopping
-                                      ? AppLocalizations.of(context).loading
-                                      : AppLocalizations.of(context).start,
+                            Row(
+                              children: [
+                                Text(
+                                  AppLocalizations.of(context).chat,
                                   style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
-                              ),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isChatExpanded = false;
+                                    });
+                                  },
+                                  child: Text(AppLocalizations.of(context).close),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: _messages.isEmpty
+                                  ? Center(
+                                      child: Text(
+                                        AppLocalizations.of(context).startToSeeConversation,
+                                        style: const TextStyle(color: AppColors.textSecondary),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    )
+                                  : _buildMessageList(_messages, expanded: true),
                             ),
                           ],
-                        )
-                      // ACTIVE SESSION - Holdable bubble + stop button
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Large holdable area (bubble + padding around it)
-                            Opacity(
-                              opacity: _canHoldToTalk ? 1.0 : 0.6,
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTapDown: (_) => unawaited(_startHoldToTalk()),
-                                onTapUp: (_) => unawaited(_endHoldToTalk(cancelled: false)),
-                                onTapCancel: () => unawaited(_endHoldToTalk(cancelled: true)),
-                                onLongPressStart: (_) => unawaited(_startHoldToTalk()),
-                                onLongPressEnd: (_) => unawaited(_endHoldToTalk(cancelled: false)),
-                                child: Container(
-                                  // Large touch target around the bubble
-                                  padding: const EdgeInsets.all(24),
-                                  child: AIAgentBubble(
+                        ),
+                      ),
+                    ),
+                    // Bottom padding for floating button area
+                    const SizedBox(height: 120),
+                  ] else ...[
+                    // Main Content - Active Session
+                    Expanded(
+                      child: _status == AppStatus.disconnected
+                          // DISCONNECTED STATE - Show start button
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                AIAgentBubble(
+                                  soundLevel: 0.0,
+                                  isAgentSpeaking: false,
+                                ),
+                                const SizedBox(height: 24),
+                                SizedBox(
+                                  width: 160,
+                                  child: ElevatedButton(
+                                    onPressed: (_isLoadingSession || _isStopping) ? null : _startConversation,
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      backgroundColor: Colors.black,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _isStopping
+                                          ? AppLocalizations.of(context).loading
+                                          : AppLocalizations.of(context).start,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          // ACTIVE SESSION - Display bubble + stop button
+                          : SingleChildScrollView(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const SizedBox(height: 16),
+                                  // AI Bubble (display only)
+                                  AIAgentBubble(
                                     soundLevel: _soundLevel,
                                     isAgentSpeaking: _isPlayingTts,
                                     isHolding: _isHoldingToTalk,
                                   ),
+                                  const SizedBox(height: 16),
+                                  // Stop button
+                                  TextButton.icon(
+                                    onPressed: (_isStopping || _isExiting) ? null : _stopSessionFast,
+                                    icon: const Icon(Icons.stop_rounded, size: 20),
+                                    label: Text(AppLocalizations.of(context).stop),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.black54,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
+
+                    // Chat preview - only show when there are messages
+                    if (_messages.isNotEmpty)
+                      GestureDetector(
+                        onTap: () => setState(() => _isChatExpanded = true),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Handle bar
+                              Container(
+                                width: 36,
+                                height: 4,
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
-                            ),
-                            // Instruction text
-                            Text(
-                              _isHoldingToTalk
-                                  ? AppLocalizations.of(context).releaseToSend
-                                  : AppLocalizations.of(context).holdToSpeak,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: _isHoldingToTalk ? Colors.black87 : Colors.black45,
+                              // Tap to open chat label - ABOVE messages
+                              Text(
+                                AppLocalizations.of(context).tapToOpenChat,
+                                style: const TextStyle(fontSize: 11, color: Colors.black38),
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            // Stop button
-                            TextButton.icon(
-                              onPressed: (_isStopping || _isExiting) ? null : _stopSessionFast,
-                              icon: const Icon(Icons.stop_rounded, size: 20),
-                              label: Text(AppLocalizations.of(context).stop),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.black54,
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                              ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              // Message preview
+                              _buildMessageList(_messages.takeLast(2), expanded: false),
+                            ],
+                          ),
                         ),
-                ),
-
-                // Chat preview - only show when there are messages, keep it minimal
-                if (_messages.isNotEmpty)
-                  GestureDetector(
-                    onTap: () => setState(() => _isChatExpanded = true),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Handle bar
-                          Container(
-                            width: 36,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          // Use same message list as expanded view
-                          _buildMessageList(_messages.takeLast(2), expanded: false),
-                          const SizedBox(height: 8),
-                          Text(
-                            AppLocalizations.of(context).tapToOpenChat,
-                            style: const TextStyle(fontSize: 11, color: Colors.black38),
-                          ),
-                        ],
                       ),
-                    ),
+                    // Bottom padding for floating button area
+                    const SizedBox(height: 130),
+                  ],
+                ],
+              ),
+
+              // Floating Hold-to-Talk Button with label - always visible when session is active
+              if (showFloatingButton)
+                Positioned(
+                  bottom: 24,
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildFloatingHoldToTalkButton(),
+                      const SizedBox(height: 8),
+                      // Hold to speak / Release to send label - BELOW button
+                      Text(
+                        _isHoldingToTalk
+                            ? AppLocalizations.of(context).releaseToSend
+                            : AppLocalizations.of(context).holdToSpeak,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _isHoldingToTalk ? AppColors.primary : Colors.black45,
+                        ),
+                      ),
+                    ],
                   ),
-              ],
+                ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingHoldToTalkButton() {
+    final bool isActive = _canHoldToTalk;
+    final bool isHolding = _isHoldingToTalk;
+    
+    return GestureDetector(
+      onTapDown: isActive ? (_) => unawaited(_startHoldToTalk()) : null,
+      onTapUp: isActive ? (_) => unawaited(_endHoldToTalk(cancelled: false)) : null,
+      onTapCancel: isActive ? () => unawaited(_endHoldToTalk(cancelled: true)) : null,
+      onLongPressStart: isActive ? (_) => unawaited(_startHoldToTalk()) : null,
+      onLongPressEnd: isActive ? (_) => unawaited(_endHoldToTalk(cancelled: false)) : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        width: isHolding ? 88 : 72,
+        height: isHolding ? 88 : 72,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Outer pulsing ring when holding
+            if (isHolding)
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 1.0, end: 1.3),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOut,
+                builder: (context, value, child) {
+                  return Container(
+                    width: 88 * value,
+                    height: 88 * value,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.3 / value),
+                        width: 3,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            // Middle ring when holding
+            if (isHolding)
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(0.2),
+                    width: 2,
+                  ),
+                ),
+              ),
+            // Main button
+            Container(
+              width: isHolding ? 88 : 72,
+              height: isHolding ? 88 : 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isHolding
+                      ? [
+                          AppColors.primary,
+                          AppColors.primaryDark,
+                        ]
+                      : isActive
+                          ? [
+                              const Color(0xFF2A2A2A),
+                              const Color(0xFF000000),
+                            ]
+                          : [
+                              const Color(0xFF9E9E9E),
+                              const Color(0xFF757575),
+                            ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isHolding
+                        ? AppColors.primary.withOpacity(0.4)
+                        : Colors.black.withOpacity(0.3),
+                    blurRadius: isHolding ? 20 : 12,
+                    offset: const Offset(0, 4),
+                    spreadRadius: isHolding ? 2 : 0,
+                  ),
+                ],
+              ),
+              child: Icon(
+                isHolding ? Icons.mic : Icons.mic_none_rounded,
+                color: Colors.white,
+                size: isHolding ? 36 : 30,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1488,9 +1601,10 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   
   Widget _buildMessageList(List<ChatMessage> messages, {required bool expanded}) {
     return ListView.separated(
+      controller: expanded ? _scrollController : null,
       shrinkWrap: !expanded,
       physics: expanded ? const BouncingScrollPhysics() : const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
+      padding: expanded ? const EdgeInsets.only(bottom: 120) : EdgeInsets.zero,
       itemCount: messages.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
@@ -1500,38 +1614,40 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               ? MainAxisAlignment.end 
               : MainAxisAlignment.start,
           children: [
-            Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: BoxDecoration(
-                color: message.isUser 
-                    ? const Color(0xFFE0E0E0) 
-                    : Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(24),
-                  topRight: const Radius.circular(24),
-                  bottomLeft: Radius.circular(message.isUser ? 24 : 4),
-                  bottomRight: Radius.circular(message.isUser ? 4 : 24),
+            Flexible(
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
-                boxShadow: message.isUser ? [] : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: message.isUser 
+                      ? const Color(0xFFE0E0E0) 
+                      : Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(20),
+                    topRight: const Radius.circular(20),
+                    bottomLeft: Radius.circular(message.isUser ? 20 : 4),
+                    bottomRight: Radius.circular(message.isUser ? 4 : 20),
                   ),
-                ],
-              ),
-              child: Text(
-                message.text,
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontWeight: message.isUser ? FontWeight.w400 : FontWeight.w500,
-                  fontSize: 15,
+                  boxShadow: message.isUser ? [] : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                maxLines: expanded ? null : 2,
-                overflow: expanded ? null : TextOverflow.ellipsis,
+                child: Text(
+                  message.text,
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: message.isUser ? FontWeight.w400 : FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  maxLines: expanded ? null : 2,
+                  overflow: expanded ? null : TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],
