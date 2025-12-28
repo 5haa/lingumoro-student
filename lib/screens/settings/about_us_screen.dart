@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/custom_back_button.dart';
 
@@ -185,17 +186,57 @@ class AboutUsScreen extends StatelessWidget {
                           const SizedBox(height: 20),
                           _buildContactItem(
                             icon: FontAwesomeIcons.envelope,
-                            text: 'support@lingumoro.com',
+                            text: 'lingumoro.institute@gmail.com',
                           ),
                           const SizedBox(height: 12),
                           _buildContactItem(
                             icon: FontAwesomeIcons.phone,
-                            text: '+964 123 456 7890',
+                            text: '+964 781 620 3894',
                           ),
                           const SizedBox(height: 12),
                           _buildContactItem(
                             icon: FontAwesomeIcons.locationDot,
                             text: 'Baghdad, Iraq',
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    // Developer Info
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Developer Info',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _buildContactItem(
+                            icon: FontAwesomeIcons.user,
+                            text: 'Shakar Mustafa',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildContactItem(
+                            icon: FontAwesomeIcons.phone,
+                            text: '+964 750 837 6087',
                           ),
                         ],
                       ),
@@ -218,13 +259,7 @@ class AboutUsScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildSocialButton(FontAwesomeIcons.facebook),
-                        const SizedBox(width: 15),
-                        _buildSocialButton(FontAwesomeIcons.twitter),
-                        const SizedBox(width: 15),
-                        _buildSocialButton(FontAwesomeIcons.instagram),
-                        const SizedBox(width: 15),
-                        _buildSocialButton(FontAwesomeIcons.linkedin),
+                        _buildSocialButton(FontAwesomeIcons.instagram, 'https://instagram.com/lingumoro'),
                       ],
                     ),
 
@@ -347,26 +382,38 @@ class AboutUsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSocialButton(IconData icon) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        gradient: AppColors.redGradient,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+  Widget _buildSocialButton(IconData icon, String url) {
+    return GestureDetector(
+      onTap: () async {
+        try {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        } catch (e) {
+          // Handle error silently
+        }
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          gradient: AppColors.redGradient,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Center(
+          child: FaIcon(
+            icon,
+            color: Colors.white,
+            size: 22,
           ),
-        ],
-      ),
-      child: Center(
-        child: FaIcon(
-          icon,
-          color: Colors.white,
-          size: 22,
         ),
       ),
     );

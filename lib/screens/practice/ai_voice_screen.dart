@@ -129,8 +129,8 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
   Timer? _sessionTimer;
   int _sessionDurationSeconds = 0;
   int _maxSessionDurationMinutes = 15;
-  int _remainingSessions = 2;
-  int _maxSessions = 2;
+  int _dailyLimitMinutes = 30;
+  int _remainingSeconds = 0;
   bool _canStartSession = true;
   String _sessionLimitReason = "";
   
@@ -191,9 +191,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       if (mounted) {
         setState(() {
           _canStartSession = sessionInfo['canStart'];
-          _remainingSessions = sessionInfo['remainingSessions'];
-          _maxSessions = sessionInfo['maxSessions'];
-          _maxSessionDurationMinutes = sessionInfo['durationMinutes'];
+          _remainingSeconds = sessionInfo['remainingSeconds'];
+          _dailyLimitMinutes = sessionInfo['dailyLimitMinutes'];
+          _maxSessionDurationMinutes = sessionInfo['sessionMaxDurationMinutes'];
           _sessionLimitReason = sessionInfo['reason'];
           _todayStats = todayStats;
           _isLoadingSession = false;
@@ -219,8 +219,19 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       });
 
       // Check if session limit reached
-      if (_sessionDurationSeconds >= (_maxSessionDurationMinutes * 60)) {
-        _showTimeUpDialog();
+      // Stop if:
+      // 1. Session hits max per-session duration (e.g. 15 mins)
+      // 2. OR Total daily usage hits the limit (remainingSeconds counts down)
+      
+      // sessionDuration is how long we've been in THIS session.
+      // _remainingSeconds is how much time was left when we STARTED.
+      
+      final sessionLimitSeconds = _maxSessionDurationMinutes * 60;
+      final dailyLimitReached = _sessionDurationSeconds >= _remainingSeconds;
+      final sessionLimitReached = _sessionDurationSeconds >= sessionLimitSeconds;
+
+      if (dailyLimitReached || sessionLimitReached) {
+        _showTimeUpDialog(dailyLimitReached: dailyLimitReached);
         _disconnect(showCompletionDialog: false);
       }
     });
@@ -231,7 +242,11 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     _sessionTimer = null;
   }
 
-  void _showTimeUpDialog() {
+  void _showTimeUpDialog({bool dailyLimitReached = false}) {
+    final message = dailyLimitReached
+        ? "You have used your $_dailyLimitMinutes minutes for today. Good job!"
+        : AppLocalizations.of(context).sessionEndedMessage.replaceAll('{minutes}', _maxSessionDurationMinutes.toString());
+        
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -275,7 +290,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               
               // Message
               Text(
-                AppLocalizations.of(context).sessionEndedMessage.replaceAll('{minutes}', _maxSessionDurationMinutes.toString()),
+                message,
                 style: const TextStyle(
                   color: Colors.black54,
                   fontSize: 15,
@@ -398,6 +413,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
           _showSessionCompletedDialog(
             result['pointsAwarded'],
             result['durationMinutes'],
+            math.max(0, _remainingSeconds - drained.durationSeconds),
           );
         }
       } else {
@@ -596,7 +612,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     );
   }
 
-  void _showSessionCompletedDialog(int points, int minutes) {
+  void _showSessionCompletedDialog(int points, int minutes, int remainingSeconds) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -673,9 +689,9 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               ),
               const SizedBox(height: 16),
               
-              // Remaining sessions
+              // Remaining time
               Text(
-                '${AppLocalizations.of(context).sessionsRemaining} $_remainingSessions',
+                '${(remainingSeconds / 60).ceil()} mins remaining today',
                 style: const TextStyle(
                   color: Colors.black54,
                   fontSize: 13,
@@ -1536,8 +1552,8 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
       );
     }
     // Calculate current session number properly
-    final sessionsUsedToday = _maxSessions - _remainingSessions;
-    final currentSession = _status != AppStatus.disconnected ? sessionsUsedToday + 1 : sessionsUsedToday;
+    // Calculate time based metrics
+    final remainingMinutes = (_remainingSeconds / 60).ceil();
     final minutes = _sessionDurationSeconds ~/ 60;
     final seconds = _sessionDurationSeconds % 60;
     final formattedTime = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
@@ -1557,10 +1573,10 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.event_note, size: 14, color: Colors.black54),
+                const Icon(Icons.av_timer, size: 14, color: Colors.black54),
                 const SizedBox(width: 6),
                 Text(
-                  '${AppLocalizations.of(context).sessionNumber} $currentSession/$_maxSessions',
+                  '$remainingMinutes ${AppLocalizations.of(context).minutes} left',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,

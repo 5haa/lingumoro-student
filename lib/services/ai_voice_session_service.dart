@@ -20,7 +20,7 @@ class AIVoiceSessionService {
   }
 
   /// Check if student can start a new voice session
-  /// Returns a map with: canStart (bool), remainingSessions (int), reason (String)
+  /// Returns a map with: canStart (bool), remainingSeconds (int), reason (String)
   Future<Map<String, dynamic>> canStartSession(String studentId) async {
     try {
       // Get settings
@@ -28,65 +28,73 @@ class AIVoiceSessionService {
           .from('ai_settings')
           .select()
           .inFilter('setting_key', [
-        'max_voice_sessions_per_day',
+        'daily_voice_limit_minutes',
         'voice_session_duration_minutes'
       ]);
 
-      int maxSessions = 2; // Default
-      int durationMinutes = 15; // Default
+      int dailyLimitMinutes = 30; // Default
+      int sessionMaxDurationMinutes = 15; // Default
 
       for (var setting in settingsResponse) {
-        if (setting['setting_key'] == 'max_voice_sessions_per_day') {
-          maxSessions = int.tryParse(setting['setting_value'] ?? '2') ?? 2;
+        if (setting['setting_key'] == 'daily_voice_limit_minutes') {
+          dailyLimitMinutes = int.tryParse(setting['setting_value'] ?? '30') ?? 30;
         } else if (setting['setting_key'] == 'voice_session_duration_minutes') {
-          durationMinutes =
+          sessionMaxDurationMinutes =
               int.tryParse(setting['setting_value'] ?? '15') ?? 15;
         }
       }
 
-      // Get today's sessions (count active ones too, so users can't start new sessions
-      // while a previous one is still finalizing/ending).
+      // Get today's completed sessions to calculate used time
       final window = _iraqDayWindowUtc();
 
       final sessionsResponse = await _supabase
           .from('ai_voice_sessions')
-          .select()
+          .select('duration_seconds')
           .eq('student_id', studentId)
-          .inFilter('status', ['completed', 'active'])
+          .inFilter('status', ['completed', 'active']) // active ones count too
           .gte('started_at', window.startUtc.toIso8601String())
           .lt('started_at', window.endUtc.toIso8601String());
 
-      final sessionCount = (sessionsResponse as List).length;
-      final remainingSessions = maxSessions - sessionCount;
+      int usedSeconds = 0;
+      for (var session in sessionsResponse) {
+        usedSeconds += (session['duration_seconds'] as int? ?? 0);
+      }
 
-      if (remainingSessions <= 0) {
+      final dailyLimitSeconds = dailyLimitMinutes * 60;
+      final remainingSeconds = dailyLimitSeconds - usedSeconds;
+
+      if (remainingSeconds <= 0) {
         return {
           'canStart': false,
-          'remainingSessions': 0,
-          'maxSessions': maxSessions,
-          'usedSessions': sessionCount,
-          'durationMinutes': durationMinutes,
+          'remainingSeconds': 0,
+          'dailyLimitMinutes': dailyLimitMinutes,
+          'usedSeconds': usedSeconds,
+          'sessionMaxDurationMinutes': sessionMaxDurationMinutes,
           'reason':
-              'You have reached your daily limit of $maxSessions sessions. Try again tomorrow!',
+              'You have reached your daily limit of $dailyLimitMinutes minutes. Try again tomorrow!',
         };
       }
 
+      // We allow starting if there is ANY time left, but the session 
+      // will be capped at min(sessionMaxDuration, remainingTime)
+      // The returning 'remainingSeconds' is the ABSOLUTE daily remaining time.
+      
       return {
         'canStart': true,
-        'remainingSessions': remainingSessions,
-        'maxSessions': maxSessions,
-        'usedSessions': sessionCount,
-        'durationMinutes': durationMinutes,
-        'reason': 'You have $remainingSessions session(s) remaining today.',
+        'remainingSeconds': remainingSeconds,
+        'dailyLimitMinutes': dailyLimitMinutes,
+        'usedSeconds': usedSeconds,
+        'sessionMaxDurationMinutes': sessionMaxDurationMinutes,
+        'reason': 'You have ${(remainingSeconds / 60).ceil()} minutes remaining today.',
       };
     } catch (e) {
       print('Error checking session availability: $e');
       return {
         'canStart': true, // Allow on error (graceful degradation)
-        'remainingSessions': 1,
-        'maxSessions': 2,
-        'usedSessions': 0,
-        'durationMinutes': 15,
+        'remainingSeconds': 30 * 60,
+        'dailyLimitMinutes': 30,
+        'usedSeconds': 0,
+        'sessionMaxDurationMinutes': 15,
         'reason': 'Unable to verify session limit',
       };
     }

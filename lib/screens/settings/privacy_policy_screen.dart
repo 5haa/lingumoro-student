@@ -91,8 +91,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     _buildSection(
                       '6. Contact Us',
                       'If you have any questions about this Privacy Policy, please contact us at:\n\n'
-                      'Email: privacy@lingumoro.com\n'
-                      'Phone: +964 123 456 7890',
+                      'Email: lingumoro.institute@gmail.com\n'
+                      'Phone: +964 781 620 3894',
                     ),
                     const SizedBox(height: 20),
                     Center(

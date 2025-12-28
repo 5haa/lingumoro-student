@@ -189,7 +189,7 @@ class AppDrawer extends StatelessWidget {
 
   void _showContactUs(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
-    final Uri whatsappUrl = Uri.parse('https://wa.me/9641234567890');
+    final Uri whatsappUrl = Uri.parse('https://wa.me/9647816203894');
     
     try {
       if (await canLaunchUrl(whatsappUrl)) {

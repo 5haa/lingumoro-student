@@ -107,8 +107,8 @@ class TermsConditionsScreen extends StatelessWidget {
                     _buildSection(
                       '9. Contact Information',
                       'For questions about these Terms, contact us at:\n\n'
-                      'Email: legal@lingumoro.com\n'
-                      'Phone: +964 123 456 7890\n'
+                      'Email: lingumoro.institute@gmail.com\n'
+                      'Phone: +964 781 620 3894\n'
                       'Address: Baghdad, Iraq',
                     ),
                     const SizedBox(height: 20),
