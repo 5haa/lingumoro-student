@@ -691,7 +691,7 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
               
               // Remaining time
               Text(
-                '${(remainingSeconds / 60).ceil()} mins remaining today',
+                '${remainingSeconds ~/ 60} min ${remainingSeconds % 60} sec remaining today',
                 style: const TextStyle(
                   color: Colors.black54,
                   fontSize: 13,
@@ -1553,7 +1553,10 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
     }
     // Calculate current session number properly
     // Calculate time based metrics
-    final remainingMinutes = (_remainingSeconds / 60).ceil();
+    final actualRemainingSeconds = (_remainingSeconds - _sessionDurationSeconds).clamp(0, _remainingSeconds);
+    final remainingMins = actualRemainingSeconds ~/ 60;
+    final remainingSecs = actualRemainingSeconds % 60;
+    final formattedRemaining = '${remainingMins.toString().padLeft(2, '0')}:${remainingSecs.toString().padLeft(2, '0')}';
     final minutes = _sessionDurationSeconds ~/ 60;
     final seconds = _sessionDurationSeconds % 60;
     final formattedTime = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
@@ -1576,11 +1579,12 @@ class _AIVoicePracticeScreenState extends State<AIVoicePracticeScreen> {
                 const Icon(Icons.av_timer, size: 14, color: Colors.black54),
                 const SizedBox(width: 6),
                 Text(
-                  '$remainingMinutes ${AppLocalizations.of(context).minutes} left',
+                  '$formattedRemaining left',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                     color: Colors.black87,
+                    fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
               ],

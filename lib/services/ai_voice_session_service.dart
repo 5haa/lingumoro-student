@@ -85,7 +85,7 @@ class AIVoiceSessionService {
         'dailyLimitMinutes': dailyLimitMinutes,
         'usedSeconds': usedSeconds,
         'sessionMaxDurationMinutes': sessionMaxDurationMinutes,
-        'reason': 'You have ${(remainingSeconds / 60).ceil()} minutes remaining today.',
+        'reason': 'You have ${remainingSeconds ~/ 60} min ${remainingSeconds % 60} sec remaining today.',
       };
     } catch (e) {
       print('Error checking session availability: $e');
