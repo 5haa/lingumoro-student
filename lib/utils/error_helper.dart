@@ -132,12 +132,25 @@ class ErrorHelper {
       return 'Service temporarily unavailable. Please try again later.';
     }
     
-    // Default fallback for unknown errors
-    if (errorMessage.contains('exception')) {
-      return 'Something went wrong. Please try again.';
+    // If no specific pattern matches, try to extract meaningful error message
+    // Remove common prefixes to get the actual error message
+    String cleanedError = error.toString();
+    
+    // Remove exception type prefixes (e.g., "AuthException: ", "PostgrestException: ")
+    if (cleanedError.contains(':')) {
+      final parts = cleanedError.split(':');
+      if (parts.length > 1) {
+        cleanedError = parts.sublist(1).join(':').trim();
+      }
     }
     
-    // If no specific pattern matches, return a generic message
+    // If we have a meaningful error message, return it
+    if (cleanedError.isNotEmpty && cleanedError.length > 3) {
+      // Capitalize first letter
+      return cleanedError[0].toUpperCase() + cleanedError.substring(1);
+    }
+    
+    // Final fallback
     return 'An unexpected error occurred. Please try again.';
   }
 }
