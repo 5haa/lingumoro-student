@@ -32,9 +32,8 @@ class StudentService {
     }
   }
 
-  /// Get students learning the same languages as the current student
-  Future<List<Map<String, dynamic>>> getStudentsInSameLanguages({
-    List<String>? knownLanguages,
+  /// Get all students (no course restrictions)
+  Future<List<Map<String, dynamic>>> getAllStudents({
     Set<String>? knownBlockedIds,
   }) async {
     try {
@@ -45,8 +44,6 @@ class StudentService {
       final futures = await Future.wait([
         if (knownBlockedIds == null) _blockingService.getBlockedUserIds() else Future.value(<String>{}),
         if (knownBlockedIds == null) _blockingService.getUsersWhoBlockedMe() else Future.value(<String>{}),
-        // Only fetch languages if not provided
-        if (knownLanguages == null) getStudentLanguages() else Future.value(knownLanguages),
       ]);
       
       final Set<String> allBlockedIds;
@@ -57,75 +54,64 @@ class StudentService {
         final blockerIds = futures[1] as Set<String>;
         allBlockedIds = {...blockedIds, ...blockerIds};
       }
-      
-      final studentLanguages = (knownLanguages != null) 
-          ? knownLanguages 
-          : futures[knownLanguages != null ? 0 : 2] as List<String>; // Adjust index based on whether blocks were skipped
 
-      // If student hasn't taken any courses, return empty list
-      if (studentLanguages.isEmpty) {
-        return [];
-      }
-
-      // Get all students with subscriptions in the same languages
+      // Get all students
       final response = await _supabase
-          .from('student_subscriptions')
+          .from('students')
           .select('''
-            student_id,
-            language_id,
-            student:students!inner(id, full_name, email, avatar_url, bio, is_suspended, province:provinces(id, name, name_ar, code)),
-            language:language_courses(id, name, code, flag_url)
+            id, full_name, email, avatar_url, bio, is_suspended,
+            province:provinces(id, name, name_ar, code),
+            subscriptions:student_subscriptions(
+              language:language_courses(id, name, code, flag_url)
+            )
           ''')
-          .inFilter('language_id', studentLanguages)
-          .eq('status', 'active')
-          .eq('student.is_suspended', false) // Filter suspended students
-          .neq('student_id', user.id); // Exclude current user
+          .eq('is_suspended', false) // Filter suspended students
+          .neq('id', user.id); // Exclude current user
 
-      // Group students by ID to avoid duplicates and collect their languages
-      final Map<String, Map<String, dynamic>> studentsMap = {};
+      // Process students to flatten languages
+      final List<Map<String, dynamic>> studentsList = [];
       
-      for (var subscription in response) {
-        final studentData = subscription['student'];
-        final languageData = subscription['language'];
+      for (var studentData in response) {
+        final studentId = studentData['id'];
         
-        if (studentData != null && languageData != null) {
-          final studentId = studentData['id'];
-          
-          // Skip blocked users
-          if (allBlockedIds.contains(studentId)) {
-            continue;
-          }
-          
-          if (!studentsMap.containsKey(studentId)) {
-            studentsMap[studentId] = {
-              'id': studentData['id'],
-              'full_name': studentData['full_name'],
-              'email': studentData['email'],
-              'avatar_url': studentData['avatar_url'],
-              'bio': studentData['bio'],
-              'province': studentData['province'],
-              'languages': <Map<String, dynamic>>[],
-            };
-          }
-          
-          // Add language if not already added
-          final languages = studentsMap[studentId]!['languages'] as List<Map<String, dynamic>>;
-          final languageExists = languages.any((lang) => lang['id'] == languageData['id']);
-          
-          if (!languageExists) {
-            languages.add({
-              'id': languageData['id'],
-              'name': languageData['name'],
-              'code': languageData['code'],
-              'flag_url': languageData['flag_url'],
-            });
+        // Skip blocked users
+        if (allBlockedIds.contains(studentId)) {
+          continue;
+        }
+        
+        // Process subscriptions to get languages
+        final List<Map<String, dynamic>> languages = [];
+        final subscriptions = studentData['subscriptions'] as List<dynamic>? ?? [];
+        
+        for (var sub in subscriptions) {
+          final language = sub['language'];
+          if (language != null) {
+             // Avoid duplicate languages
+             if (!languages.any((l) => l['id'] == language['id'])) {
+               languages.add({
+                'id': language['id'],
+                'name': language['name'],
+                'code': language['code'],
+                'flag_url': language['flag_url'],
+               });
+             }
           }
         }
+        
+        studentsList.add({
+          'id': studentData['id'],
+          'full_name': studentData['full_name'],
+          'email': studentData['email'],
+          'avatar_url': studentData['avatar_url'],
+          'bio': studentData['bio'],
+          'province': studentData['province'],
+          'languages': languages,
+        });
       }
 
-      return studentsMap.values.toList();
+      return studentsList;
     } catch (e) {
-      print('Error fetching students in same languages: $e');
+      print('Error fetching all students: $e');
       throw Exception('Failed to load students');
     }
   }

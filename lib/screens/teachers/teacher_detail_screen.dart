@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
@@ -135,7 +136,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
           flags: const YoutubePlayerFlags(
             autoPlay: false,
             mute: false,
-            enableCaption: true,
+            enableCaption: false,
             controlsVisibleAtStart: true,
           ),
         );
@@ -565,31 +566,48 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   }
 
   Widget _buildVideoSection() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: YoutubePlayer(
-          controller: _youtubeController!,
-          showVideoProgressIndicator: true,
-          progressIndicatorColor: AppColors.primary,
-          progressColors: ProgressBarColors(
-            playedColor: AppColors.primary,
-            handleColor: AppColors.primaryDark,
-          ),
+    return YoutubePlayerBuilder(
+      onEnterFullScreen: () {
+        // Lock to portrait to prevent rotation when going fullscreen
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+        ]);
+      },
+      onExitFullScreen: () {
+        // Restore portrait orientation when exiting fullscreen
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+        ]);
+      },
+      player: YoutubePlayer(
+        controller: _youtubeController!,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: AppColors.primary,
+        progressColors: ProgressBarColors(
+          playedColor: AppColors.primary,
+          handleColor: AppColors.primaryDark,
         ),
       ),
+      builder: (context, player) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: player,
+          ),
+        );
+      },
     );
   }
 

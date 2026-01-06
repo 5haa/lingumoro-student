@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:student/services/practice_service.dart';
 import 'package:student/services/auth_service.dart';
@@ -2113,7 +2114,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         autoPlay: true,
         controlsVisibleAtStart: false, // Hide controls to prevent skipping
         disableDragSeek: true, // Prevent drag seeking
-        enableCaption: true,
+        enableCaption: false,
         hideControls: false,
       ),
     );
@@ -2513,270 +2514,272 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Top Bar
-              _buildTopBar(),
-              
-              // Video Player
-              _buildVideoPlayerSection(),
-              
-              // Watch Progress Indicator
-              _buildWatchProgressIndicator(),
-              
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Video Title Card
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFFED4264), Color(0xFFFFB88C)],
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const FaIcon(
-                                    FontAwesomeIcons.video,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    widget.video['title'] ?? 'Untitled',
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                if (widget.video['level'] != null)
-                                  _buildDetailChip(
-                                    icon: FontAwesomeIcons.signal,
-                                    label: 'Level ${widget.video['level']}',
-                                    color: Colors.purple,
-                                  ),
-                                _buildDetailChip(
-                                  icon: FontAwesomeIcons.star,
-                                  label: '+${widget.video['points_reward'] ?? 10} points',
-                                  color: Colors.amber,
-                                ),
-                                if (widget.video['duration_seconds'] != null)
-                                  _buildDetailChip(
-                                    icon: FontAwesomeIcons.clock,
-                                    label: _formatDuration(widget.video['duration_seconds']),
-                                    color: Colors.blue,
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      if (widget.video['description'] != null) ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const FaIcon(
-                                      FontAwesomeIcons.alignLeft,
-                                      color: AppColors.primary,
-                                      size: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    AppLocalizations.of(context).aboutThisLesson,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                widget.video['description'],
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  color: AppColors.textSecondary,
-                                  height: 1.6,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      
-                      const SizedBox(height: 16),
-                      // Info Banner
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.orange.shade50, Colors.orange.shade100],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.orange.shade200,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(
-                                Icons.lightbulb_rounded,
-                                color: Colors.orange.shade600,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
-                                AppLocalizations.of(context).watchFullVideoToUnlock,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVideoPlayerSection() {
     if (_controllerDisposed || _isExitingScreen) {
-      return Container(
-        height: 220,
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.black12,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Center(
-          child: Icon(
-            Icons.play_circle_fill,
-            color: AppColors.grey,
-            size: 48,
+      // Return a placeholder when controller is disposed
+      return WillPopScope(
+        onWillPop: _onWillPop,
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: Center(
+              child: Icon(
+                Icons.play_circle_fill,
+                color: AppColors.grey,
+                size: 48,
+              ),
+            ),
           ),
         ),
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: YoutubePlayer(
-          controller: _controller,
-          showVideoProgressIndicator: false,
-          progressIndicatorColor: AppColors.primary,
-          progressColors: ProgressBarColors(
-            playedColor: Colors.red.shade600,
-            handleColor: Colors.red.shade700,
-            backgroundColor: Colors.grey.shade300,
-            bufferedColor: Colors.grey.shade400,
-          ),
-          onReady: () {
-            // Video is ready
-          },
-          onEnded: (metaData) {
-            // Video ended naturally
-            if (!_hasMarkedAsWatched) {
-              _hasMarkedAsWatched = true;
-              _markVideoAsWatched();
-            }
-          },
+    return YoutubePlayerBuilder(
+      player: YoutubePlayer(
+        controller: _controller,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: AppColors.primary,
+        progressColors: ProgressBarColors(
+          playedColor: Colors.red.shade600,
+          handleColor: Colors.red.shade700,
+          backgroundColor: Colors.grey.shade300,
+          bufferedColor: Colors.grey.shade400,
         ),
+        onReady: () {
+          // Video is ready
+        },
+        onEnded: (metaData) {
+          // Video ended naturally
+          if (!_hasMarkedAsWatched) {
+            _hasMarkedAsWatched = true;
+            _markVideoAsWatched();
+          }
+        },
       ),
+      builder: (context, player) {
+        return WillPopScope(
+          onWillPop: _onWillPop,
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            body: SafeArea(
+              child: Column(
+                children: [
+                  // Top Bar
+                  _buildTopBar(),
+                  
+                  // Video Player
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: player,
+                    ),
+                  ),
+                  
+                  // Watch Progress Indicator
+                  _buildWatchProgressIndicator(),
+                  
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Video Title Card
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFFED4264), Color(0xFFFFB88C)],
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const FaIcon(
+                                        FontAwesomeIcons.video,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        widget.video['title'] ?? 'Untitled',
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    if (widget.video['level'] != null)
+                                      _buildDetailChip(
+                                        icon: FontAwesomeIcons.signal,
+                                        label: 'Level ${widget.video['level']}',
+                                        color: Colors.purple,
+                                      ),
+                                    _buildDetailChip(
+                                      icon: FontAwesomeIcons.star,
+                                      label: '+${widget.video['points_reward'] ?? 10} points',
+                                      color: Colors.amber,
+                                    ),
+                                    if (widget.video['duration_seconds'] != null)
+                                      _buildDetailChip(
+                                        icon: FontAwesomeIcons.clock,
+                                        label: _formatDuration(widget.video['duration_seconds']),
+                                        color: Colors.blue,
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          if (widget.video['description'] != null) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: AppColors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const FaIcon(
+                                          FontAwesomeIcons.alignLeft,
+                                          color: AppColors.primary,
+                                          size: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        AppLocalizations.of(context).aboutThisLesson,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    widget.video['description'],
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      color: AppColors.textSecondary,
+                                      height: 1.6,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          
+                          const SizedBox(height: 16),
+                          // Info Banner
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.orange.shade50, Colors.orange.shade100],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.orange.shade200,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.lightbulb_rounded,
+                                    color: Colors.orange.shade600,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Text(
+                                    AppLocalizations.of(context).watchFullVideoToUnlock,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

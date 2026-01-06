@@ -3,10 +3,19 @@ class ErrorHelper {
   static String getUserFriendlyError(dynamic error) {
     final errorMessage = error.toString().toLowerCase();
     
-    // Authentication errors
+    // Authentication errors - comprehensive patterns for Supabase
     if (errorMessage.contains('invalid login credentials') || 
         errorMessage.contains('invalid credentials') ||
-        errorMessage.contains('incorrect password')) {
+        errorMessage.contains('incorrect password') ||
+        errorMessage.contains('wrong password') ||
+        errorMessage.contains('bad_credentials') ||
+        errorMessage.contains('invalid_credentials') ||
+        errorMessage.contains('invalid password') ||
+        errorMessage.contains('password is incorrect') ||
+        errorMessage.contains('authexception') ||
+        errorMessage.contains('authapiexception') ||
+        errorMessage.contains('signinwithotp') ||
+        errorMessage.contains('signinerror')) {
       return 'Incorrect email or password. Please try again.';
     }
     
@@ -22,8 +31,20 @@ class ErrorHelper {
     
     if (errorMessage.contains('email already registered') ||
         errorMessage.contains('email already exists') ||
-        errorMessage.contains('user already registered')) {
-      return 'An account with this email already exists.';
+        errorMessage.contains('user already registered') ||
+        errorMessage.contains('email_exists') ||
+        errorMessage.contains('identity_already_exists') ||
+        errorMessage.contains('already registered as a student') ||
+        errorMessage.contains('already registered as a teacher')) {
+      return 'An account with this email already exists. Please login instead.';
+    }
+    
+    if (errorMessage.contains('over_request_rate_limit') ||
+        errorMessage.contains('over_email_send_rate_limit') ||
+        errorMessage.contains('over_sms_rate_limit') ||
+        errorMessage.contains('email rate limit exceeded') ||
+        errorMessage.contains('for security purposes')) {
+      return 'Too many requests. Please wait a few minutes and try again.';
     }
     
     if (errorMessage.contains('weak password') ||

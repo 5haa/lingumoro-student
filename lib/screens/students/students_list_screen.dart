@@ -145,26 +145,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
 
       // 1. Start independent tasks in parallel
       
-      // Task A: Check PRO (Use Cache if available)
-      Future<bool> proFuture;
-      if (studentId != null) {
-        if (_preloadService.proSubscription != null) {
-          // Use cached subscription data
-          final sub = _preloadService.proSubscription!;
-          final expiresAt = sub['expires_at'] as String?;
-          bool isActive = false;
-          if (expiresAt != null) {
-            final expiryDate = DateTime.parse(expiresAt);
-            isActive = expiryDate.isAfter(DateTime.now());
-          }
-          proFuture = Future.value(isActive);
-          print('⏱️ PRO Check used CACHE');
-        } else {
-          proFuture = _proService.hasActivePro(studentId);
-        }
-      } else {
-        proFuture = Future.value(false);
-      }
+      // Task A: Check PRO (Removed restriction, just checking for UI if needed or defaulting to true)
+      // We no longer block access based on PRO, so we can treat everyone as having access
+      Future<bool> proFuture = Future.value(true);
 
       // Task B: Chat Requests (Optimized Single Query)
       // Chat requests are real-time, so we fetch fresh (but optimized)
@@ -195,22 +178,14 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
       print('⏱️ Languages Fetch took: ${stopwatch.elapsedMilliseconds - langStart}ms');
       
       if (languages.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _myLanguages = [];
-            _students = [];
-            _isLoading = false;
-            _errorMessage = 'You need to enroll in a course to see other students';
-          });
-        }
-        return;
+        _myLanguages = [];
       }
 
       // 2. Start dependent task immediately after languages are ready
       // Use cached blocked users if available
       final studentsStart = stopwatch.elapsedMilliseconds;
-      final studentsFuture = _studentService.getStudentsInSameLanguages(
-        knownLanguages: languages,
+      // Fetch ALL students without course restrictions
+      final studentsFuture = _studentService.getAllStudents(
         knownBlockedIds: _preloadService.blockedUserIds,
       );
       
