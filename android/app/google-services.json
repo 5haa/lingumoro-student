@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "342869418554",
+    "project_id": "lingumoro-b6065",
+    "storage_bucket": "lingumoro-b6065.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:342869418554:android:90c30f5cc53894a3c6cb03",
+        "android_client_info": {
+          "package_name": "com.lingumoro.student"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxLje0IYqd1BUrQc9L15JTkl0bejdvcS8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

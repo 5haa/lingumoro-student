@@ -96,6 +96,6 @@ app.*.map.json
 .fvm/fvm_config.json
 
 # Firebase
-google-services.json
-GoogleService-Info.plist
-firebase_options.dart
+# google-services.json
+# GoogleService-Info.plist
+# firebase_options.dart
