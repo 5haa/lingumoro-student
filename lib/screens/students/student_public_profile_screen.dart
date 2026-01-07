@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/services/photo_service.dart';
 import 'package:student/services/blocking_service.dart';
+import 'package:student/services/presence_service.dart';
+import 'package:student/services/chat_service.dart';
 import 'package:student/l10n/app_localizations.dart';
-import 'package:student/widgets/custom_back_button.dart';
+import 'package:student/screens/chat/chat_conversation_screen.dart';
 import '../../config/app_colors.dart';
 
 class StudentPublicProfileScreen extends StatefulWidget {
@@ -24,17 +27,33 @@ class StudentPublicProfileScreen extends StatefulWidget {
 class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen> {
   final _photoService = PhotoService();
   final _blockingService = BlockingService();
+  final _presenceService = PresenceService();
+  final _chatService = ChatService();
   List<Map<String, dynamic>> _photos = [];
   bool _isLoadingPhotos = true;
   int _currentPhotoIndex = 0;
   bool _isBlocked = false;
   bool _isCheckingBlock = true;
+  bool _isOnline = false;
+  StreamSubscription<bool>? _onlineSubscription;
+  String? _chatRequestStatus; // null, 'pending', 'accepted'
+  bool _isRecipientOfRequest = false;
+  String? _chatRequestId;
+  bool _isLoadingChatStatus = true;
 
   @override
   void initState() {
     super.initState();
     _loadPhotos();
     _checkIfBlocked();
+    _subscribeToOnlineStatus();
+    _loadChatStatus();
+  }
+  
+  @override
+  void dispose() {
+    _onlineSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadPhotos() async {
@@ -50,6 +69,52 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
       if (mounted) {
         setState(() => _isLoadingPhotos = false);
       }
+    }
+  }
+  
+  void _subscribeToOnlineStatus() {
+    _onlineSubscription = _presenceService
+        .subscribeToUserStatus(widget.studentId, 'student')
+        .listen((isOnline) {
+      if (mounted) {
+        setState(() {
+          _isOnline = isOnline;
+        });
+      }
+    });
+  }
+  
+  Future<void> _loadChatStatus() async {
+    try {
+      final currentUserId = _chatService.supabase.auth.currentUser?.id;
+      if (currentUserId == null) {
+        if (mounted) setState(() => _isLoadingChatStatus = false);
+        return;
+      }
+      
+      // Check for any chat request between current user and this student
+      final requests = await _chatService.supabase
+          .from('chat_requests')
+          .select('id, status, requester_id, recipient_id')
+          .or('and(requester_id.eq.$currentUserId,recipient_id.eq.${widget.studentId}),and(requester_id.eq.${widget.studentId},recipient_id.eq.$currentUserId)')
+          .limit(1);
+      
+      if (mounted) {
+        if (requests.isNotEmpty) {
+          final request = requests.first;
+          setState(() {
+            _chatRequestStatus = request['status'] as String;
+            _chatRequestId = request['id'] as String;
+            _isRecipientOfRequest = request['recipient_id'] == currentUserId;
+            _isLoadingChatStatus = false;
+          });
+        } else {
+          setState(() => _isLoadingChatStatus = false);
+        }
+      }
+    } catch (e) {
+      print('Error loading chat status: $e');
+      if (mounted) setState(() => _isLoadingChatStatus = false);
     }
   }
 
@@ -158,6 +223,423 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
       }
     }
   }
+  
+  Future<void> _sendChatRequest() async {
+    final l = AppLocalizations.of(context);
+    final fullName = widget.studentData['full_name'] ?? l.studentPlaceholder;
+    
+    final messageController = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                decoration: BoxDecoration(
+                  gradient: AppColors.redGradient,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            l.chatRequestTitle,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            fullName,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white.withOpacity(0.9),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l.messageHint,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: messageController,
+                      maxLines: 3,
+                      maxLength: 200,
+                      decoration: InputDecoration(
+                        hintText: l.messageHint,
+                        hintStyle: TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 14,
+                        ),
+                        filled: true,
+                        fillColor: AppColors.lightGrey,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.all(14),
+                        counterText: '',
+                      ),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: AppColors.grey.withOpacity(0.3),
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              l.cancel,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context, messageController.text);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              l.sendMessage,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    final success = await _chatService.sendChatRequest(
+      widget.studentId,
+      message: result.isEmpty ? null : result,
+    );
+
+    if (mounted) {
+      if (success != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.chatRequestSent),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadChatStatus();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.failedToSendMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _acceptAndOpenChat() async {
+    if (_chatRequestId == null) return;
+    
+    final success = await _chatService.acceptChatRequest(_chatRequestId!);
+    
+    if (mounted) {
+      final l = AppLocalizations.of(context);
+      if (success) {
+        await _loadChatStatus();
+        _openChat();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l.failedToAcceptRequest),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _openChat() async {
+    final fullName = widget.studentData['full_name'] ?? AppLocalizations.of(context).studentPlaceholder;
+    final conversation = await _chatService.getOrCreateStudentConversation(widget.studentId);
+    
+    if (conversation != null && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatConversationScreen(
+            conversationId: conversation['id'],
+            recipientId: widget.studentId,
+            recipientName: fullName,
+            recipientAvatar: widget.studentData['avatar_url'],
+            recipientType: 'student',
+          ),
+        ),
+      );
+    } else if (mounted) {
+      final l = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l.unableToStartChat),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+  
+  Widget _buildChatButton() {
+    final l = AppLocalizations.of(context);
+    
+    if (_isLoadingChatStatus) {
+      return const SizedBox(
+        width: 48,
+        height: 48,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    
+    // Already accepted - show chat button
+    if (_chatRequestStatus == 'accepted') {
+      return GestureDetector(
+        onTap: _openChat,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.green,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const FaIcon(
+                FontAwesomeIcons.comment,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                l.chat,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Pending request from this student - show accept
+    if (_chatRequestStatus == 'pending' && _isRecipientOfRequest) {
+      return GestureDetector(
+        onTap: _acceptAndOpenChat,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.green,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const FaIcon(
+                FontAwesomeIcons.check,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                l.accept,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Pending request sent by me - show pending status
+    if (_chatRequestStatus == 'pending') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.orange.withOpacity(0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const FaIcon(
+              FontAwesomeIcons.clock,
+              color: Colors.orange,
+              size: 14,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              l.chatRequestPendingStatus,
+              style: const TextStyle(
+                color: Colors.orange,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // No request yet - show add friend button
+    return GestureDetector(
+      onTap: _sendChatRequest,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: AppColors.redGradient,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const FaIcon(
+              FontAwesomeIcons.userPlus,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              l.sendChatRequest,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +684,27 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                                 color: AppColors.textPrimary,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
+                            // Online status overlap
+                            if (_isOnline)
+                                Text(
+                                  l.online,
+                                  style: const TextStyle(
+                                    color: Colors.green, // Use specific online green
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                )
+                            else
+                                Text(
+                                  l.notConnected, // Fallback to "Offline" or generic if needed
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                            const SizedBox(height: 12),
                             Row(
                               children: [
                                 Container(
@@ -234,6 +736,7 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                                     ],
                                   ),
                                 ),
+
                               ],
                             ),
                           ],
@@ -241,6 +744,11 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                       ),
                     ],
                   ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Chat Button
+                  _buildChatButton(),
                   
                   const SizedBox(height: 20),
 
@@ -435,6 +943,9 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                     ),
 
                   if (languages.isNotEmpty) const SizedBox(height: 32),
+                  
+                  // Extra bottom padding for device navigation elements
+                  const SizedBox(height: 200),
                 ],
               ),
             ),
@@ -555,30 +1066,23 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
       child: Stack(
         children: [
           // Photo Carousel
-          if (_isLoadingPhotos)
+            if (_isLoadingPhotos)
             Container(
-              decoration: BoxDecoration(
-                gradient: AppColors.redGradient,
-              ),
+              color: AppColors.lightGrey,
               child: const Center(
                 child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.grey),
                 ),
               ),
             )
           else if (_photos.isEmpty)
             Container(
-              decoration: BoxDecoration(
-                gradient: AppColors.redGradient,
-              ),
-              child: Center(
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    fontSize: 80,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+              color: AppColors.lightGrey,
+              child: const Center(
+                child: Icon(
+                  Icons.person,
+                  size: 80,
+                  color: AppColors.grey,
                 ),
               ),
             )
@@ -601,32 +1105,22 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
                     width: double.infinity,
                     height: double.infinity,
                     placeholder: (context, url) => Container(
-                      decoration: BoxDecoration(
-                        gradient: AppColors.redGradient,
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 80,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                      color: AppColors.lightGrey,
+                      child: const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 80,
+                          color: AppColors.grey,
                         ),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
-                      decoration: BoxDecoration(
-                        gradient: AppColors.redGradient,
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 80,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                      color: AppColors.lightGrey,
+                      child: const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 80,
+                          color: AppColors.grey,
                         ),
                       ),
                     ),
@@ -718,6 +1212,49 @@ class _StudentPublicProfileScreenState extends State<StudentPublicProfileScreen>
               ),
             ),
           
+            // Online Indicator
+          if (_isOnline)
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      AppLocalizations.of(context).online,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Photo Indicators
           if (_photos.isNotEmpty && _photos.length > 1)
             Positioned(

@@ -6,6 +6,7 @@ import 'package:student/services/pro_subscription_service.dart';
 import 'package:student/services/auth_service.dart';
 import 'package:student/services/session_update_service.dart';
 import 'package:student/services/preload_service.dart';
+import 'package:student/services/presence_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:student/screens/students/student_public_profile_screen.dart';
 import 'package:student/screens/chat/chat_requests_screen.dart';
@@ -28,12 +29,14 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
   final _authService = AuthService();
   final _sessionUpdateService = SessionUpdateService();
   final _preloadService = PreloadService();
+  final _presenceService = PresenceService();
   List<Map<String, dynamic>> _students = [];
   List<String> _myLanguages = [];
   List<Map<String, dynamic>> _sentRequests = [];
   Map<String, String> _chatRequestStatus = {}; // studentId -> status
   Map<String, bool> _isRecipientOfRequest = {}; // studentId -> isRecipient
   Map<String, String> _chatRequestIds = {}; // studentId -> requestId
+  Map<String, bool> _onlineStatus = {}; // studentId -> isOnline
   bool _isLoading = true;
   bool _hasProSubscription = false;
   String? _errorMessage;
@@ -255,6 +258,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
         }
       }
       
+      // Subscribe to online status for each student
+      _subscribeToOnlineStatus(students);
+      
       if (mounted) {
         setState(() {
           _hasProSubscription = true;
@@ -270,6 +276,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
       print('✅ TOTAL PARALLEL LOAD TIME: ${stopwatch.elapsedMilliseconds}ms');
       stopwatch.stop();
 
+
     } catch (e) {
       print('❌ ERROR after ${stopwatch.elapsedMilliseconds}ms: $e');
       if (mounted) {
@@ -278,6 +285,19 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
           _errorMessage = 'Failed to load students: ${e.toString()}';
         });
       }
+    }
+  }
+  
+  void _subscribeToOnlineStatus(List<Map<String, dynamic>> students) {
+    for (var student in students) {
+      final studentId = student['id'] as String;
+      _presenceService.subscribeToUserStatus(studentId, 'student').listen((isOnline) {
+        if (mounted) {
+          setState(() {
+            _onlineStatus[studentId] = isOnline;
+          });
+        }
+      });
     }
   }
   
@@ -635,13 +655,13 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                           : RefreshIndicator(
                               onRefresh: _loadStudents,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
                                 child: GridView.builder(
                                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: 2,
-                                    childAspectRatio: 1.1,
-                                    crossAxisSpacing: 10,
-                                    mainAxisSpacing: 10,
+                                    childAspectRatio: 0.7,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
                                   ),
                                   itemCount: _students.length,
                                   itemBuilder: (context, index) {
@@ -738,6 +758,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     final studentId = student['id'] as String;
     final l = AppLocalizations.of(context);
     final studentName = student['full_name'] ?? l.studentPlaceholder;
+    final isOnline = _onlineStatus[studentId] ?? false;
     final status = _chatRequestStatus[studentId];
     
     // Calculate level from languages or use default
@@ -746,7 +767,6 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     
     return GestureDetector(
       onTap: () {
-        // Navigate to public profile
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -755,7 +775,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
               studentData: student,
             ),
           ),
-        ); // No reload needed - data unchanged
+        );
       },
       child: Container(
         decoration: BoxDecoration(
@@ -763,190 +783,284 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          // Student Image - Left Side (Full Height)
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
-            ),
-            child: Container(
-              width: 80,
-              decoration: BoxDecoration(
-                color: AppColors.lightGrey,
-              ),
-              child: student['avatar_url'] != null
-                  ? CachedNetworkImage(
-                      imageUrl: student['avatar_url'],
-                      fit: BoxFit.cover,
-                      memCacheWidth: 200, // Optimize memory usage
-                      placeholder: (context, url) => Container(
-                        color: AppColors.lightGrey,
-                        child: const Icon(
-                          Icons.person,
-                          size: 30,
-                          color: AppColors.grey,
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        color: AppColors.lightGrey,
-                        child: const Icon(
-                          Icons.person,
-                          size: 30,
-                          color: AppColors.grey,
-                        ),
-                      ),
-                    )
-                  : Container(
-                      color: AppColors.lightGrey,
-                      child: Center(
-                        child: Text(
-                          studentName.isNotEmpty ? studentName[0].toUpperCase() : '?',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.grey,
+            // Top: Photo with level badge and online indicator
+            Expanded(
+              flex: 2,
+              child: Stack(
+                children: [
+                  // Photo
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                    child: SizedBox.expand(
+                      child: student['avatar_url'] != null
+                          ? CachedNetworkImage(
+                              imageUrl: student['avatar_url'],
+                              fit: BoxFit.cover,
+                              memCacheWidth: 400,
+                              placeholder: (context, url) => Container(
+                                color: AppColors.lightGrey,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 48,
+                                    color: AppColors.grey,
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: AppColors.lightGrey,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 48,
+                                    color: AppColors.grey,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: AppColors.lightGrey,
+                              child: const Center(
+                                child: Icon(
+                                  Icons.person,
+                                  size: 48,
+                                  color: AppColors.grey,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                  
+                  // Level badge (top left corner)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const FaIcon(
+                            FontAwesomeIcons.trophy,
+                            size: 11,
+                            color: Colors.amber,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${l.level} $level',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // Online indicator (edge of photo)
+                  if (isOnline)
+                    Positioned(
+                      bottom: -6,
+                      right: 8,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.4),
+                              blurRadius: 4,
+                            ),
+                          ],
                         ),
                       ),
                     ),
+                ],
+              ),
             ),
-          ),
-          
-          // Right Side Content
-          Expanded(
-            child: Padding(
+            
+            // Bottom: Name and Chat Button on white background
+            Container(
               padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Student Name
                   Text(
                     studentName,
-                    textAlign: TextAlign.center,
+                    textAlign: TextAlign.start,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  
-                  const SizedBox(height: 6),
-                  
-                  // Level Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.redGradient,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${l.level} $level',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.white,
-                      ),
-                    ),
-                  ),
-                  
                   const SizedBox(height: 8),
                   
-                  // Chat Button - Centered
-                  (status == 'pending' && _isRecipientOfRequest[studentId] == true)
-                      ? Container(
-                          width: 35,
-                          height: 35,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.green.withOpacity(0.3),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            iconSize: 14,
-                            icon: const FaIcon(
-                              FontAwesomeIcons.comment,
-                              size: 14,
-                              color: Colors.green,
-                            ),
-                            onPressed: () {
-                              _acceptAndOpenChat(studentId, studentName);
-                            },
-                          ),
-                        )
-                      : status == 'pending'
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            'Pending',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          width: 35,
-                          height: 35,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppColors.primary.withOpacity(0.3),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            iconSize: 14,
-                            icon: FaIcon(
-                              status == 'accepted'
-                                  ? FontAwesomeIcons.comment
-                                  : FontAwesomeIcons.userPlus,
-                              size: 14,
-                              color: status == 'accepted' 
-                                  ? Colors.green 
-                                  : AppColors.primary,
-                            ),
-                            onPressed: () {
-                              if (status == 'accepted') {
-                                _openChat(studentId, studentName);
-                              } else {
-                                _sendChatRequest(studentId, studentName);
-                              }
-                            },
-                          ),
-                        ),
+                  // Chat Button
+                  _buildCardChatButton(studentId, studentName, status),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+  
+  Widget _buildCardChatButton(String studentId, String studentName, String? status) {
+    final l = AppLocalizations.of(context);
+    
+    // Already accepted - show chat button (green)
+    if (status == 'accepted') {
+      return GestureDetector(
+        onTap: () => _openChat(studentId, studentName),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.green,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const FaIcon(FontAwesomeIcons.comment, size: 14, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                l.chat,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Pending request from this student - show accept
+    if (status == 'pending' && _isRecipientOfRequest[studentId] == true) {
+      return GestureDetector(
+        onTap: () => _acceptAndOpenChat(studentId, studentName),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.green,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const FaIcon(FontAwesomeIcons.check, size: 14, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                l.accept,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Pending request sent by me - show pending
+    if (status == 'pending') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FaIcon(FontAwesomeIcons.clock, size: 14, color: Colors.grey.shade600),
+            const SizedBox(width: 6),
+            Text(
+              l.chatRequestPendingStatus,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // No request yet - show add friend button (blue like in image)
+    return GestureDetector(
+      onTap: () => _sendChatRequest(studentId, studentName),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.primary, // App's red color
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const FaIcon(FontAwesomeIcons.userPlus, size: 14, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              l.sendChatRequest,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

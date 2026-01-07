@@ -388,28 +388,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           // Photo Carousel
           if (_isLoadingPhotos)
             Container(
-              decoration: BoxDecoration(
-                gradient: AppColors.redGradient,
-              ),
+              color: AppColors.lightGrey,
               child: const Center(
                 child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.grey),
                 ),
               ),
             )
           else if (_photos.isEmpty)
             Container(
-              decoration: BoxDecoration(
-                gradient: AppColors.redGradient,
-              ),
-              child: Center(
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    fontSize: 80,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+              color: AppColors.lightGrey,
+              child: const Center(
+                child: Icon(
+                  Icons.person,
+                  size: 80,
+                  color: AppColors.grey,
                 ),
               ),
             )
@@ -433,32 +426,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     width: double.infinity,
                     height: double.infinity,
                     placeholder: (context, url) => Container(
-                      decoration: BoxDecoration(
-                        gradient: AppColors.redGradient,
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 80,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                      color: AppColors.lightGrey,
+                      child: const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 80,
+                          color: AppColors.grey,
                         ),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
-                      decoration: BoxDecoration(
-                        gradient: AppColors.redGradient,
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 80,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                      color: AppColors.lightGrey,
+                      child: const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 80,
+                          color: AppColors.grey,
                         ),
                       ),
                     ),
