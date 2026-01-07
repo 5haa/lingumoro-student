@@ -419,7 +419,7 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
     if (timestamp == null) return '';
     
     try {
-      final date = DateTime.parse(timestamp);
+      final date = DateTime.parse(timestamp).toLocal();
       final now = DateTime.now();
       final difference = now.difference(date);
 
@@ -427,9 +427,9 @@ class _ChatListScreenState extends State<ChatListScreen> with AutomaticKeepAlive
         return AppLocalizations.of(context).justNow;
       } else if (difference.inMinutes < 60) {
         return AppLocalizations.of(context).minutesAgo(difference.inMinutes);
-      } else if (difference.inDays == 0) {
+      } else if (difference.inDays == 0 && date.day == now.day) {
         return DateFormat.jm().format(date);
-      } else if (difference.inDays == 1) {
+      } else if (difference.inDays == 1 || (difference.inDays == 0 && date.day != now.day)) {
         return AppLocalizations.of(context).oneDayAgo;
       } else if (difference.inDays < 7) {
         return AppLocalizations.of(context).daysAgo(difference.inDays);

@@ -211,22 +211,63 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
         final existingIndex = _messages.indexWhere((m) => m['id'] == messageId);
 
         if (existingIndex != -1) {
-          // If message with this ID already exists, update it (e.g., if it was a temp message that got its real ID)
+          // Message with this ID already exists, update it with full data
           setState(() {
             _messages[existingIndex] = message;
           });
           _preloadService.addMessageToCache(widget.conversationId, message);
         } else {
-          // Check if there's a temporary message that this real message might be replacing
-          final tempIndex = _messages.indexWhere((m) => m['is_temp'] == true && m['sender_id'] == message['sender_id'] && m['message_text'] == message['message_text']);
-          if (tempIndex != -1) {
-            // Replace the temporary message with the real one
-            setState(() {
-              _messages[tempIndex] = message;
-            });
-            _preloadService.addMessageToCache(widget.conversationId, message);
+          // Check if this is a message from the current user that might be replacing a temp message
+          final isFromCurrentUser = message['sender_id'] == _currentUserId;
+          
+          if (isFromCurrentUser) {
+            // For messages from current user, find any temp message that:
+            // 1. Is marked as temp
+            // 2. Is from the same sender
+            // 3. Is still in "sending" state (not yet replaced by API return)
+            // This handles text, attachments, and voice messages uniformly
+            final tempIndex = _messages.indexWhere((m) => 
+                m['is_temp'] == true && 
+                m['is_sending'] == true &&
+                m['sender_id'] == message['sender_id']);
+            
+            if (tempIndex != -1) {
+              // Replace the temporary message with the real one
+              // CHECK: If real message has incomplete attachments (race condition), wait for API return
+              final hasAttachments = message['has_attachment'] == true;
+              final attachments = message['attachments'] as List?;
+              final isAttachmentsIncomplete = hasAttachments && (attachments == null || attachments.isEmpty);
+              
+              if (!isAttachmentsIncomplete) {
+                setState(() {
+                  _messages[tempIndex] = message;
+                });
+                _preloadService.addMessageToCache(widget.conversationId, message);
+              } else {
+                // Ignore this update to prevent flicker (image -> loading -> image)
+                // The API call return will handle the full update shortly
+                print('⏳ Ignoring incomplete real-time message to prevent flicker');
+              }
+            } else {
+              // No temp message found - this could be a message already handled by API return
+              // Check if a message with similar content exists (race condition)
+              final createdAt = DateTime.tryParse(message['created_at'] ?? '');
+              final recentDuplicate = createdAt != null && _messages.any((m) =>
+                  m['sender_id'] == message['sender_id'] &&
+                  m['is_temp'] != true &&
+                  m['id'] != messageId &&
+                  (DateTime.tryParse(m['created_at'] ?? '')?.difference(createdAt).inSeconds.abs() ?? 999) < 5);
+              
+              if (!recentDuplicate) {
+                // Only add if not a duplicate
+                setState(() {
+                  _messages.add(message);
+                });
+                _preloadService.addMessageToCache(widget.conversationId, message);
+              }
+            }
           } else {
-            // Otherwise, it's a new message, add it
+            // Message from another user - simply add it
             setState(() {
               _messages.add(message);
             });
@@ -811,7 +852,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
 
   String _formatMessageTime(String timestamp) {
     try {
-      final date = DateTime.parse(timestamp);
+      final date = DateTime.parse(timestamp).toLocal();
       return DateFormat.jm().format(date);
     } catch (e) {
       return '';
@@ -819,22 +860,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
   }
 
   String _formatMessageDate(String timestamp) {
-    try {
-      final date = DateTime.parse(timestamp);
-      final now = DateTime.now();
-      final difference = now.difference(date);
+  try {
+    final date = DateTime.parse(timestamp).toLocal();
+    final now = DateTime.now();
+    final difference = now.difference(date);
 
-      if (difference.inDays == 0) {
-        return 'Today';
-      } else if (difference.inDays == 1) {
-        return 'Yesterday';
-      } else {
-        return DateFormat.yMMMd().format(date);
-      }
-    } catch (e) {
-      return '';
+    if (difference.inDays == 0 && date.day == now.day) {
+      return 'Today';
+    } else if (difference.inDays == 1 || (difference.inDays == 0 && date.day != now.day)) {
+      // Handle edge case where difference is < 24h but it's previous calendar day
+      return 'Yesterday';
+    } else {
+      return DateFormat.yMMMd().format(date);
     }
+  } catch (e) {
+    return '';
   }
+}
 
   bool _shouldShowDateSeparator(int index) {
     if (index == 0) return true;
@@ -1282,8 +1324,32 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> with Wi
                               height: 1.4,
                             ),
                           )
+                        else if (hasAttachment && (attachments == null || attachments.isEmpty))
+                          // Show loading state while attachments are being fetched/processed
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                isMe ? 'Sending attachment...' : 'Loading attachment...',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontStyle: FontStyle.italic,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          )
                         else if (hasAttachment && (message['message_text'] == null || message['message_text'].toString().isEmpty))
-                          // Show attachment placeholder when no text
+                          // Fallback should not be reached if above logic works, but keep as safety
                           const SizedBox.shrink(),
                       ],
                     ),

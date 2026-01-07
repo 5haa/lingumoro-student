@@ -71,13 +71,13 @@ class _ClassesScreenState extends State<ClassesScreen>
           final scheduledDate = DateTime.parse(session['scheduled_date']);
           final startTime = session['scheduled_start_time'] ?? '00:00:00';
           final timeParts = startTime.split(':');
-          final scheduledDateTime = DateTime(
+          final scheduledDateTime = DateTime.utc(
             scheduledDate.year,
             scheduledDate.month,
             scheduledDate.day,
             int.parse(timeParts[0]),
             int.parse(timeParts[1]),
-          );
+          ).toLocal();
           
           final status = session['status'] ?? '';
           // Move to finished if: completed, cancelled, or time has passed (unless in_progress)
@@ -136,13 +136,13 @@ class _ClassesScreenState extends State<ClassesScreen>
           final scheduledDate = DateTime.parse(session['scheduled_date']);
           final startTime = session['scheduled_start_time'] ?? '00:00:00';
           final timeParts = startTime.split(':');
-          final scheduledDateTime = DateTime(
+          final scheduledDateTime = DateTime.utc(
             scheduledDate.year,
             scheduledDate.month,
             scheduledDate.day,
             int.parse(timeParts[0]),
             int.parse(timeParts[1]),
-          );
+          ).toLocal();
           
           final status = session['status'] ?? '';
           // Move to finished if: completed, cancelled, or time has passed (unless in_progress)
@@ -517,27 +517,47 @@ class _ClassesScreenState extends State<ClassesScreen>
     final isTeacherCreated = session['teacher_created'] == true;
     final isCancelled = session['status'] == 'cancelled';
 
-    final scheduledDate = DateTime.parse(session['scheduled_date']);
-    final dateStr =
-        '${_getWeekday(scheduledDate.weekday)}, ${scheduledDate.day}';
-    final monthStr = '${_getMonth(scheduledDate.month)} ${scheduledDate.year}';
-    final timeStr =
-        '${session['scheduled_start_time']?.substring(0, 5)} : ${session['scheduled_end_time']?.substring(0, 5)}';
+    final scheduledDateRaw = DateTime.parse(session['scheduled_date']);
+  final startTimeRaw = session['scheduled_start_time'] ?? '00:00:00';
+  final endTimeRaw = session['scheduled_end_time'] ?? '00:00:00';
 
-    // Calculate duration
-    final startTime = session['scheduled_start_time'];
-    final endTime = session['scheduled_end_time'];
-    String duration = '45 ${AppLocalizations.of(context).min}'; // default
-    if (startTime != null && endTime != null) {
-      try {
-        final start = DateTime.parse('2000-01-01 $startTime');
-        final end = DateTime.parse('2000-01-01 $endTime');
-        final diff = end.difference(start).inMinutes;
-        duration = '$diff ${AppLocalizations.of(context).min}';
-      } catch (e) {
-        // Keep default
-      }
-    }
+  final startParts = startTimeRaw.split(':');
+  final startDateTime = DateTime.utc(
+    scheduledDateRaw.year, 
+    scheduledDateRaw.month, 
+    scheduledDateRaw.day,
+    int.parse(startParts[0]),
+    int.parse(startParts[1])
+  ).toLocal();
+
+  final endParts = endTimeRaw.split(':');
+  final endDateTime = DateTime.utc(
+    scheduledDateRaw.year, 
+    scheduledDateRaw.month, 
+    scheduledDateRaw.day,
+    int.parse(endParts[0]),
+    int.parse(endParts[1])
+  ).toLocal();
+
+  final dateStr =
+      '${_getWeekday(startDateTime.weekday)}, ${startDateTime.day}';
+  final monthStr = '${_getMonth(startDateTime.month)} ${startDateTime.year}';
+  
+  final startHour = startDateTime.hour.toString().padLeft(2, '0');
+  final startMinute = startDateTime.minute.toString().padLeft(2, '0');
+  final endHour = endDateTime.hour.toString().padLeft(2, '0');
+  final endMinute = endDateTime.minute.toString().padLeft(2, '0');
+  
+  final timeStr = '$startHour:$startMinute : $endHour:$endMinute';
+
+  // Calculate duration
+  String duration = '45 ${AppLocalizations.of(context).min}'; // default
+  try {
+    final diff = endDateTime.difference(startDateTime).inMinutes;
+    duration = '$diff ${AppLocalizations.of(context).min}';
+  } catch (e) {
+    // Keep default
+  }
 
     // Get flag code from language name
     FlagsCode? flagCode = _getFlagCodeFromLanguage(language['name'] ?? '');

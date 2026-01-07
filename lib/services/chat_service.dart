@@ -450,42 +450,53 @@ class ChatService {
           .single();
 
       // Create attachment record
-      await _supabase
-          .from('chat_attachments')
-          .insert({
-            'message_id': message['id'],
-            'file_name': path.basename(file.path),
-            'file_url': fileUrl,
-            'file_type': path.extension(file.path).replaceAll('.', ''),
-            'file_size': await file.length(),
-          });
-
-      // Fetch complete message with attachments
-      final completeMessage = await _supabase
-          .from('chat_messages')
-          .select('''
-            *,
-            attachments:chat_attachments (*)
-          ''')
-          .eq('id', message['id'])
-          .single();
-
-      // Update conversation preview
       try {
-        final extension = path.extension(file.path).toLowerCase();
-        final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(extension);
-        final previewText = messageText.isNotEmpty ? messageText : (isImage ? '📷 Photo' : '📎 Attachment');
-        
-        await _supabase.from('chat_conversations').update({
-          'last_message': previewText,
-          'last_message_at': DateTime.now().toIso8601String(),
-          'has_attachment': true,
-        }).eq('id', conversationId);
-      } catch (e) {
-        print('Error updating conversation preview: $e');
-      }
+        await _supabase
+            .from('chat_attachments')
+            .insert({
+              'message_id': message['id'],
+              'file_name': path.basename(file.path),
+              'file_url': fileUrl,
+              'file_type': path.extension(file.path).replaceAll('.', ''),
+              'file_size': await file.length(),
+            });
 
-      return completeMessage;
+        // Fetch complete message with attachments
+        final completeMessage = await _supabase
+            .from('chat_messages')
+            .select('''
+              *,
+              attachments:chat_attachments (*)
+            ''')
+            .eq('id', message['id'])
+            .single();
+
+        // Update conversation preview
+        try {
+          final extension = path.extension(file.path).toLowerCase();
+          final isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(extension);
+          final previewText = messageText.isNotEmpty ? messageText : (isImage ? '📷 Photo' : '📎 Attachment');
+          
+          await _supabase.from('chat_conversations').update({
+            'last_message': previewText,
+            'last_message_at': DateTime.now().toIso8601String(),
+            'has_attachment': true,
+          }).eq('id', conversationId);
+        } catch (e) {
+          print('Error updating conversation preview: $e');
+        }
+
+        return completeMessage;
+      } catch (attachError) {
+        // If attachment fails, delete the message to avoid "ghost" messages
+        print('Error creating attachment record: $attachError');
+        try {
+          await _supabase.from('chat_messages').delete().eq('id', message['id']);
+        } catch (deleteError) {
+          print('Error cleaning up failed message: $deleteError');
+        }
+        rethrow;
+      }
     } catch (e) {
       print('Error sending message with attachment: $e');
       return null;
@@ -547,41 +558,52 @@ class ChatService {
           .single();
 
       // Create voice attachment record
-      await _supabase
-          .from('chat_attachments')
-          .insert({
-            'message_id': message['id'],
-            'file_name': 'Voice Message',
-            'file_url': fileUrl,
-            'file_type': 'm4a',
-            'file_size': await audioFile.length(),
-            'attachment_type': 'voice',
-            'duration_seconds': durationSeconds,
-          });
-
-      // Fetch complete message with attachments
-      final completeMessage = await _supabase
-          .from('chat_messages')
-          .select('''
-            *,
-            attachments:chat_attachments (*)
-          ''')
-          .eq('id', message['id'])
-          .single();
-
-      // Update conversation preview
       try {
-        final previewText = (messageText != null && messageText.isNotEmpty) ? messageText : '🎤 Voice Message';
-        await _supabase.from('chat_conversations').update({
-          'last_message': previewText,
-          'last_message_at': DateTime.now().toIso8601String(),
-          'has_attachment': true,
-        }).eq('id', conversationId);
-      } catch (e) {
-        print('Error updating conversation preview: $e');
-      }
+        await _supabase
+            .from('chat_attachments')
+            .insert({
+              'message_id': message['id'],
+              'file_name': 'Voice Message',
+              'file_url': fileUrl,
+              'file_type': 'm4a',
+              'file_size': await audioFile.length(),
+              'attachment_type': 'voice',
+              'duration_seconds': durationSeconds,
+            });
 
-      return completeMessage;
+        // Fetch complete message with attachments
+        final completeMessage = await _supabase
+            .from('chat_messages')
+            .select('''
+              *,
+              attachments:chat_attachments (*)
+            ''')
+            .eq('id', message['id'])
+            .single();
+
+        // Update conversation preview
+        try {
+          final previewText = (messageText != null && messageText.isNotEmpty) ? messageText : '🎤 Voice Message';
+          await _supabase.from('chat_conversations').update({
+            'last_message': previewText,
+            'last_message_at': DateTime.now().toIso8601String(),
+            'has_attachment': true,
+          }).eq('id', conversationId);
+        } catch (e) {
+          print('Error updating conversation preview: $e');
+        }
+
+        return completeMessage;
+      } catch (attachError) {
+        // If attachment fails, delete the message to avoid "ghost" messages
+        print('Error creating voice attachment record: $attachError');
+        try {
+          await _supabase.from('chat_messages').delete().eq('id', message['id']);
+        } catch (deleteError) {
+          print('Error cleaning up failed voice message: $deleteError');
+        }
+        rethrow;
+      }
     } catch (e) {
       print('Error sending voice message: $e');
       return null;
