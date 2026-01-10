@@ -1,0 +1,35 @@
+workflows:
+  ios-simulator:
+    name: iOS Simulator
+    instance_type: mac_mini_m2
+    environment:
+      flutter: 3.27.3
+      xcode: 16.2
+    scripts:
+      - flutter pub get
+      - flutter build ios --simulator
+      - find build/ios/iphonesimulator -name "*.app"
+    artifacts:
+      - build/ios/iphonesimulator/*.app
+
+  ios-testflight:
+    name: iOS TestFlight
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: LinguMoro
+    environment:
+      flutter: 3.27.3
+      xcode: 16.2
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.lingumoro.student
+    scripts:
+      - flutter pub get
+      - flutter build ipa --release
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
