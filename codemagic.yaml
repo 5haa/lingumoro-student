@@ -5,8 +5,9 @@ workflows:
       flutter: 3.27.3
       xcode: 16.2
     scripts:
+      - flutter pub get
       - flutter build ios --simulator
-      - find build/ios/iphonesimulator -name "*.app" # Debug: Verify file existence
+      - find build/ios/iphonesimulator -name "*.app"
     artifacts:
       - build/ios/iphonesimulator/*.app
 
