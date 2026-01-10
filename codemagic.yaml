@@ -25,6 +25,8 @@ workflows:
         bundle_identifier: com.lingumoro.student
     scripts:
       - flutter pub get
+      - name: Set up provisioning profiles settings on Xcode project
+        script: xcode-project use-profiles
       - flutter build ipa --release
     artifacts:
       - build/ios/ipa/*.ipa
