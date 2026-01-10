@@ -6,5 +6,6 @@ workflows:
       xcode: 16.2
     scripts:
       - flutter build ios --simulator
+      - find build/ios/iphonesimulator -name "*.app" # Debug: Verify file existence
     artifacts:
-      - build/ios/iphonesimulator/Runner.app
+      - build/ios/iphonesimulator/*.app
