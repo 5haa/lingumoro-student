@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,15 +18,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase with error handling
-  // Android works because Firebase auto-initializes via Gradle plugin
-  // iOS needs explicit handling - crash here causes blank screen on iPad
+  // Initialize Firebase with explicit options for iOS to prevent [core/no-app] error
   try {
-    await Firebase.initializeApp();
+    FirebaseOptions? options;
+    if (Platform.isIOS) {
+      options = const FirebaseOptions(
+        apiKey: 'AIzaSyBF5PuYvjfBrXHYouOwnkkLzhgcDP-13pY',
+        appId: '1:342869418554:ios:aa892f026aa60d3ac6cb03',
+        messagingSenderId: '342869418554',
+        projectId: 'lingumoro-b6065',
+        storageBucket: 'lingumoro-b6065.firebasestorage.app',
+        iosBundleId: 'com.lingumoro.student',
+      );
+    }
+    
+    await Firebase.initializeApp(options: options);
     print('✅ Firebase initialized successfully');
   } catch (e) {
     print('❌ Firebase initialization error: $e');
-    // Continue anyway - Firebase might already be initialized or is not critical for launch
   }
 
   // Initialize Supabase with error handling
