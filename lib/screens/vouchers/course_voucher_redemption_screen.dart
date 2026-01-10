@@ -106,9 +106,10 @@ class _CourseVoucherRedemptionScreenState
     } catch (e) {
       if (!mounted) return;
       
+      final errorMessage = e.toString().replaceAll(RegExp(r'^Exception: '), '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${l10n.error}: ${e.toString()}'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
         ),
       );
